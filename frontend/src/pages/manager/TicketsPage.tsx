@@ -1,0 +1,351 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Bug, AlertOctagon, Trash2 } from 'lucide-react';
+import { projectApi, teamApi, ticketApi } from '../../api/endpoints';
+import { ApiError } from '../../api/client';
+import { useToast } from '../../components/Toast';
+import { TicketList } from '../../components/TicketList';
+import { TICKET_STATUS_LABEL } from '../../components/Badges';
+import {
+  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, StatCard,
+} from '../../components/ui';
+import type { Project, TeamMember, Ticket, TicketCounts, TicketStatus } from '../../types';
+
+const STATUS_TABS: { value: string; label: string }[] = [
+  { value: 'unresolved', label: 'Needs attention' },
+  { value: '', label: 'All' },
+  { value: 'open', label: 'Open' },
+  { value: 'in_progress', label: 'In Progress' },
+  { value: 'resolved', label: 'Resolved' },
+  { value: 'closed', label: 'Closed' },
+];
+
+const MANAGER_STATUSES: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
+
+export function ManagerTicketsPage() {
+  const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const highlightId = Number(params.get('highlight')) || null;
+
+  const [tickets, setTickets] = useState<Ticket[]>([]);
+  const [counts, setCounts] = useState<TicketCounts | null>(null);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+
+  const [status, setStatus] = useState(params.get('status') ?? 'unresolved');
+  const [projectId, setProjectId] = useState('');
+  const [reporterId, setReporterId] = useState('');
+  const [severity, setSeverity] = useState('');
+  const [search, setSearch] = useState('');
+  const [sort, setSort] = useState('severity_desc');
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+
+  const [resolving, setResolving] = useState<Ticket | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [savingResolution, setSavingResolution] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Ticket | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const scrolledTo = useRef<number | null>(null);
+
+  useEffect(() => {
+    projectApi.list().then(({ data }) => setProjects(data)).catch(() => setProjects([]));
+    teamApi.list().then(({ data }) => setMembers(data)).catch(() => setMembers([]));
+  }, []);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data, meta } = await ticketApi.list({
+        status: status || undefined,
+        projectId: projectId ? Number(projectId) : undefined,
+        reporterId: reporterId ? Number(reporterId) : undefined,
+        severity: severity || undefined,
+        search: search || undefined,
+        sort,
+        limit: 200,
+      }, signal);
+      setTickets(data);
+      setCounts((meta?.counts as TicketCounts) ?? null);
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(err instanceof ApiError ? err.message : 'Could not load tickets.');
+    } finally {
+      setLoading(false);
+    }
+  }, [status, projectId, reporterId, severity, search, sort]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [load, search]);
+
+  // A ticket reached from a notification may not match the default filter, so widen
+  // to "All" rather than showing an empty list the person cannot explain.
+  useEffect(() => {
+    if (highlightId && status === 'unresolved') setStatus('');
+  }, [highlightId, status]);
+
+  useEffect(() => {
+    if (!highlightId || loading || scrolledTo.current === highlightId) return;
+    const el = document.getElementById(`ticket-${highlightId}`);
+    if (!el) return;
+    scrolledTo.current = highlightId;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    const timer = window.setTimeout(() => {
+      setParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('highlight');
+        return next;
+      }, { replace: true });
+    }, 3000);
+    return () => window.clearTimeout(timer);
+  }, [highlightId, loading, tickets, setParams]);
+
+  const changeStatus = async (ticket: Ticket, next: TicketStatus) => {
+    if (next === ticket.status) return;
+    // Resolving asks for a note — "what did you actually do" is the useful part.
+    if (next === 'resolved') {
+      setResolutionNote(ticket.resolution_note ?? '');
+      setResolving(ticket);
+      return;
+    }
+    setUpdatingId(ticket.id);
+    try {
+      const { data } = await ticketApi.updateStatus(ticket.id, next);
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? data : t)));
+      toast.success(`${ticket.ticket_key} set to ${TICKET_STATUS_LABEL[next]}.`);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update the ticket.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  const confirmResolve = async () => {
+    if (!resolving) return;
+    setSavingResolution(true);
+    try {
+      const { data } = await ticketApi.updateStatus(resolving.id, 'resolved', resolutionNote.trim() || undefined);
+      setTickets((prev) => prev.map((t) => (t.id === resolving.id ? data : t)));
+      toast.success(`${resolving.ticket_key} marked as Resolved.`);
+      setResolving(null);
+      setResolutionNote('');
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not resolve the ticket.');
+    } finally {
+      setSavingResolution(false);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await ticketApi.remove(confirmDelete.id);
+      setTickets((prev) => prev.filter((t) => t.id !== confirmDelete.id));
+      toast.success(`${confirmDelete.ticket_key} was deleted.`);
+      setConfirmDelete(null);
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not delete the ticket.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const hasFilters = Boolean(search || projectId || reporterId || severity || status !== 'unresolved');
+
+  return (
+    <div className="space-y-5">
+      <PageHeader title="Tickets" subtitle="Bugs reported by the team while working on their tasks." />
+
+      {counts && counts.total > 0 && (
+        <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
+          <StatCard label="Open" value={counts.open} accent="red" icon={<Bug className="h-5 w-5" />} />
+          <StatCard label="In Progress" value={counts.in_progress} accent="blue" icon={<Bug className="h-5 w-5" />} />
+          <StatCard label="Resolved" value={counts.resolved} accent="emerald" icon={<Bug className="h-5 w-5" />} />
+          <StatCard
+            label="Critical open"
+            value={counts.critical_open}
+            accent={counts.critical_open > 0 ? 'red' : 'ink'}
+            icon={<AlertOctagon className="h-5 w-5" />}
+          />
+        </div>
+      )}
+
+      <div className="card">
+        <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+          <div className="overflow-x-auto">
+            <div className="flex min-w-max gap-1 rounded-lg bg-ink-100 p-1" role="tablist" aria-label="Filter tickets by status">
+              {STATUS_TABS.map((tab) => (
+                <button
+                  key={tab.value || 'all'}
+                  type="button"
+                  role="tab"
+                  aria-selected={status === tab.value}
+                  onClick={() => setStatus(tab.value)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
+                    status === tab.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
+                  }`}
+                >
+                  {tab.label}
+                </button>
+              ))}
+            </div>
+          </div>
+          <SearchInput value={search} onChange={setSearch} placeholder="Search tickets, key or reporter" className="lg:w-72" />
+        </div>
+
+        <div className="grid gap-4 border-b border-ink-200 bg-ink-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+          <div>
+            <label className="label" htmlFor="tf-project">Project</label>
+            <select id="tf-project" value={projectId} onChange={(e) => setProjectId(e.target.value)} className="input">
+              <option value="">All projects</option>
+              {projects.map((p) => <option key={p.id} value={p.id}>{p.project_key} · {p.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="tf-reporter">Reported by</label>
+            <select id="tf-reporter" value={reporterId} onChange={(e) => setReporterId(e.target.value)} className="input">
+              <option value="">Everyone</option>
+              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="tf-severity">Severity</label>
+            <select id="tf-severity" value={severity} onChange={(e) => setSeverity(e.target.value)} className="input">
+              <option value="">Any severity</option>
+              <option value="critical">Critical</option>
+              <option value="high">High</option>
+              <option value="medium">Medium</option>
+              <option value="low">Low</option>
+            </select>
+          </div>
+          <div>
+            <label className="label" htmlFor="tf-sort">Sort</label>
+            <select id="tf-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="input">
+              <option value="severity_desc">Most severe first</option>
+              <option value="status_asc">By status</option>
+              <option value="created_desc">Newest first</option>
+              <option value="created_asc">Oldest first</option>
+            </select>
+          </div>
+        </div>
+
+        {loading ? (
+          <LoadingBlock label="Loading tickets" rows={4} />
+        ) : error ? (
+          <ErrorState message={error} onRetry={() => void load()} />
+        ) : tickets.length === 0 ? (
+          <EmptyState
+            icon={<Bug className="h-6 w-6" />}
+            title={hasFilters ? 'No tickets match these filters' : 'No open tickets'}
+            description={
+              hasFilters
+                ? 'Try another project, a different reporter, or clear the search.'
+                : 'Nothing is currently blocking the team. Bugs raised by team members appear here.'
+            }
+            action={hasFilters && (
+              <button
+                type="button"
+                onClick={() => { setSearch(''); setProjectId(''); setReporterId(''); setSeverity(''); setStatus('unresolved'); }}
+                className="btn-secondary"
+              >
+                Clear filters
+              </button>
+            )}
+          />
+        ) : (
+          <>
+            <p className="px-4 py-2 text-xs text-ink-500">
+              {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
+            </p>
+            <TicketList
+              tickets={tickets}
+              highlightId={highlightId}
+              updatingId={updatingId}
+              allowedStatuses={MANAGER_STATUSES}
+              onStatusChange={changeStatus}
+              onDelete={setConfirmDelete}
+              linkReporter
+            />
+          </>
+        )}
+      </div>
+
+      <Modal
+        open={!!resolving}
+        onClose={() => setResolving(null)}
+        title={resolving ? `Resolve ${resolving.ticket_key}` : 'Resolve ticket'}
+        description="Tell the reporter what was done. They'll be notified."
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setResolving(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={confirmResolve} disabled={savingResolution} className="btn-primary">
+              {savingResolution ? 'Saving…' : 'Mark resolved'}
+            </button>
+          </div>
+        )}
+      >
+        {resolving && (
+          <div className="space-y-4">
+            <div className="rounded-lg border border-ink-200 bg-ink-50 p-3.5">
+              <p className="font-medium text-ink-900">{resolving.title}</p>
+              <p className="mt-1 text-xs text-ink-500">
+                Raised by {resolving.reporter_name} on {resolving.task_key ?? 'a deleted task'}
+              </p>
+            </div>
+            <div>
+              <label className="label" htmlFor="resolution">What was done?</label>
+              <textarea
+                id="resolution"
+                value={resolutionNote}
+                onChange={(e) => setResolutionNote(e.target.value)}
+                rows={4}
+                maxLength={2000}
+                placeholder="e.g. Fixed the encoding on the staging table and re-ran the import."
+                className="input resize-y"
+              />
+              <p className="hint">Optional, but it saves the next person asking.</p>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete this ticket?"
+        description="This removes the bug report for everyone. It cannot be undone."
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={remove} disabled={deleting} className="btn-danger">
+              <Trash2 className="h-4 w-4" /> {deleting ? 'Deleting…' : 'Delete ticket'}
+            </button>
+          </div>
+        )}
+      >
+        {confirmDelete && (
+          <div className="rounded-lg border border-ink-200 bg-ink-50 p-4">
+            <p className="font-semibold text-ink-900">
+              <span className="mr-2 font-mono text-xs text-brand-700">{confirmDelete.ticket_key}</span>
+              {confirmDelete.title}
+            </p>
+            <p className="mt-1 text-sm text-ink-600">Raised by {confirmDelete.reporter_name}</p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}

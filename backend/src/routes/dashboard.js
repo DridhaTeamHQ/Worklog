@@ -10,6 +10,7 @@ import {
 } from '../services/analytics.js';
 import { listTasks } from '../services/tasks.js';
 import { listReports } from '../services/reports.js';
+import { listTickets } from '../services/tickets.js';
 import { getReportForDate } from '../services/reports.js';
 import { today } from '../utils/dates.js';
 
@@ -23,12 +24,13 @@ router.use(requireAuth);
  */
 router.get('/', asyncHandler(async (req, res) => {
   if (req.user.role === 'manager') {
-    const [summary, recentTasks, recentReports, breakdown, activity] = await Promise.all([
+    const [summary, recentTasks, recentReports, breakdown, activity, openTickets] = await Promise.all([
       managerOverview(),
       listTasks({ sort: 'created_desc', limit: 8 }),
       listReports({ limit: 6 }),
       statusBreakdown({}),
       dailyActivity({ days: 14 }),
+      listTickets({ status: 'unresolved', sort: 'severity_desc', limit: 5 }),
     ]);
     return ok(res, {
       role: 'manager',
@@ -37,14 +39,16 @@ router.get('/', asyncHandler(async (req, res) => {
       activity,
       recent_tasks: recentTasks.items,
       recent_reports: recentReports.items,
+      open_tickets: openTickets.items,
     });
   }
 
-  const [summary, tasks, reports, todayReport] = await Promise.all([
+  const [summary, tasks, reports, todayReport, myTickets] = await Promise.all([
     employeeOverview(req.user.id),
     listTasks({ employeeId: req.user.id, sort: 'deadline_asc', limit: 6 }),
     listReports({ employeeId: req.user.id, limit: 5 }),
     getReportForDate(req.user.id, today()),
+    listTickets({ reporterId: req.user.id, sort: 'created_desc', limit: 5 }),
   ]);
   return ok(res, {
     role: 'team_member',
@@ -52,6 +56,7 @@ router.get('/', asyncHandler(async (req, res) => {
     upcoming_tasks: tasks.items,
     recent_reports: reports.items,
     today_report: todayReport,
+    recent_tickets: myTickets.items,
   });
 }));
 

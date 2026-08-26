@@ -13,6 +13,7 @@ import { ProfilePage } from './pages/ProfilePage';
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { TasksDonePage } from './pages/employee/TasksDonePage';
 import { TasksAssignedPage } from './pages/employee/TasksAssignedPage';
+import { TicketsPage } from './pages/employee/TicketsPage';
 
 import { ManagerDashboard } from './pages/manager/ManagerDashboard';
 import { TeamMembersPage } from './pages/manager/TeamMembersPage';
@@ -20,6 +21,7 @@ import { EmployeeDetailPage } from './pages/manager/EmployeeDetailPage';
 import { AllTasksPage } from './pages/manager/AllTasksPage';
 import { TaskReportsPage } from './pages/manager/TaskReportsPage';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
+import { ManagerTicketsPage } from './pages/manager/TicketsPage';
 
 export default function App() {
   return (
@@ -41,6 +43,7 @@ export default function App() {
                     <Route path="/manager/team/:id" element={<EmployeeDetailPage />} />
                     <Route path="/manager/tasks" element={<AllTasksPage />} />
                     <Route path="/manager/reports" element={<TaskReportsPage />} />
+                    <Route path="/manager/tickets" element={<ManagerTicketsPage />} />
                     <Route path="/manager/analytics" element={<AnalyticsPage />} />
                     <Route path="/manager/notifications" element={<NotificationsPage />} />
                     <Route path="/manager/profile" element={<ProfilePage />} />
@@ -51,6 +54,7 @@ export default function App() {
                     <Route path="/employee" element={<EmployeeDashboard />} />
                     <Route path="/employee/tasks-assigned" element={<TasksAssignedPage />} />
                     <Route path="/employee/tasks-done" element={<TasksDonePage />} />
+                    <Route path="/employee/tickets" element={<TicketsPage />} />
                     <Route path="/employee/notifications" element={<NotificationsPage />} />
                     <Route path="/employee/profile" element={<ProfilePage />} />
                   </Route>

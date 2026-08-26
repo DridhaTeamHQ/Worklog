@@ -16,6 +16,7 @@ import { migrate } from './migrate.js';
 import { createUser, findByEmail } from '../services/users.js';
 import { createProject, listProjects } from '../services/projects.js';
 import { assignTask, updateTaskStatus } from '../services/tasks.js';
+import { createTicket } from '../services/tickets.js';
 import { today, addDays } from '../utils/dates.js';
 
 const MANAGER = {
@@ -54,6 +55,35 @@ const TASK_TEMPLATES = {
   'employee3@company.com': [
     { project: 'SHMOB', title: 'Dashboard UI revamp', description: 'Redesign the manager dashboard cards and the status badge system.', priority: 'high', start: -2, due: 5, status: 'in_progress' },
     { project: 'SHMOB', title: 'Icon set for notifications', description: 'Produce a consistent icon set for the notification types.', priority: 'low', start: -1, due: 9, status: 'pending' },
+  ],
+};
+
+/** Bug tickets raised against a task, keyed by that task's title. */
+const TICKET_TEMPLATES = {
+  'Develop Login API': [
+    {
+      title: 'Refresh token rejected after password change',
+      description: [
+        'Steps: sign in, change the password from Profile, then wait for the access token to expire.',
+        'Expected: the refresh call issues a new token.',
+        'Actual: it returns 401 and the user is silently signed out.',
+      ].join('\n'),
+      severity: 'high',
+    },
+  ],
+  'Customer database integration': [
+    {
+      title: 'CRM export drops rows with non-ASCII names',
+      description: 'Roughly 40 of 5,000 rows are skipped on import. All of them have accented characters in the customer name. Looks like an encoding mismatch on the staging table.',
+      severity: 'critical',
+    },
+  ],
+  'Dashboard UI revamp': [
+    {
+      title: 'Status badges overlap on narrow screens',
+      description: 'Below about 380px the priority and status badges wrap on top of each other in the task card. Reproduced on an iPhone SE and in the responsive inspector.',
+      severity: 'low',
+    },
   ],
 };
 
@@ -108,6 +138,7 @@ export async function seed() {
     console.log(`[seed] team member ${employee.email} ${isNew ? 'created' : 'already present'}`);
     if (!isNew) continue;
 
+    const createdTasks = [];
     for (const tpl of TASK_TEMPLATES[spec.email] || []) {
       const task = await assignTask({
         employeeId: employee.id,
@@ -120,11 +151,26 @@ export async function seed() {
         startDate: addDays(t, tpl.start),
         deadline: addDays(t, tpl.due),
       });
+      createdTasks.push(task);
       if (tpl.status !== 'pending') {
         await updateTaskStatus({
           taskId: task.id,
           status: tpl.status,
           actor: { id: employee.id, role: 'team_member', name: employee.name },
+        });
+      }
+    }
+
+    // Bug tickets against the tasks just assigned.
+    for (const [taskTitle, tickets] of Object.entries(TICKET_TEMPLATES)) {
+      const task = createdTasks.find((c) => c.title === taskTitle);
+      if (!task) continue;
+      for (const spec of tickets) {
+        await createTicket({
+          reporterId: employee.id,
+          projectId: task.project_id,
+          taskId: task.id,
+          ...spec,
         });
       }
     }
@@ -148,6 +194,7 @@ export async function seed() {
        (SELECT COUNT(*) FROM projects) AS projects,
        (SELECT COUNT(*) FROM assigned_tasks) AS tasks,
        (SELECT COUNT(*) FROM daily_task_reports) AS reports,
+       (SELECT COUNT(*) FROM tickets) AS tickets,
        (SELECT COUNT(*) FROM notifications) AS notifications`,
   );
 

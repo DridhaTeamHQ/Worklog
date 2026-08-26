@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, ClipboardCheck, CheckCircle2, Clock, Loader2, AlertTriangle, FileText, ArrowRight,
+  Users, ClipboardCheck, CheckCircle2, Clock, Loader2, AlertTriangle, FileText, ArrowRight, Bug,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -9,7 +9,7 @@ import {
 import { dashboardApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { PriorityBadge, StatusBadge } from '../../components/Badges';
+import { PriorityBadge, StatusBadge, SeverityBadge } from '../../components/Badges';
 import { formatDate, formatDateShort, reportLines } from '../../lib/format';
 import type { ManagerDashboard as ManagerDashboardData } from '../../types';
 
@@ -36,7 +36,7 @@ export function ManagerDashboard() {
   if (loading) return <PageLoader />;
   if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
 
-  const { summary, activity, recent_tasks: tasks, recent_reports: reports } = data;
+  const { summary, activity, recent_tasks: tasks, recent_reports: reports, open_tickets: tickets } = data;
 
   const chartData = activity.map((point) => ({
     ...point,
@@ -115,6 +115,45 @@ export function ManagerDashboard() {
           </div>
         </div>
       </div>
+
+      {summary.open_tickets > 0 && (
+        <section className="card">
+          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
+            <div className="flex items-center gap-2.5">
+              <Bug className="h-5 w-5 text-red-600" aria-hidden />
+              <h2 className="font-semibold text-ink-900">
+                {summary.open_tickets} open ticket{summary.open_tickets === 1 ? '' : 's'}
+                {summary.critical_tickets > 0 && (
+                  <span className="ml-2 font-normal text-red-600">
+                    · {summary.critical_tickets} critical
+                  </span>
+                )}
+              </h2>
+            </div>
+            <Link to="/manager/tickets" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+              View all
+            </Link>
+          </header>
+          <ul className="divide-y divide-ink-100">
+            {tickets.map((ticket) => (
+              <li key={ticket.id} className="flex items-start gap-3 px-5 py-3.5">
+                <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-medium text-ink-900">
+                    <span className="mr-1.5 font-mono text-xs text-brand-700">{ticket.ticket_key}</span>
+                    {ticket.title}
+                  </p>
+                  <p className="truncate text-xs text-ink-500">
+                    {ticket.reporter_name} · {ticket.project_name}
+                    {ticket.task_key && ` · on ${ticket.task_key}`}
+                  </p>
+                </div>
+                <SeverityBadge severity={ticket.severity} />
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       <section className="card p-5">
         <h2 className="font-semibold text-ink-900">Activity — last 14 days</h2>

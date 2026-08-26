@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import {
   ClipboardList, CheckSquare, Clock, AlertTriangle, ArrowRight, CalendarCheck,
-  FileText, Loader2, PenLine,
+  FileText, Loader2, PenLine, Bug,
 } from 'lucide-react';
 import { dashboardApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
@@ -114,6 +114,31 @@ export function EmployeeDashboard() {
         <StatCard label="Completed" value={summary.completed_tasks} accent="emerald" icon={<CheckSquare className="h-5 w-5" />} hint={`${summary.completed_today} today`} />
         <StatCard label="Overdue" value={summary.overdue_tasks} accent="red" icon={<AlertTriangle className="h-5 w-5" />} />
       </div>
+
+      <Link
+        to="/employee/tickets"
+        className="card card-hover flex items-center gap-3 p-4 sm:p-5"
+      >
+        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+          summary.open_tickets > 0 ? 'bg-red-50 text-red-600' : 'bg-ink-100 text-ink-500'
+        }`}
+        >
+          <Bug className="h-5 w-5" />
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="font-semibold text-ink-900">
+            {summary.open_tickets > 0
+              ? `${summary.open_tickets} open ticket${summary.open_tickets === 1 ? '' : 's'}`
+              : 'No open tickets'}
+          </p>
+          <p className="mt-0.5 text-sm text-ink-500">
+            {summary.total_tickets > 0
+              ? `You have raised ${summary.total_tickets} in total.`
+              : 'Hit a bug while working on a task? Raise a ticket so your manager knows.'}
+          </p>
+        </div>
+        <ArrowRight className="h-5 w-5 shrink-0 text-ink-300" aria-hidden />
+      </Link>
 
       {!summary.submitted_today && (
         <div className="card flex flex-col gap-3 border-amber-200 bg-amber-50 p-5 sm:flex-row sm:items-center sm:justify-between">

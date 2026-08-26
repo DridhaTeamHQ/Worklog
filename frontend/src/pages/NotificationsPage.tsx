@@ -12,6 +12,8 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   task_updated: 'Task updated',
   status_changed: 'Status changed',
   report_submitted: 'Report submitted',
+  ticket_raised: 'Ticket raised',
+  ticket_updated: 'Ticket updated',
   general: 'General',
 };
 
@@ -27,8 +29,14 @@ export function NotificationsPage() {
     [items, filter],
   );
 
+  const base = user?.role === 'manager' ? '/manager' : '/employee';
+
   const open = async (n: AppNotification) => {
     if (!n.is_read) await markRead(n.id);
+    if (n.related_ticket_id) {
+      navigate(`${base}/tickets?highlight=${n.related_ticket_id}`);
+      return;
+    }
     if (!n.related_task_id) return;
     navigate(
       user?.role === 'manager'
@@ -91,7 +99,7 @@ export function NotificationsPage() {
         ) : (
           <ul className="divide-y divide-ink-100">
             {visible.map((n) => {
-              const clickable = Boolean(n.related_task_id);
+              const clickable = Boolean(n.related_task_id || n.related_ticket_id);
               const Tag = clickable ? 'button' : 'div';
               return (
                 <li key={n.id}>

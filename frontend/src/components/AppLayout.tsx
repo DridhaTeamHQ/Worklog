@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell, User as UserIcon,
-  LogOut, Menu, X, ChevronDown, CheckSquare,
+  LogOut, Menu, X, ChevronDown, CheckSquare, Bug,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
@@ -15,6 +15,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/manager/team', label: 'Team Members', icon: <Users className="h-[18px] w-[18px]" /> },
   { to: '/manager/tasks', label: 'Assigned Tasks', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { to: '/manager/reports', label: 'Task Reports', icon: <FileText className="h-[18px] w-[18px]" /> },
+  { to: '/manager/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/manager/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
   { to: '/manager/profile', label: 'Profile', icon: <UserIcon className="h-[18px] w-[18px]" /> },
@@ -24,6 +25,7 @@ const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
   { to: '/employee/tasks-assigned', label: 'Tasks Assigned', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { to: '/employee/tasks-done', label: 'Tasks Done', icon: <CheckSquare className="h-[18px] w-[18px]" /> },
+  { to: '/employee/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/employee/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
   { to: '/employee/profile', label: 'Profile', icon: <UserIcon className="h-[18px] w-[18px]" /> },
 ];

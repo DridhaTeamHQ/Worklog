@@ -1,5 +1,6 @@
 import { getDb } from '../db/index.js';
 import { today, addDays, startOfWeek } from '../utils/dates.js';
+import { ticketCounts } from './tickets.js';
 
 /**
  * Builds the WHERE fragment shared by every analytics query so that the employee,
@@ -38,8 +39,12 @@ export async function managerOverview() {
     [t],
   );
 
+  const tickets = await ticketCounts();
+
   const n = (v) => Number(v || 0);
   return {
+    open_tickets: tickets.unresolved,
+    critical_tickets: tickets.critical_open,
     total_team_members: n(team?.c),
     tasks_assigned_today: n(tasks?.assigned_today),
     tasks_completed_today: n(tasks?.completed_today),
@@ -80,8 +85,12 @@ export async function employeeOverview(employeeId) {
     [employeeId, startOfWeek(t)],
   );
 
+  const tickets = await ticketCounts({ reporterId: employeeId });
+
   const n = (v) => Number(v || 0);
   return {
+    open_tickets: tickets.unresolved,
+    total_tickets: tickets.total,
     total_tasks: n(tasks?.total),
     pending_tasks: n(tasks?.pending),
     in_progress_tasks: n(tasks?.in_progress),

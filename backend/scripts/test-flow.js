@@ -47,7 +47,7 @@ async function api(path, { method = 'GET', token, body } = {}) {
   });
   let payload = null;
   try { payload = await res.json(); } catch { payload = null; }
-  return { status: res.status, body: payload, data: payload?.data };
+  return { status: res.status, body: payload, data: payload?.data, meta: payload?.meta };
 }
 
 const isoDay = (offset = 0) => {
@@ -540,6 +540,159 @@ async function run() {
 
   const badToken = await api('/dashboard', { token: 'not.a.real.token' });
   check('a forged token is rejected (401)', badToken.status === 401);
+
+  /* ------------------------------------------------------------------ tickets */
+  step('11c. Bug tickets');
+
+  const ticketBefore = await api('/tickets', { token: employeeToken });
+  check('employee can list their tickets', ticketBefore.status === 200 && Array.isArray(ticketBefore.data), ticketBefore.body);
+  check('the list carries counts', typeof ticketBefore.meta?.counts?.unresolved === 'number', ticketBefore.meta?.counts);
+
+  // A task of this employee's to hang the ticket on.
+  const ticketTask = await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: employee.id, projectId: project.id, title: `Ticket host ${Date.now()}`, description: 'Task the bug is found on.', priority: 'medium' },
+  });
+  const hostTaskId = ticketTask.data?.task?.id;
+
+  const managerUnreadBefore = (await api('/notifications/unread-count', { token: managerToken })).data?.unread ?? 0;
+
+  const raised = await api('/tickets', {
+    method: 'POST', token: employeeToken,
+    body: {
+      projectId: project.id,
+      taskId: hostTaskId,
+      title: 'Totals are double-counted on the reports page',
+      description: 'Steps: filter to last week. Expected: totals match the table. Actual: doubled.',
+      severity: 'high',
+    },
+  });
+  check('employee can raise a ticket (201)', raised.status === 201, raised.body);
+  check('the ticket is keyed from its project', new RegExp('^' + project.project_key + '-B\\d+$').test(raised.data?.ticket?.ticket_key || ''), raised.data?.ticket?.ticket_key);
+  check('it starts open', raised.data?.ticket?.status === 'open');
+  check('it records the project, task and reporter',
+    raised.data?.ticket?.project_id === project.id
+    && raised.data?.ticket?.task_id === hostTaskId
+    && raised.data?.ticket?.reporter_id === employee.id,
+    { p: raised.data?.ticket?.project_id, t: raised.data?.ticket?.task_id, r: raised.data?.ticket?.reporter_id });
+  check('it carries the task key for display', raised.data?.ticket?.task_key === ticketTask.data.task.task_key, raised.data?.ticket?.task_key);
+  const ticketId = raised.data?.ticket?.id;
+  const ticketKey = raised.data?.ticket?.ticket_key;
+
+  const managerUnreadAfter = (await api('/notifications/unread-count', { token: managerToken })).data?.unread ?? 0;
+  check('the manager is notified of a new ticket', managerUnreadAfter === managerUnreadBefore + 1, { managerUnreadBefore, managerUnreadAfter });
+
+  const mgrNotes = await api('/notifications?limit=5', { token: managerToken });
+  const ticketNote = mgrNotes.data?.find((n) => n.type === 'ticket_raised' && n.related_ticket_id === ticketId);
+  check('the notification links back to the ticket', !!ticketNote, mgrNotes.data?.[0]);
+
+  // Scope: a ticket belongs to the person who raised it.
+  const otherSees = await api('/tickets', { token: otherToken });
+  check('an employee sees only their own tickets',
+    otherSees.data.every((t) => t.reporter_id !== employee.id), otherSees.data?.map((t) => t.reporter_id));
+
+  const forcedScope = await api(`/tickets?reporterId=${employee.id}`, { token: otherToken });
+  check('reporterId in the query cannot widen an employee\'s scope',
+    forcedScope.data.every((t) => t.reporter_id !== employee.id), forcedScope.data?.map((t) => t.reporter_id));
+
+  const otherReads = await api(`/tickets/${ticketId}`, { token: otherToken });
+  check('an employee cannot open a colleague\'s ticket (403)', otherReads.status === 403, otherReads.body);
+
+  const managerReads = await api(`/tickets/${ticketId}`, { token: managerToken });
+  check('the manager can read any ticket', managerReads.status === 200, managerReads.body);
+
+  // Raising rules.
+  const foreignTask = await api('/tickets', {
+    method: 'POST', token: otherToken,
+    body: { projectId: project.id, taskId: hostTaskId, title: 'not mine', description: 'x', severity: 'low' },
+  });
+  check('cannot raise a ticket on someone else\'s task (403)', foreignTask.status === 403, foreignTask.body);
+
+  const wrongProject = await api('/tickets', {
+    method: 'POST', token: employeeToken,
+    body: { projectId: probeProject.id, taskId: hostTaskId, title: 'mismatch', description: 'x', severity: 'low' },
+  });
+  check('task and project must agree (400)', wrongProject.status === 400, wrongProject.body);
+
+  const managerRaises = await api('/tickets', {
+    method: 'POST', token: managerToken,
+    body: { projectId: project.id, taskId: hostTaskId, title: 'manager bug', description: 'x', severity: 'low' },
+  });
+  check('a manager cannot raise a ticket (403)', managerRaises.status === 403, managerRaises.body);
+
+  const emptyDescription = await api('/tickets', {
+    method: 'POST', token: employeeToken,
+    body: { projectId: project.id, taskId: hostTaskId, title: 'x', description: '   ', severity: 'low' },
+  });
+  check('an empty bug description is rejected (400)', emptyDescription.status === 400);
+
+  // Status rules.
+  const selfResolve = await api(`/tickets/${ticketId}/status`, {
+    method: 'PATCH', token: employeeToken, body: { status: 'resolved' },
+  });
+  check('the reporter cannot mark their own ticket resolved (403)', selfResolve.status === 403, selfResolve.body);
+
+  const selfClose = await api(`/tickets/${ticketId}/status`, {
+    method: 'PATCH', token: employeeToken, body: { status: 'closed' },
+  });
+  check('the reporter can close their own ticket', selfClose.status === 200 && selfClose.data?.status === 'closed', selfClose.body);
+
+  const reopen = await api(`/tickets/${ticketId}/status`, {
+    method: 'PATCH', token: employeeToken, body: { status: 'open' },
+  });
+  check('the reporter can reopen it', reopen.status === 200 && reopen.data?.status === 'open');
+
+  const otherUpdates = await api(`/tickets/${ticketId}/status`, {
+    method: 'PATCH', token: otherToken, body: { status: 'closed' },
+  });
+  check('an employee cannot touch a colleague\'s ticket (403)', otherUpdates.status === 403);
+
+  const empUnreadBefore = (await api('/notifications/unread-count', { token: employeeToken })).data?.unread ?? 0;
+  const resolved = await api(`/tickets/${ticketId}/status`, {
+    method: 'PATCH', token: managerToken,
+    body: { status: 'resolved', resolutionNote: 'Fixed the aggregation and added a regression test.' },
+  });
+  check('the manager can resolve a ticket', resolved.status === 200 && resolved.data?.status === 'resolved', resolved.body);
+  check('the resolution note is stored', resolved.data?.resolution_note?.includes('regression test'), resolved.data?.resolution_note);
+  check('a resolved timestamp is recorded', !!resolved.data?.resolved_at);
+
+  const empUnreadAfter = (await api('/notifications/unread-count', { token: employeeToken })).data?.unread ?? 0;
+  check('the reporter is notified when it is resolved', empUnreadAfter === empUnreadBefore + 1, { empUnreadBefore, empUnreadAfter });
+
+  // Editing rules.
+  const lateEdit = await api(`/tickets/${ticketId}`, {
+    method: 'PATCH', token: employeeToken, body: { title: 'too late' },
+  });
+  check('the reporter cannot edit a resolved ticket (400)', lateEdit.status === 400, lateEdit.body);
+
+  // Filters.
+  const ticketsBySeverity = await api('/tickets?severity=high', { token: managerToken });
+  check('ticket severity filter works', ticketsBySeverity.status === 200 && ticketsBySeverity.data.every((t) => t.severity === 'high'));
+
+  const ticketsByProject = await api(`/tickets?projectId=${project.id}`, { token: managerToken });
+  check('ticket project filter works', ticketsByProject.status === 200 && ticketsByProject.data.every((t) => t.project_id === project.id));
+
+  const unresolvedOnly = await api('/tickets?status=unresolved', { token: managerToken });
+  check('the unresolved filter excludes resolved and closed',
+    unresolvedOnly.status === 200 && unresolvedOnly.data.every((t) => ['open', 'in_progress'].includes(t.status)),
+    unresolvedOnly.data?.map((t) => t.status));
+
+  const keyFind = await api(`/tickets?search=${encodeURIComponent(ticketKey)}`, { token: managerToken });
+  check('searching by ticket key finds it', keyFind.status === 200 && keyFind.data.some((t) => t.id === ticketId));
+
+  // The dashboards surface ticket counts.
+  const mgrDashTickets = await api('/dashboard', { token: managerToken });
+  check('the manager dashboard reports open tickets', typeof mgrDashTickets.data?.summary?.open_tickets === 'number', mgrDashTickets.data?.summary?.open_tickets);
+  const empDashTickets = await api('/dashboard', { token: employeeToken });
+  check('the employee dashboard reports their own tickets', typeof empDashTickets.data?.summary?.total_tickets === 'number', empDashTickets.data?.summary);
+
+  // A deleted task must not take its bug report with it.
+  await api(`/tasks/${hostTaskId}`, { method: 'DELETE', token: managerToken });
+  const orphaned = await api(`/tickets/${ticketId}`, { token: managerToken });
+  check('deleting the task keeps the ticket', orphaned.status === 200, orphaned.body);
+  check('the ticket detaches from the deleted task', orphaned.data?.task_id === null, orphaned.data?.task_id);
+
+  await api(`/tickets/${ticketId}`, { method: 'DELETE', token: managerToken });
 
   /* ------------------------------------------------------------ misc hardening */
   step('13. Input handling');

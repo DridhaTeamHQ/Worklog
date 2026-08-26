@@ -34,15 +34,18 @@ export function NotificationBell() {
     setOpen(false);
     if (!n.is_read) await markRead(n.id);
 
-    if (n.related_task_id) {
-      if (user?.role === 'manager') {
-        navigate(`/manager/tasks?highlight=${n.related_task_id}`);
-      } else {
-        navigate(`/employee/tasks-assigned?highlight=${n.related_task_id}`);
-      }
+    const base = user?.role === 'manager' ? '/manager' : '/employee';
+    if (n.related_ticket_id) {
+      navigate(`${base}/tickets?highlight=${n.related_ticket_id}`);
       return;
     }
-    navigate(user?.role === 'manager' ? '/manager/notifications' : '/employee/notifications');
+    if (n.related_task_id) {
+      navigate(user?.role === 'manager'
+        ? `/manager/tasks?highlight=${n.related_task_id}`
+        : `/employee/tasks-assigned?highlight=${n.related_task_id}`);
+      return;
+    }
+    navigate(`${base}/notifications`);
   };
 
   return (

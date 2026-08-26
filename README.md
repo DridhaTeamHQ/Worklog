@@ -83,7 +83,8 @@ The driver switches automatically when `DATABASE_URL` is present.
 | `projects` | Work areas, each with a unique key (e.g. `SHMOB`). Tasks belong to one project. |
 | `daily_task_reports` | One row per employee per day — `UNIQUE (employee_id, report_date)` is what makes "Save" and "Update" the same action. |
 | `assigned_tasks` | Tasks, linked to a project plus the employee and the manager who assigned them. `UNIQUE (project_id, task_number)` guarantees one task per key. |
-| `notifications` | Per-user feed, optionally linked to the task that caused it. |
+| `tickets` | Bug reports raised by a team member against a task they are working on. Keyed per project as `SHMOB-B1`. |
+| `notifications` | Per-user feed, optionally linked to the task or ticket that caused it. |
 | `password_reset_tokens` | Single-use, 30-minute reset tokens, stored as SHA-256 hashes. |
 
 Foreign keys cascade on delete, so removing a user takes their reports, tasks and
@@ -143,8 +144,11 @@ data access lives in services, so authorization rules are stated once each.
   notes and deadline. Status is changed inline; the manager is notified. Project tabs
   appear when the employee has work in more than one project, counted against their own
   tasks rather than the project totals.
+- **Tickets** — raise a bug hit while working: pick the project, then the task (the list
+  narrows to that project, and only their own tasks are ever offered), then describe what
+  went wrong and set a severity. Their own tickets are listed with status and history.
 - **Notifications** — unread count, mark one or all read, timestamps. Clicking one jumps
-  straight to the task it refers to.
+  straight to the task or ticket it refers to.
 - **Profile** — personal details and password change.
 
 ### Manager
@@ -168,6 +172,9 @@ data access lives in services, so authorization rules are stated once each.
   them. Projects are created and edited from here too.
 - **Task Reports** — every report company-wide, grouped by day, filtered by employee,
   department and date range.
+- **Tickets** — every bug the team has reported, defaulting to the ones that still need
+  attention. Filter by project, reporter and severity; move a ticket through its statuses,
+  and record a resolution note when closing one out.
 - **Analytics** — per-employee productivity, status breakdown, and daily/weekly activity,
   all filterable by employee, department and date range.
 
@@ -269,13 +276,14 @@ hang the request.
 npm test
 ```
 
-Runs `backend/scripts/test-flow.js` against the live API — 153 assertions covering the full
+Runs `backend/scripts/test-flow.js` against the live API — 187 assertions covering the full
 workflow from the brief (manager assigns → employee is notified → views the task → updates
 status → submits a report → manager sees both), plus adding a team member and signing in as
 them, project creation and key allocation, project filtering on both portals, the
 authorization boundaries, validation rules, derived overdue behaviour, analytics filters,
-the password reset cycle, the onboarding email, and the editing rules — including that
-renaming a project key re-renders existing task keys without moving their numbers. It cleans up the tasks it creates.
+the password reset cycle, the onboarding email, the bug-ticket rules, and the editing rules
+— including that renaming a project key re-renders existing task keys without moving their
+numbers, and that deleting a task keeps the bug reports raised against it. It cleans up the tasks it creates.
 
 The API must be running. Type checking:
 
@@ -360,6 +368,12 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `GET` | `/projects/:id` | any | One project |
 | `POST` | `/projects` | manager | Create a project |
 | `PATCH` | `/projects/:id` | manager | Rename, re-key, re-describe or archive a project |
+| `GET` | `/tickets` | any | List tickets (scoped to self for employees) |
+| `GET` | `/tickets/:id` | any | One ticket |
+| `POST` | `/tickets` | team member | Raise a bug ticket against one of their tasks |
+| `PATCH` | `/tickets/:id` | any | Correct the wording of an open ticket |
+| `PATCH` | `/tickets/:id/status` | any | Move a ticket's status |
+| `DELETE` | `/tickets/:id` | any | Delete a ticket |
 | `GET` | `/team` | manager | Team list with counts |
 | `POST` | `/team` | manager | Add a team member |
 | `GET` | `/team/departments` | manager | Departments for filters |
@@ -385,6 +399,12 @@ email is not guaranteed — see the Email section for what happens when it fails
 **Adding a member cannot create a manager.** `POST /api/team` fixes the role to
 `team_member` rather than reading it from the request, so the endpoint cannot be used to
 escalate. Manager accounts are created by the seed or directly in the database.
+
+**A ticket is a report from the person doing the work.** Only a team member can raise one,
+and only against a task assigned to them — both checked server-side, not just in the form.
+The reporter can close or reopen their own ticket but cannot mark it *Resolved*: deciding
+the bug is actually fixed is the manager's call. Deleting a task leaves its tickets intact
+and simply detaches them, because the bug report is usually the more durable record.
 
 **Editing is deliberately narrow.** A project's name, key and description can all be
 corrected, and a task's title, description, notes, priority and dates can too — those are

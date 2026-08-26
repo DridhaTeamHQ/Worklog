@@ -93,8 +93,49 @@ export interface DailyReport {
   employee_department: string | null;
 }
 
+export type TicketSeverity = 'low' | 'medium' | 'high' | 'critical';
+export type TicketStatus = 'open' | 'in_progress' | 'resolved' | 'closed';
+
+export interface Ticket {
+  id: number;
+  project_id: number;
+  task_id: number | null;
+  reporter_id: number;
+  ticket_number: number;
+  /** Human-facing key, e.g. "SHMOB-B3". */
+  ticket_key: string;
+  title: string;
+  description: string;
+  severity: TicketSeverity;
+  status: TicketStatus;
+  resolution_note: string | null;
+  resolved_at: string | null;
+  created_at: string;
+  updated_at: string;
+  project_name: string;
+  project_key: string;
+  reporter_name: string;
+  reporter_email: string;
+  reporter_department: string | null;
+  reporter_profile_image: string | null;
+  /** Null if the linked task was deleted after the ticket was raised. */
+  task_title: string | null;
+  task_key: string | null;
+}
+
+export interface TicketCounts {
+  total: number;
+  open: number;
+  in_progress: number;
+  resolved: number;
+  closed: number;
+  critical_open: number;
+  unresolved: number;
+}
+
 export type NotificationType =
-  | 'task_assigned' | 'task_updated' | 'status_changed' | 'report_submitted' | 'general';
+  | 'task_assigned' | 'task_updated' | 'status_changed' | 'report_submitted'
+  | 'ticket_raised' | 'ticket_updated' | 'general';
 
 export interface AppNotification {
   id: number;
@@ -102,6 +143,7 @@ export interface AppNotification {
   message: string;
   type: NotificationType;
   related_task_id: number | null;
+  related_ticket_id: number | null;
   task_title: string | null;
   task_employee_id: number | null;
   is_read: boolean;
@@ -109,6 +151,8 @@ export interface AppNotification {
 }
 
 export interface ManagerSummary {
+  open_tickets: number;
+  critical_tickets: number;
   total_team_members: number;
   tasks_assigned_today: number;
   tasks_completed_today: number;
@@ -122,6 +166,8 @@ export interface ManagerSummary {
 }
 
 export interface EmployeeSummary {
+  open_tickets: number;
+  total_tickets: number;
   total_tasks: number;
   pending_tasks: number;
   in_progress_tasks: number;
@@ -174,6 +220,7 @@ export interface ManagerDashboard {
   activity: ActivityPoint[];
   recent_tasks: Task[];
   recent_reports: DailyReport[];
+  open_tickets: Ticket[];
 }
 
 export interface EmployeeDashboard {
@@ -182,6 +229,7 @@ export interface EmployeeDashboard {
   upcoming_tasks: Task[];
   recent_reports: DailyReport[];
   today_report: DailyReport | null;
+  recent_tickets: Ticket[];
 }
 
 export interface AnalyticsPayload {

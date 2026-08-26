@@ -68,6 +68,31 @@ CREATE INDEX IF NOT EXISTS idx_tasks_project ON assigned_tasks (project_id, stat
 -- The task key (e.g. SHMOB-5) is project_key + task_number, so the pair must be unique.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tasks_key ON assigned_tasks (project_id, task_number);
 
+CREATE TABLE IF NOT EXISTS tickets (
+  id             SERIAL PRIMARY KEY,
+  project_id     INTEGER NOT NULL REFERENCES projects (id) ON DELETE CASCADE,
+  -- The task the person was working on when they hit the bug. Kept as SET NULL so a
+  -- deleted task does not take the bug report down with it.
+  task_id        INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL,
+  reporter_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  ticket_number  INTEGER NOT NULL,
+  title          TEXT NOT NULL,
+  description    TEXT NOT NULL,
+  severity       TEXT NOT NULL DEFAULT 'medium'
+                 CHECK (severity IN ('low', 'medium', 'high', 'critical')),
+  status         TEXT NOT NULL DEFAULT 'open'
+                 CHECK (status IN ('open', 'in_progress', 'resolved', 'closed')),
+  resolution_note TEXT,
+  resolved_at    TEXT,
+  created_at     TEXT NOT NULL,
+  updated_at     TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets (project_id, status);
+CREATE INDEX IF NOT EXISTS idx_tickets_reporter ON tickets (reporter_id, status);
+CREATE INDEX IF NOT EXISTS idx_tickets_task ON tickets (task_id);
+-- The ticket key (e.g. SHMOB-B3) is project_key + ticket_number, so the pair is unique.
+CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_key ON tickets (project_id, ticket_number);
+
 CREATE TABLE IF NOT EXISTS notifications (
   id               SERIAL PRIMARY KEY,
   user_id          INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -75,6 +100,7 @@ CREATE TABLE IF NOT EXISTS notifications (
   message          TEXT NOT NULL,
   type             TEXT NOT NULL DEFAULT 'general',
   related_task_id  INTEGER REFERENCES assigned_tasks (id) ON DELETE CASCADE,
+  related_ticket_id INTEGER REFERENCES tickets (id) ON DELETE CASCADE,
   is_read          SMALLINT NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL
 );

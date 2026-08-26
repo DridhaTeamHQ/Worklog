@@ -1,7 +1,8 @@
 import { api } from './client';
 import type {
   AnalyticsPayload, AppNotification, DailyReport, EmployeeDashboard, ManagerDashboard,
-  Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, User,
+  Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
+  TicketCounts, TicketSeverity, TicketStatus, User,
 } from '../types';
 
 /* --------------------------------------------------------------------- auth */
@@ -143,6 +144,36 @@ export const projectApi = {
     patch: { name?: string; key?: string; description?: string | null; isArchived?: boolean },
   ) => api.patch<Project>(`/projects/${id}`, patch),
 };
+
+/* ------------------------------------------------------------------ tickets */
+
+export interface TicketFilters {
+  reporterId?: number;
+  projectId?: number;
+  taskId?: number;
+  status?: string;
+  severity?: string;
+  search?: string;
+  sort?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export const ticketApi = {
+  list: (filters: TicketFilters = {}, signal?: AbortSignal) =>
+    api.get<Ticket[]>('/tickets', filters as Record<string, string | number | undefined>, signal),
+  get: (id: number) => api.get<Ticket>(`/tickets/${id}`),
+  create: (input: {
+    projectId: number; taskId: number; title: string; description: string; severity: TicketSeverity;
+  }) => api.post<{ ticket: Ticket; message: string }>('/tickets', input),
+  updateStatus: (id: number, status: TicketStatus, resolutionNote?: string) =>
+    api.patch<Ticket>(`/tickets/${id}/status`, { status, resolutionNote }),
+  update: (id: number, patch: { title?: string; description?: string; severity?: TicketSeverity }) =>
+    api.patch<Ticket>(`/tickets/${id}`, patch),
+  remove: (id: number) => api.delete<{ message: string }>(`/tickets/${id}`),
+};
+
+export type { TicketCounts };
 
 /* ------------------------------------------------------------------ profile */
 

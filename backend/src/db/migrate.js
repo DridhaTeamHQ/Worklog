@@ -17,6 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const TABLES = [
   'password_reset_tokens',
   'notifications',
+  'tickets',
   'assigned_tasks',
   'projects',
   'daily_task_reports',
@@ -131,6 +132,9 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'assigned_tasks', 'task_number', 'INTEGER')) {
     added.push('assigned_tasks.task_number');
+  }
+  if (await ensureColumn(db, 'notifications', 'related_ticket_id', 'INTEGER REFERENCES tickets (id) ON DELETE CASCADE')) {
+    added.push('notifications.related_ticket_id');
   }
 
   for (const statement of statements.filter((s) => !isCreateTable(s))) {
