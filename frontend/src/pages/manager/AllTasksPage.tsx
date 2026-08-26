@@ -1,0 +1,449 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { ClipboardList, Filter, Trash2, X, ClipboardPlus, FolderPlus, Pencil } from 'lucide-react';
+import { projectApi, taskApi, teamApi } from '../../api/endpoints';
+import { ApiError } from '../../api/client';
+import { useToast } from '../../components/Toast';
+import { AssignTaskModal } from '../../components/AssignTaskModal';
+import { ProjectSwitcher } from '../../components/ProjectSwitcher';
+import { TaskTable } from '../../components/TaskTable';
+import { CreateProjectModal } from '../../components/CreateProjectModal';
+import { EditProjectModal } from '../../components/EditProjectModal';
+import { EditTaskModal } from '../../components/EditTaskModal';
+import {
+  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner,
+} from '../../components/ui';
+import { STATUS_LABEL } from '../../lib/format';
+import type { Project, Task, TaskStatus, TeamMember } from '../../types';
+
+export function AllTasksPage() {
+  const toast = useToast();
+  const [params, setParams] = useSearchParams();
+  const highlightId = Number(params.get('highlight')) || null;
+
+  const [tasks, setTasks] = useState<Task[]>([]);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [members, setMembers] = useState<TeamMember[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const [projectId, setProjectId] = useState<number | null>(
+    params.get('projectId') ? Number(params.get('projectId')) : null,
+  );
+  const [search, setSearch] = useState('');
+  const [status, setStatus] = useState(params.get('status') ?? '');
+  const [priority, setPriority] = useState('');
+  const [employeeId, setEmployeeId] = useState('');
+  const [assignedFrom, setAssignedFrom] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
+  const [deadlineTo, setDeadlineTo] = useState('');
+  const [sort, setSort] = useState('created_desc');
+  const [showFilters, setShowFilters] = useState(false);
+
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [bulkBusy, setBulkBusy] = useState(false);
+
+  const [assignOpen, setAssignOpen] = useState(false);
+  const [createProjectOpen, setCreateProjectOpen] = useState(false);
+  const [editProjectOpen, setEditProjectOpen] = useState(false);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const highlightRef = useRef<HTMLTableRowElement | null>(null);
+
+  const loadProjects = useCallback(async () => {
+    try {
+      const { data } = await projectApi.list();
+      setProjects(data);
+    } catch {
+      setProjects([]);
+    }
+  }, []);
+
+  useEffect(() => {
+    void loadProjects();
+    teamApi.list().then(({ data }) => setMembers(data)).catch(() => setMembers([]));
+  }, [loadProjects]);
+
+  const load = useCallback(async (signal?: AbortSignal) => {
+    setLoading(true);
+    setError('');
+    try {
+      const { data } = await taskApi.list({
+        projectId: projectId ?? undefined,
+        search: search || undefined,
+        status: status || undefined,
+        priority: (priority || undefined) as never,
+        employeeId: employeeId ? Number(employeeId) : undefined,
+        assignedFrom: assignedFrom || undefined,
+        assignedTo: assignedTo || undefined,
+        deadlineTo: deadlineTo || undefined,
+        sort,
+        limit: 200,
+      }, signal);
+      setTasks(data);
+      // Drop selections for rows that are no longer on screen.
+      setSelected((prev) => new Set([...prev].filter((id) => data.some((t) => t.id === id))));
+    } catch (err) {
+      if ((err as Error).name === 'AbortError') return;
+      setError(err instanceof ApiError ? err.message : 'Could not load tasks.');
+    } finally {
+      setLoading(false);
+    }
+  }, [projectId, search, status, priority, employeeId, assignedFrom, assignedTo, deadlineTo, sort]);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
+    return () => { window.clearTimeout(timer); controller.abort(); };
+  }, [load, search]);
+
+  // Keep the chosen project in the URL so the view is linkable and survives a refresh.
+  useEffect(() => {
+    setParams((prev) => {
+      const next = new URLSearchParams(prev);
+      if (projectId) next.set('projectId', String(projectId));
+      else next.delete('projectId');
+      return next;
+    }, { replace: true });
+  }, [projectId, setParams]);
+
+  useEffect(() => {
+    if (!highlightId || loading) return;
+    highlightRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }, [highlightId, loading, tasks.length]);
+
+  const activeFilterCount = useMemo(
+    () => [status, priority, employeeId, assignedFrom, assignedTo, deadlineTo].filter(Boolean).length,
+    [status, priority, employeeId, assignedFrom, assignedTo, deadlineTo],
+  );
+
+  const activeProject = projects.find((p) => p.id === projectId) ?? null;
+
+  const clearFilters = () => {
+    setStatus(''); setPriority(''); setEmployeeId('');
+    setAssignedFrom(''); setAssignedTo(''); setDeadlineTo('');
+  };
+
+  const changeStatus = async (task: Task, next: TaskStatus) => {
+    if (next === task.status) return;
+    setUpdatingId(task.id);
+    try {
+      const { data } = await taskApi.updateStatus(task.id, next);
+      setTasks((prev) => prev.map((t) => (t.id === task.id ? data : t)));
+      toast.success(`${task.task_key ?? task.title} set to ${STATUS_LABEL[next]}.`);
+      void loadProjects();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not update the task status.');
+    } finally {
+      setUpdatingId(null);
+    }
+  };
+
+  /** Applies one status to every selected task, reporting partial failures honestly. */
+  const bulkStatus = async (next: TaskStatus) => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    const failures: string[] = [];
+    for (const id of ids) {
+      try {
+        const { data } = await taskApi.updateStatus(id, next);
+        setTasks((prev) => prev.map((t) => (t.id === id ? data : t)));
+      } catch {
+        failures.push(tasks.find((t) => t.id === id)?.task_key ?? `#${id}`);
+      }
+    }
+    setBulkBusy(false);
+    setSelected(new Set());
+    void loadProjects();
+    if (failures.length) {
+      toast.error(`${ids.length - failures.length} updated, ${failures.length} failed: ${failures.join(', ')}`);
+    } else {
+      toast.success(`${ids.length} task${ids.length === 1 ? '' : 's'} set to ${STATUS_LABEL[next]}.`);
+    }
+  };
+
+  const remove = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await taskApi.remove(confirmDelete.id);
+      setTasks((prev) => prev.filter((t) => t.id !== confirmDelete.id));
+      toast.success(`${confirmDelete.task_key ?? confirmDelete.title} was deleted.`);
+      setConfirmDelete(null);
+      void loadProjects();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not delete the task.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  return (
+    <div className="space-y-5">
+      <PageHeader
+        title="All Assigned Tasks"
+        subtitle={activeProject
+          ? `${activeProject.project_key} · ${activeProject.name}`
+          : 'Every task assigned across the company.'}
+        actions={
+          <>
+            {activeProject && (
+              <button type="button" onClick={() => setEditProjectOpen(true)} className="btn-secondary">
+                <Pencil className="h-4 w-4" /> Edit project
+              </button>
+            )}
+            <button type="button" onClick={() => setCreateProjectOpen(true)} className="btn-secondary">
+              <FolderPlus className="h-4 w-4" /> New project
+            </button>
+            {members.length > 0 && (
+              <button type="button" onClick={() => setAssignOpen(true)} className="btn-primary">
+                <ClipboardPlus className="h-4 w-4" /> Assign Task
+              </button>
+            )}
+          </>
+        }
+      />
+
+      {projects.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={<FolderPlus className="h-6 w-6" />}
+            title="No projects yet"
+            description="Tasks live inside projects. Create your first one to start assigning work."
+            action={(
+              <button type="button" onClick={() => setCreateProjectOpen(true)} className="btn-primary">
+                <FolderPlus className="h-4 w-4" /> Create a project
+              </button>
+            )}
+          />
+        </div>
+      ) : (
+        <>
+          <ProjectSwitcher projects={projects} value={projectId} onChange={setProjectId} />
+
+          <div className="card">
+            <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+              <SearchInput
+                value={search}
+                onChange={setSearch}
+                placeholder="Search work, key or assignee"
+                className="lg:w-80"
+              />
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setShowFilters((s) => !s)}
+                  aria-expanded={showFilters}
+                  className="btn-secondary"
+                >
+                  <Filter className="h-4 w-4" /> Filter
+                  {activeFilterCount > 0 && (
+                    <span className="rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                      {activeFilterCount}
+                    </span>
+                  )}
+                </button>
+                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort tasks" className="input w-44">
+                  <option value="created_desc">Newest first</option>
+                  <option value="created_asc">Oldest first</option>
+                  <option value="deadline_asc">Deadline (soonest)</option>
+                  <option value="priority_desc">Priority (highest)</option>
+                </select>
+              </div>
+            </div>
+
+            {showFilters && (
+              <div className="grid gap-4 border-b border-ink-200 bg-ink-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+                <div>
+                  <label className="label" htmlFor="f-employee">Employee</label>
+                  <select id="f-employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="input">
+                    <option value="">All employees</option>
+                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="f-status">Status</label>
+                  <select id="f-status" value={status} onChange={(e) => setStatus(e.target.value)} className="input">
+                    <option value="">All statuses</option>
+                    <option value="pending">Pending</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="completed">Completed</option>
+                    <option value="overdue">Overdue</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="f-priority">Priority</label>
+                  <select id="f-priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="input">
+                    <option value="">All priorities</option>
+                    <option value="low">Low</option>
+                    <option value="medium">Medium</option>
+                    <option value="high">High</option>
+                    <option value="urgent">Urgent</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="label" htmlFor="f-from">Assigned from</label>
+                  <input id="f-from" type="date" value={assignedFrom} max={assignedTo || undefined} onChange={(e) => setAssignedFrom(e.target.value)} className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="f-to">Assigned to</label>
+                  <input id="f-to" type="date" value={assignedTo} min={assignedFrom || undefined} onChange={(e) => setAssignedTo(e.target.value)} className="input" />
+                </div>
+                <div>
+                  <label className="label" htmlFor="f-deadline">Deadline before</label>
+                  <input id="f-deadline" type="date" value={deadlineTo} onChange={(e) => setDeadlineTo(e.target.value)} className="input" />
+                </div>
+                {activeFilterCount > 0 && (
+                  <div className="sm:col-span-2 lg:col-span-3">
+                    <button type="button" onClick={clearFilters} className="btn-ghost">
+                      <X className="h-4 w-4" /> Clear all filters
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Bulk action bar — only present when something is actually selected. */}
+            {selected.size > 0 && (
+              <div className="flex flex-wrap items-center gap-3 border-b border-brand-200 bg-brand-50 px-4 py-2.5">
+                <p className="text-sm font-semibold text-brand-900">
+                  {selected.size} selected
+                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {(['pending', 'in_progress', 'completed'] as TaskStatus[]).map((s) => (
+                    <button
+                      key={s}
+                      type="button"
+                      disabled={bulkBusy}
+                      onClick={() => void bulkStatus(s)}
+                      className="btn-secondary btn-sm"
+                    >
+                      {STATUS_LABEL[s]}
+                    </button>
+                  ))}
+                  {bulkBusy && <Spinner className="h-4 w-4 text-brand-700" />}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setSelected(new Set())}
+                  className="ml-auto text-sm font-semibold text-brand-700 hover:text-brand-900"
+                >
+                  Clear selection
+                </button>
+              </div>
+            )}
+
+            {loading ? (
+              <LoadingBlock label="Loading tasks" rows={5} />
+            ) : error ? (
+              <ErrorState message={error} onRetry={() => void load()} />
+            ) : tasks.length === 0 ? (
+              <EmptyState
+                icon={<ClipboardList className="h-6 w-6" />}
+                title={search || activeFilterCount || projectId ? 'No tasks match these filters' : 'No tasks have been assigned yet.'}
+                description={
+                  search || activeFilterCount || projectId
+                    ? 'Try another project, a wider date range, or clear a filter.'
+                    : 'Open a team member from the Team Members page to assign their first task.'
+                }
+                action={(search || activeFilterCount > 0 || projectId) && (
+                  <button
+                    type="button"
+                    onClick={() => { setSearch(''); clearFilters(); setProjectId(null); }}
+                    className="btn-secondary"
+                  >
+                    Clear filters
+                  </button>
+                )}
+              />
+            ) : (
+              <>
+                <p className="px-4 py-2 text-xs text-ink-500">
+                  {tasks.length} task{tasks.length === 1 ? '' : 's'}
+                </p>
+                <TaskTable
+                  tasks={tasks}
+                  highlightId={highlightId}
+                  updatingId={updatingId}
+                  onStatusChange={changeStatus}
+                  onEdit={setEditTask}
+                  onDelete={setConfirmDelete}
+                  selectable
+                  selected={selected}
+                  onSelectedChange={setSelected}
+                  linkAssignee
+                  rowRef={(id) => (id === highlightId ? (el) => { highlightRef.current = el; } : undefined)}
+                />
+              </>
+            )}
+          </div>
+        </>
+      )}
+
+      <AssignTaskModal
+        open={assignOpen}
+        onClose={() => setAssignOpen(false)}
+        defaultProjectId={projectId}
+        onAssigned={(task) => { setTasks((prev) => [task, ...prev]); void loadProjects(); }}
+      />
+
+      <EditProjectModal
+        open={editProjectOpen}
+        onClose={() => setEditProjectOpen(false)}
+        project={activeProject}
+        onSaved={(updated) => {
+          void loadProjects();
+          // An archived project disappears from the switcher, so fall back to All.
+          if (updated.is_archived) setProjectId(null);
+          // Task keys are composed from the project key, so refresh the rows too.
+          void load();
+        }}
+      />
+
+      <EditTaskModal
+        open={!!editTask}
+        onClose={() => setEditTask(null)}
+        task={editTask}
+        onSaved={(updated) => setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))}
+      />
+
+      <CreateProjectModal
+        open={createProjectOpen}
+        onClose={() => setCreateProjectOpen(false)}
+        onCreated={(project) => { void loadProjects(); setProjectId(project.id); }}
+      />
+
+      <Modal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete this task?"
+        description="This removes it from the employee's list as well. It cannot be undone."
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={remove} disabled={deleting} className="btn-danger">
+              <Trash2 className="h-4 w-4" /> {deleting ? 'Deleting…' : 'Delete task'}
+            </button>
+          </div>
+        )}
+      >
+        {confirmDelete && (
+          <div className="rounded-lg border border-ink-200 bg-ink-50 p-4">
+            <p className="font-semibold text-ink-900">
+              {confirmDelete.task_key && (
+                <span className="mr-2 font-mono text-xs text-brand-700">{confirmDelete.task_key}</span>
+              )}
+              {confirmDelete.title}
+            </p>
+            <p className="mt-1 text-sm text-ink-600">Assigned to {confirmDelete.employee_name}</p>
+          </div>
+        )}
+      </Modal>
+    </div>
+  );
+}

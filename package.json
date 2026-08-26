@@ -1,0 +1,24 @@
+{
+  "name": "worklog",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Internal Employee Task Management and Daily Work Reporting App",
+  "scripts": {
+    "setup": "npm --prefix backend install && npm --prefix frontend install && npm run db:reset",
+    "db:migrate": "npm --prefix backend run migrate",
+    "db:seed": "npm --prefix backend run seed",
+    "db:reset": "npm --prefix backend run reset",
+    "dev": "node scripts/dev.js",
+    "dev:backend": "npm --prefix backend run dev",
+    "dev:frontend": "npm --prefix frontend run dev",
+    "build": "npm --prefix frontend run build",
+    "start": "npm --prefix backend start",
+    "typecheck": "npm --prefix frontend run typecheck",
+    "test": "npm --prefix backend run test:flow",
+    "mail:test": "npm --prefix backend run mail:test --"
+  },
+  "engines": {
+    "node": ">=22.5.0"
+  }
+}

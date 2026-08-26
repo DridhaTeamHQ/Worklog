@@ -1,0 +1,211 @@
+import { useState, type FormEvent } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AlertCircle, Eye, EyeOff, LogIn, CheckSquare } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
+import { ApiError } from '../../api/client';
+import { homeFor } from '../../components/RouteGuards';
+import { Spinner } from '../../components/ui';
+
+export function LoginPage() {
+  const { login } = useAuth();
+  const navigate = useNavigate();
+
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [error, setError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  const [submitting, setSubmitting] = useState(false);
+
+  const handleSubmit = async (e: FormEvent) => {
+    e.preventDefault();
+    setError('');
+    setFieldErrors({});
+
+    if (!email.trim() || !password) {
+      setFieldErrors({
+        ...(email.trim() ? {} : { email: 'Enter your email address.' }),
+        ...(password ? {} : { password: 'Enter your password.' }),
+      });
+      return;
+    }
+
+    setSubmitting(true);
+    try {
+      const user = await login(email.trim(), password);
+      // The role decides the destination — there is no shared landing page.
+      navigate(homeFor(user.role), { replace: true });
+    } catch (err) {
+      if (err instanceof ApiError) {
+        setError(err.message);
+        setFieldErrors(err.fieldErrors);
+      } else {
+        setError('Something went wrong. Please try again.');
+      }
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  return (
+    <div className="flex min-h-screen flex-col lg:flex-row">
+      {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
+      <div className="relative hidden overflow-hidden bg-ink-900 lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
+        <div
+          aria-hidden
+          className="absolute inset-0 opacity-30"
+          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #4f46e5 0%, transparent 45%), radial-gradient(circle at 80% 70%, #6366f1 0%, transparent 40%)' }}
+        />
+        <div className="relative flex items-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+            <CheckSquare className="h-6 w-6" />
+          </span>
+          <span className="flex flex-col leading-tight">
+            <span className="text-lg font-bold text-white">Dridha Technologies</span>
+            <span className="text-sm text-ink-400">Worklog</span>
+          </span>
+        </div>
+
+        <div className="relative">
+          <h2 className="text-3xl font-bold leading-tight text-white">
+            Track the work.<br />Not the paperwork.
+          </h2>
+          <p className="mt-4 max-w-md text-ink-300">
+            One place for daily work reports, assigned tasks and team progress — so nobody has to
+            chase a status update again.
+          </p>
+          <ul className="mt-8 space-y-3">
+            {[
+              'Submit and edit your daily task report in seconds',
+              'See every task assigned to you, with deadlines and priority',
+              'Managers get live progress across the whole team',
+            ].map((line) => (
+              <li key={line} className="flex items-start gap-3 text-sm text-ink-300">
+                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" aria-hidden />
+                {line}
+              </li>
+            ))}
+          </ul>
+        </div>
+
+        <p className="relative text-xs text-ink-500">
+          © {new Date().getFullYear()} Dridha Technologies. Internal use only.
+        </p>
+      </div>
+
+      {/* Form panel */}
+      <div className="flex flex-1 items-center justify-center bg-white px-5 py-10 sm:px-8">
+        <div className="w-full max-w-sm">
+          <div className="mb-8 flex items-center gap-3 lg:hidden">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+              <CheckSquare className="h-6 w-6" />
+            </span>
+            <span className="flex flex-col leading-tight">
+              <span className="text-base font-bold text-ink-900">Dridha Technologies</span>
+              <span className="text-sm text-ink-500">Worklog</span>
+            </span>
+          </div>
+
+          <h1 className="text-2xl font-bold text-ink-900">Sign in</h1>
+          <p className="mt-1.5 text-sm text-ink-500">Use your company account to continue.</p>
+
+          {error && (
+            <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
+              <p className="text-sm font-medium text-red-700">{error}</p>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+            <div>
+              <label className="label" htmlFor="email">Email address</label>
+              <input
+                id="email"
+                type="email"
+                autoComplete="username"
+                autoFocus
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="you@company.com"
+                aria-invalid={!!fieldErrors.email}
+                className={`input ${fieldErrors.email ? 'input-error' : ''}`}
+              />
+              {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
+            </div>
+
+            <div>
+              <div className="flex items-baseline justify-between">
+                <label className="label" htmlFor="password">Password</label>
+                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">
+                  Forgot password?
+                </Link>
+              </div>
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? 'text' : 'password'}
+                  autoComplete="current-password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  aria-invalid={!!fieldErrors.password}
+                  className={`input pr-11 ${fieldErrors.password ? 'input-error' : ''}`}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((s) => !s)}
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
+              </div>
+              {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
+            </div>
+
+            <button type="submit" disabled={submitting} className="btn-primary w-full">
+              {submitting ? <><Spinner className="h-4 w-4" /> Signing in…</> : <><LogIn className="h-4 w-4" /> Login</>}
+            </button>
+          </form>
+
+          <DemoAccounts onPick={(e, p) => { setEmail(e); setPassword(p); }} />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Development convenience only. It is compiled out of production builds, so the demo
+ * credentials never ship to a real deployment.
+ */
+function DemoAccounts({ onPick }: { onPick: (email: string, password: string) => void }) {
+  if (import.meta.env.PROD) return null;
+
+  const accounts = [
+    { label: 'Manager', email: 'manager@company.com', password: 'Manager@123' },
+    { label: 'Team member', email: 'employee1@company.com', password: 'Employee@123' },
+  ];
+
+  return (
+    <div className="mt-8 rounded-lg border border-dashed border-ink-300 bg-ink-50 p-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Demo accounts</p>
+      <div className="mt-2.5 space-y-1.5">
+        {accounts.map((a) => (
+          <button
+            key={a.email}
+            type="button"
+            onClick={() => onPick(a.email, a.password)}
+            className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-ink-600 transition-colors hover:bg-white"
+          >
+            <span><span className="font-semibold text-ink-800">{a.label}</span> · {a.email}</span>
+            <span className="font-medium text-brand-600">Use</span>
+          </button>
+        ))}
+      </div>
+      <p className="mt-2 text-[11px] text-ink-400">
+        Seeded by <code className="font-mono">npm run seed</code>; passwords are set in the backend .env file.
+      </p>
+    </div>
+  );
+}
