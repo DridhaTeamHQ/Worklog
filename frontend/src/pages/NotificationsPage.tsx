@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { EmptyState, LoadingBlock, PageHeader } from '../components/ui';
 import { formatDateTime, relativeTime } from '../lib/format';
 import type { AppNotification, NotificationType } from '../types';
+import { isManagerLevel } from '../types';
 
 const TYPE_LABEL: Record<NotificationType, string> = {
   task_assigned: 'Task assigned',
@@ -29,7 +30,7 @@ export function NotificationsPage() {
     [items, filter],
   );
 
-  const base = user?.role === 'manager' ? '/manager' : '/employee';
+  const base = isManagerLevel(user?.role) ? '/manager' : '/employee';
 
   const open = async (n: AppNotification) => {
     if (!n.is_read) await markRead(n.id);
@@ -39,7 +40,7 @@ export function NotificationsPage() {
     }
     if (!n.related_task_id) return;
     navigate(
-      user?.role === 'manager'
+      isManagerLevel(user?.role)
         ? `/manager/tasks?highlight=${n.related_task_id}`
         : `/employee/tasks-assigned?highlight=${n.related_task_id}`,
     );

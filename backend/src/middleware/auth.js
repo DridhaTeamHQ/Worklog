@@ -1,7 +1,8 @@
 import jwt from 'jsonwebtoken';
 import config from '../config/env.js';
-import { getDb } from '../db/index.js';
 import { unauthorized, forbidden, asyncHandler } from '../utils/errors.js';
+import { findAuthUser } from '../models/user.js';
+import { ROLES, MANAGER_ROLES } from '../utils/roles.js';
 
 export function signToken(user) {
   return jwt.sign(
@@ -34,13 +35,8 @@ export const requireAuth = asyncHandler(async (req, _res, next) => {
     throw unauthorized(err.name === 'TokenExpiredError' ? 'Your session has expired. Please sign in again.' : 'Invalid session.');
   }
 
-  const db = await getDb();
-  const user = await db.get(
-    `SELECT id, name, email, role, department, job_title, phone, profile_image, is_active
-       FROM users WHERE id = ?`,
-    [Number(payload.sub)],
-  );
-  if (!user || !user.is_active) throw unauthorized('This account is no longer active.');
+  const user = await findAuthUser(Number(payload.sub));
+  if (!user) throw unauthorized('This account is no longer active.');
 
   req.user = user;
   next();
@@ -55,5 +51,13 @@ export const requireRole = (...roles) => (req, _res, next) => {
   return next();
 };
 
-export const requireManager = requireRole('manager');
-export const requireEmployee = requireRole('team_member');
+/**
+ * Manager-level access: admins and managers both. Admin is a strict superset of
+ * manager, so every route a manager may reach, an admin may reach too.
+ */
+export const requireManager = requireRole(...MANAGER_ROLES);
+
+/** Admin-only. Currently the gate on granting admin access to someone else. */
+export const requireAdmin = requireRole(ROLES.ADMIN);
+
+export const requireEmployee = requireRole(ROLES.TEAM_MEMBER);

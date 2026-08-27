@@ -22,6 +22,7 @@ import { AllTasksPage } from './pages/manager/AllTasksPage';
 import { TaskReportsPage } from './pages/manager/TaskReportsPage';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { ManagerTicketsPage } from './pages/manager/TicketsPage';
+import { MANAGER_ROLES } from './types';
 
 export default function App() {
   return (
@@ -37,7 +38,7 @@ export default function App() {
                 <Route element={<AppLayout />}>
                   {/* Manager portal — RequireRole keeps a team member out even if they
                       type the URL, and the API refuses these routes independently. */}
-                  <Route element={<RequireRole role="manager" />}>
+                  <Route element={<RequireRole role={MANAGER_ROLES} />}>
                     <Route path="/manager" element={<ManagerDashboard />} />
                     <Route path="/manager/team" element={<TeamMembersPage />} />
                     <Route path="/manager/team/:id" element={<EmployeeDetailPage />} />

@@ -6,6 +6,7 @@ import { ApiError } from '../api/client';
 import { useToast } from '../components/Toast';
 import { Avatar, PageHeader, Spinner } from '../components/ui';
 import { formatDate } from '../lib/format';
+import { roleLabel } from '../types';
 
 export function ProfilePage() {
   const { user, refresh } = useAuth();
@@ -97,7 +98,7 @@ export function ProfilePage() {
             <div className="mt-2 flex flex-wrap items-center gap-2">
               <span className="badge border-brand-200 bg-brand-50 text-brand-700">
                 <ShieldCheck className="h-3 w-3" aria-hidden />
-                {user.role === 'manager' ? 'Manager / Admin' : 'Team Member'}
+                {roleLabel(user.role)}
               </span>
               {user.department && (
                 <span className="badge border-ink-200 bg-ink-100 text-ink-600">{user.department}</span>

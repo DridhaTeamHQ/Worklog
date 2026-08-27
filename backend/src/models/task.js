@@ -1,13 +1,15 @@
 import { getDb } from '../db/index.js';
 import { nowIso, today } from '../utils/dates.js';
-import { createNotification } from './notifications.js';
-import { nextTaskNumber } from './projects.js';
+import { createNotification } from './notification.js';
+import { nextTaskNumber } from './project.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
+import { ROLES, isTeamMember } from '../utils/roles.js';
+import { PRIORITIES, STATUSES } from '../utils/constants.js';
 
-export const PRIORITIES = ['low', 'medium', 'high', 'urgent'];
-export const STATUSES = ['pending', 'in_progress', 'completed'];
+export { PRIORITIES, STATUSES, FILTER_STATUSES } from '../utils/constants.js';
+
 /** 'overdue' is derived, never stored — see effectiveStatusSql. */
-export const FILTER_STATUSES = [...STATUSES, 'overdue'];
+
 
 /**
  * Overdue is computed at read time from the deadline rather than written by a
@@ -117,7 +119,7 @@ export async function assignTask({
 }) {
   const db = await getDb();
   const employee = await db.get('SELECT id, name, role, is_active FROM users WHERE id = ?', [employeeId]);
-  if (!employee || employee.role !== 'team_member' || !employee.is_active) {
+  if (!employee || !isTeamMember(employee.role) || !employee.is_active) {
     throw notFound('That team member could not be found.');
   }
 
@@ -159,10 +161,12 @@ export async function updateTaskStatus({ taskId, status, actor }) {
   const task = await db.get('SELECT * FROM assigned_tasks WHERE id = ?', [taskId]);
   if (!task) throw notFound('That task no longer exists.');
 
-  if (actor.role === 'team_member' && task.employee_id !== actor.id) {
+  if (isTeamMember(actor.role) && task.employee_id !== actor.id) {
     throw forbidden('You can only update tasks assigned to you.');
   }
-  if (actor.role === 'manager' && task.manager_id !== actor.id) {
+  // A manager owns only the tasks they assigned. An admin sits above that and may
+  // act on any task, which is the whole point of the tier.
+  if (actor.role === ROLES.MANAGER && task.manager_id !== actor.id) {
     throw forbidden('You can only update tasks you assigned.');
   }
 
@@ -177,7 +181,7 @@ export async function updateTaskStatus({ taskId, status, actor }) {
     );
     if (task.status === status) return;
 
-    if (actor.role === 'team_member') {
+    if (isTeamMember(actor.role)) {
       await createNotification({
         userId: task.manager_id,
         title: 'Task status updated',
@@ -199,11 +203,15 @@ export async function updateTaskStatus({ taskId, status, actor }) {
   return getTaskById(taskId);
 }
 
-export async function updateTask({ taskId, managerId, patch }) {
+export async function updateTask({ taskId, actor, patch }) {
   const db = await getDb();
   const task = await db.get('SELECT * FROM assigned_tasks WHERE id = ?', [taskId]);
   if (!task) throw notFound('That task no longer exists.');
-  if (task.manager_id !== managerId) throw forbidden('You can only edit tasks you assigned.');
+  // Same ownership rule as updateTaskStatus: a manager owns only what they assigned,
+  // an admin may edit any task.
+  if (actor.role === ROLES.MANAGER && task.manager_id !== actor.id) {
+    throw forbidden('You can only edit tasks you assigned.');
+  }
 
   const columns = {
     title: patch.title,
@@ -234,11 +242,13 @@ export async function updateTask({ taskId, managerId, patch }) {
   return getTaskById(taskId);
 }
 
-export async function deleteTask({ taskId, managerId }) {
+export async function deleteTask({ taskId, actor }) {
   const db = await getDb();
   const task = await db.get('SELECT id, manager_id FROM assigned_tasks WHERE id = ?', [taskId]);
   if (!task) throw notFound('That task no longer exists.');
-  if (task.manager_id !== managerId) throw forbidden('You can only delete tasks you assigned.');
+  if (actor.role === ROLES.MANAGER && task.manager_id !== actor.id) {
+    throw forbidden('You can only delete tasks you assigned.');
+  }
   await db.run('DELETE FROM assigned_tasks WHERE id = ?', [taskId]);
   return true;
 }

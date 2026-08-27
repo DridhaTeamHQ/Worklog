@@ -7,7 +7,7 @@ CREATE TABLE IF NOT EXISTS users (
   name           TEXT NOT NULL,
   email          TEXT NOT NULL UNIQUE,
   password_hash  TEXT NOT NULL,
-  role           TEXT NOT NULL CHECK (role IN ('manager', 'team_member')),
+  role           TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'team_member')),
   department     TEXT,
   job_title      TEXT,
   phone          TEXT,

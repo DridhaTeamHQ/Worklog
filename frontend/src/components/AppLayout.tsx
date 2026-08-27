@@ -7,6 +7,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
 import { Avatar } from './ui';
+import { isManagerLevel, roleLabel } from '../types';
 
 interface NavItem { to: string; label: string; icon: ReactNode; end?: boolean }
 
@@ -36,7 +37,7 @@ export function AppLayout() {
   const location = useLocation();
   const [sidebarOpen, setSidebarOpen] = useState(false);
 
-  const isManager = user?.role === 'manager';
+  const isManager = isManagerLevel(user?.role);
   const nav = isManager ? MANAGER_NAV : EMPLOYEE_NAV;
 
   // On mobile the sidebar is an overlay; navigating should dismiss it.
@@ -70,7 +71,7 @@ export function AppLayout() {
 
         <div className="px-3 pb-3">
           <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
-            {isManager ? 'Manager' : 'Team Member'}
+            {roleLabel(user?.role)}
           </p>
           <nav className="space-y-1">
             {nav.map((item) => (
@@ -176,7 +177,7 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
   }, [open]);
 
   if (!user) return null;
-  const profilePath = user.role === 'manager' ? '/manager/profile' : '/employee/profile';
+  const profilePath = isManagerLevel(user.role) ? '/manager/profile' : '/employee/profile';
 
   return (
     <div className="relative" ref={ref}>
@@ -190,7 +191,7 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         <Avatar name={user.name} src={user.profile_image} size="sm" />
         <span className="hidden text-left sm:block">
           <span className="block max-w-[10rem] truncate text-sm font-semibold text-ink-900">{user.name}</span>
-          <span className="block text-xs text-ink-500">{user.role === 'manager' ? 'Manager' : 'Team Member'}</span>
+          <span className="block text-xs text-ink-500">{roleLabel(user.role)}</span>
         </span>
         <ChevronDown className="h-4 w-4 text-ink-400" aria-hidden />
       </button>

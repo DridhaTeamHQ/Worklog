@@ -1,9 +1,15 @@
+import { fileURLToPath, URL } from 'node:url';
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import tailwindcss from '@tailwindcss/vite';
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
+  resolve: {
+    // Mirrors the `@/*` path in tsconfig.app.json. Without this the alias would
+    // typecheck and then fail to resolve at build time.
+    alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
+  },
   server: {
     port: 5173,
     // The API is called through /api on the same origin in development, so the

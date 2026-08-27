@@ -13,10 +13,10 @@ import { fileURLToPath } from 'node:url';
 import config from '../config/env.js';
 import { getDb, closeDb } from './index.js';
 import { migrate } from './migrate.js';
-import { createUser, findByEmail } from '../services/users.js';
-import { createProject, listProjects } from '../services/projects.js';
-import { assignTask, updateTaskStatus } from '../services/tasks.js';
-import { createTicket } from '../services/tickets.js';
+import { createUser, findByEmail } from '../models/user.js';
+import { createProject, listProjects } from '../models/project.js';
+import { assignTask, updateTaskStatus } from '../models/task.js';
+import { createTicket } from '../models/ticket.js';
 import { today, addDays } from '../utils/dates.js';
 
 const MANAGER = {
@@ -208,7 +208,7 @@ export async function seed() {
   const counts = await db.get(
     `SELECT
        (SELECT COUNT(*) FROM users) AS users,
-       (SELECT COUNT(*) FROM users WHERE role = 'manager') AS admins,
+       (SELECT COUNT(*) FROM users WHERE role IN ('admin', 'manager')) AS admins,
        (SELECT COUNT(*) FROM projects) AS projects,
        (SELECT COUNT(*) FROM assigned_tasks) AS tasks,
        (SELECT COUNT(*) FROM daily_task_reports) AS reports,

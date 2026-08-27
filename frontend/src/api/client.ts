@@ -88,8 +88,10 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
     throw new ApiError(0, 'Cannot reach the server. Check your connection and try again.');
   }
 
-  let payload: { success?: boolean; data?: T; meta?: Record<string, unknown>; error?: { message: string; details?: { field: string; message: string }[] } } | null = null;
-  try { payload = await res.json(); } catch { payload = null; }
+  type Envelope = { success?: boolean; data?: T; meta?: Record<string, unknown>; error?: { message: string; details?: { field: string; message: string }[] } };
+  // `res.json()` is typed `any`; the cast keeps that from silently spreading.
+  let payload: Envelope | null;
+  try { payload = await res.json() as Envelope; } catch { payload = null; }
 
   if (!res.ok) {
     if (res.status === 401 && !skipAuthRedirect) {

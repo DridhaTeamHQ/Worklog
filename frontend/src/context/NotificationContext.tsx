@@ -62,7 +62,7 @@ export function NotificationProvider({ children }: { children: ReactNode }) {
       } catch { /* ignore transient poll failures */ }
     };
 
-    const id = window.setInterval(tick, POLL_MS);
+    const id = window.setInterval(() => { void tick(); }, POLL_MS);
     const onVisible = () => { if (!document.hidden) void tick(); };
     document.addEventListener('visibilitychange', onVisible);
     return () => {

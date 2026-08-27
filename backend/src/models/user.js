@@ -3,7 +3,8 @@ import { getDb } from '../db/index.js';
 import config from '../config/env.js';
 import { nowIso, today } from '../utils/dates.js';
 import { conflict, notFound } from '../utils/errors.js';
-import { taskCountsByEmployee } from './tasks.js';
+import { taskCountsByEmployee } from './task.js';
+import { MANAGER_ROLES } from '../utils/roles.js';
 
 /** Columns that are safe to return to a client — never includes password_hash. */
 const PUBLIC_COLUMNS = `id, name, email, role, department, job_title, phone, profile_image, is_active, created_at, updated_at`;
@@ -47,6 +48,23 @@ export async function createUser({ name, email, password, role, department, jobT
       jobTitle ?? null, phone ?? null, profileImage ?? null, ts, ts],
   );
   return findById(id);
+}
+
+/**
+ * The identity `requireAuth` attaches to each request.
+ *
+ * Deliberately raw (not run through `toPublicUser`) because the middleware compares
+ * `is_active` directly, and returns null for a missing or deactivated account so the
+ * caller has a single case to handle.
+ */
+export async function findAuthUser(id) {
+  const db = await getDb();
+  const user = await db.get(
+    `SELECT id, name, email, role, department, job_title, phone, profile_image, is_active
+       FROM users WHERE id = ?`,
+    [id],
+  );
+  return user && user.is_active ? user : null;
 }
 
 export async function updateProfile(userId, patch) {
@@ -139,12 +157,15 @@ export async function listTeamMembers({ search, department, status } = {}) {
 }
 
 /**
- * Everyone with manager access. Managers can add other managers, so this list is how
- * they see who currently holds that access.
+ * Everyone with manager-level access — admins as well as managers, since an admin
+ * holds every manager right plus account administration. This list is how the Admins
+ * tab shows who currently holds that access, so it must not omit admins.
  */
 export async function listManagers({ search } = {}) {
   const db = await getDb();
-  const where = ["role = 'manager'"];
+  const roleList = MANAGER_ROLES.map((r) => `'${r}'`).join(', ');
+  // Admins first, then managers, alphabetical within each tier.
+  const where = [`role IN (${roleList})`];
   const params = [];
   if (search) {
     where.push("(LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(department, '')) LIKE ?)");
@@ -153,7 +174,8 @@ export async function listManagers({ search } = {}) {
   }
 
   const rows = await db.query(
-    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE ${where.join(' AND ')} ORDER BY name ASC`,
+    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE ${where.join(' AND ')}
+      ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, name ASC`,
     params,
   );
 

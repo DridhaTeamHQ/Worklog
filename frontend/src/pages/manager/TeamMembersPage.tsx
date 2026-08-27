@@ -9,6 +9,7 @@ import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
 import { formatDate, formatDateShort } from '../../lib/format';
 import type { Manager, Role, TeamMember } from '../../types';
+import { isAdmin, roleLabel } from '../../types';
 
 type Tab = 'team' | 'admins';
 
@@ -26,6 +27,9 @@ export function TeamMembersPage() {
 
   /** Which kind of account the modal is creating, or null when it is closed. */
   const [addingRole, setAddingRole] = useState<Role | null>(null);
+
+  // Mirrors the server rule in backend/src/utils/roles.js: only an admin mints admins.
+  const canGrantAdmin = isAdmin(user?.role);
 
   const loadDepartments = useCallback(() => {
     teamApi.departments().then(({ data }) => setDepartments(data)).catch(() => setDepartments([]));
@@ -83,15 +87,23 @@ export function TeamMembersPage() {
         title={isTeam ? 'Team Members' : 'Admins'}
         subtitle={isTeam
           ? 'Everyone on the team, with their current workload at a glance.'
-          : 'Everyone who can sign in to the manager portal.'}
+          : 'Admins and managers who can sign in to this portal.'}
         actions={isTeam ? (
           <button type="button" onClick={() => setAddingRole('team_member')} className="btn-primary">
             <UserPlus className="h-4 w-4" /> Add team member
           </button>
         ) : (
-          <button type="button" onClick={() => setAddingRole('manager')} className="btn-primary">
-            <ShieldPlus className="h-4 w-4" /> Add admin
-          </button>
+          <span className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setAddingRole('manager')} className="btn-secondary">
+              <ShieldPlus className="h-4 w-4" /> Add manager
+            </button>
+            {/* Only an admin can grant admin access, so only an admin is offered it. */}
+            {canGrantAdmin && (
+              <button type="button" onClick={() => setAddingRole('admin')} className="btn-primary">
+                <ShieldPlus className="h-4 w-4" /> Add admin
+              </button>
+            )}
+          </span>
         )}
       />
 
@@ -226,12 +238,12 @@ export function TeamMembersPage() {
           <EmptyState
             icon={<ShieldCheck className="h-6 w-6" />}
             title={filtered ? 'No matching admins' : 'No admins found.'}
-            description={filtered ? 'Try a different search term.' : 'Add someone who should have manager access.'}
+            description={filtered ? 'Try a different search term.' : 'Add someone who should reach this portal.'}
             action={filtered ? (
               <button type="button" onClick={() => setSearch('')} className="btn-secondary">Clear search</button>
             ) : (
-              <button type="button" onClick={() => setAddingRole('manager')} className="btn-primary">
-                <ShieldPlus className="h-4 w-4" /> Add admin
+              <button type="button" onClick={() => setAddingRole(canGrantAdmin ? 'admin' : 'manager')} className="btn-primary">
+                <ShieldPlus className="h-4 w-4" /> {canGrantAdmin ? 'Add admin' : 'Add manager'}
               </button>
             )}
           />
@@ -241,7 +253,8 @@ export function TeamMembersPage() {
               <table className="table">
                 <thead>
                   <tr>
-                    <th scope="col">Admin</th>
+                    <th scope="col">Name</th>
+                    <th scope="col">Role</th>
                     <th scope="col">Department</th>
                     <th scope="col">Job title</th>
                     <th scope="col" className="text-right">Tasks assigned</th>
@@ -266,6 +279,13 @@ export function TeamMembersPage() {
                           </span>
                         </span>
                       </td>
+                      <td>
+                        <span className={a.role === 'admin'
+                          ? 'badge border-violet-200 bg-violet-50 text-violet-700'
+                          : 'badge border-ink-200 bg-ink-50 text-ink-600'}>
+                          {roleLabel(a.role)}
+                        </span>
+                      </td>
                       <td className="text-ink-600">{a.department || '—'}</td>
                       <td className="text-ink-600">{a.job_title || '—'}</td>
                       <td className="text-right font-semibold tabular-nums text-ink-900">{a.assigned_tasks}</td>
@@ -277,8 +297,10 @@ export function TeamMembersPage() {
               </table>
             </div>
             <p className="border-t border-ink-100 px-4 py-3 text-xs text-ink-500">
-              Everyone listed here has full manager access, including the ability to add
-              further admins. Manager access is a single tier — there is no separate owner role.
+              Everyone listed here reaches this portal. <strong>Admins</strong> hold every
+              manager right and are the only role that can grant admin access.{' '}
+              <strong>Managers</strong> can add further managers and team members, but
+              cannot create admins.
             </p>
           </>
         )}

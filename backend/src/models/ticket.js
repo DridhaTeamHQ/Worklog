@@ -1,10 +1,12 @@
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
-import { createNotification } from './notifications.js';
+import { createNotification } from './notification.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
+import { isTeamMember } from '../utils/roles.js';
+import { SEVERITIES, TICKET_STATUSES } from '../utils/constants.js';
 
-export const SEVERITIES = ['low', 'medium', 'high', 'critical'];
-export const TICKET_STATUSES = ['open', 'in_progress', 'resolved', 'closed'];
+export { SEVERITIES, TICKET_STATUSES } from '../utils/constants.js';
+
 /** Statuses that mean the bug still needs someone's attention. */
 export const OPEN_STATUSES = ['open', 'in_progress'];
 
@@ -161,7 +163,7 @@ export async function updateTicketStatus({ ticketId, status, resolutionNote, act
   const ticket = await db.get('SELECT * FROM tickets WHERE id = ?', [ticketId]);
   if (!ticket) throw notFound('That ticket no longer exists.');
 
-  if (actor.role === 'team_member') {
+  if (isTeamMember(actor.role)) {
     if (ticket.reporter_id !== actor.id) {
       throw forbidden('You can only update tickets you raised.');
     }
@@ -187,7 +189,7 @@ export async function updateTicketStatus({ ticketId, status, resolutionNote, act
 
     // Tell the other side. A reporter closing their own ticket informs the manager;
     // a manager moving it informs the reporter.
-    if (actor.role === 'team_member') {
+    if (isTeamMember(actor.role)) {
       const task = await tx.get('SELECT manager_id FROM assigned_tasks WHERE id = ?', [ticket.task_id]);
       if (task?.manager_id) {
         await createNotification({
@@ -218,7 +220,7 @@ export async function updateTicket({ ticketId, actor, patch }) {
   const ticket = await db.get('SELECT * FROM tickets WHERE id = ?', [ticketId]);
   if (!ticket) throw notFound('That ticket no longer exists.');
 
-  if (actor.role === 'team_member') {
+  if (isTeamMember(actor.role)) {
     if (ticket.reporter_id !== actor.id) throw forbidden('You can only edit tickets you raised.');
     if (!OPEN_STATUSES.includes(ticket.status)) {
       throw badRequest('This ticket has been resolved or closed, so it can no longer be edited.');
@@ -243,7 +245,7 @@ export async function deleteTicket({ ticketId, actor }) {
   const db = await getDb();
   const ticket = await db.get('SELECT id, reporter_id, status FROM tickets WHERE id = ?', [ticketId]);
   if (!ticket) throw notFound('That ticket no longer exists.');
-  if (actor.role === 'team_member' && ticket.reporter_id !== actor.id) {
+  if (isTeamMember(actor.role) && ticket.reporter_id !== actor.id) {
     throw forbidden('You can only delete tickets you raised.');
   }
   await db.run('DELETE FROM tickets WHERE id = ?', [ticketId]);

@@ -25,7 +25,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
    */
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    // The body handles every outcome itself, so the promise is intentionally
+    // not awaited.
+    void (async () => {
       if (!tokenStore.get()) {
         setLoading(false);
         return;

@@ -133,11 +133,15 @@ export const teamApi = {
 
 /* ------------------------------------------------------------------- admins */
 
-/** Manager accounts. Separate from `teamApi` so granting access is its own action. */
+/**
+ * Manager-level accounts (admins and managers). Separate from `teamApi` so granting
+ * elevated access is its own action. `role` picks the tier and defaults to manager;
+ * the server rejects a manager who asks for 'admin'.
+ */
 export const adminApi = {
   list: (params: { search?: string } = {}, signal?: AbortSignal) =>
     api.get<Manager[]>('/admins', params, signal),
-  create: (input: NewTeamMemberInput) =>
+  create: (input: NewTeamMemberInput & { role?: 'admin' | 'manager' }) =>
     api.post<{
       admin: User;
       email: { delivered: boolean; mode: string; error?: string };

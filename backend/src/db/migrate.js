@@ -10,6 +10,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import config from '../config/env.js';
 import { getDb, closeDb } from './index.js';
+import { ALL_ROLES } from '../utils/roles.js';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -51,6 +52,65 @@ async function ensureColumn(db, table, column, definition) {
   const columns = await listColumns(db, table);
   if (columns.includes(column)) return false;
   await db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+  return true;
+}
+
+/**
+ * Widens the `users.role` CHECK constraint so that 'admin' is accepted.
+ *
+ * `CREATE TABLE IF NOT EXISTS` does nothing on a database that already has the table,
+ * so a database created before the admin role existed keeps the old two-value
+ * constraint and rejects every admin INSERT. This brings it forward in place, without
+ * touching the rows.
+ *
+ * Returns true when it actually changed something.
+ */
+async function ensureRoleConstraint(db) {
+  const allowed = ALL_ROLES.map((r) => `'${r}'`).join(', ');
+
+  if (db.dialect === 'postgres') {
+    const row = await db.get(
+      `SELECT conname, pg_get_constraintdef(oid) AS def
+         FROM pg_constraint
+        WHERE conrelid = 'users'::regclass AND contype = 'c'
+          AND pg_get_constraintdef(oid) ILIKE '%role%'`,
+    );
+    // No constraint at all, or one that already lists every role: nothing to do.
+    if (!row) return false;
+    if (ALL_ROLES.every((r) => row.def.includes(`'${r}'`))) return false;
+
+    await db.exec(`ALTER TABLE users DROP CONSTRAINT ${row.conname}`);
+    await db.exec(`ALTER TABLE users ADD CONSTRAINT ${row.conname} CHECK (role IN (${allowed}))`);
+    return true;
+  }
+
+  // SQLite cannot alter a CHECK constraint, so the table is rebuilt. The rebuild only
+  // runs when the constraint is genuinely out of date, which on a fresh database is
+  // never.
+  const table = await db.get(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'",
+  );
+  if (!table?.sql) return false;
+  if (ALL_ROLES.every((r) => table.sql.includes(`'${r}'`))) return false;
+
+  const rebuilt = table.sql.replace(
+    /CHECK\s*\(\s*role\s+IN\s*\([^)]*\)\s*\)/i,
+    `CHECK (role IN (${allowed}))`,
+  );
+  if (rebuilt === table.sql) return false;
+
+  // Foreign keys are disabled for the swap: every child table references users(id)
+  // ON DELETE CASCADE, and dropping the old table with them enabled would cascade the
+  // entire database away.
+  await db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    await db.exec(rebuilt.replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?users/i, 'CREATE TABLE users_rolefix'));
+    await db.exec('INSERT INTO users_rolefix SELECT * FROM users');
+    await db.exec('DROP TABLE users');
+    await db.exec('ALTER TABLE users_rolefix RENAME TO users');
+  } finally {
+    await db.exec('PRAGMA foreign_keys = ON');
+  }
   return true;
 }
 
@@ -137,13 +197,16 @@ export async function migrate({ fresh = false } = {}) {
     added.push('notifications.related_ticket_id');
   }
 
+  // Databases created before the admin role existed still reject role = 'admin'.
+  const roleConstraintUpgraded = await ensureRoleConstraint(db);
+
   for (const statement of statements.filter((s) => !isCreateTable(s))) {
     await db.exec(statement);
   }
 
   const backfilled = await backfillProjects(db);
 
-  return { driver: config.db.client, fresh, added, backfilled };
+  return { driver: config.db.client, fresh, added, backfilled, roleConstraintUpgraded };
 }
 
 const isEntry = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
@@ -154,6 +217,7 @@ if (isEntry) {
       console.log(`[migrate] schema ready (driver=${r.driver}${r.fresh ? ', fresh' : ''})`);
       if (r.added.length) console.log(`[migrate] added columns: ${r.added.join(', ')}`);
       if (r.backfilled) console.log(`[migrate] moved ${r.backfilled} existing task(s) into the ${DEFAULT_PROJECT.key} project`);
+      if (r.roleConstraintUpgraded) console.log("[migrate] users.role now accepts 'admin'");
       if (config.db.client === 'sqlite') console.log(`[migrate] file: ${config.db.sqliteFile}`);
       await closeDb();
     })

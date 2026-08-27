@@ -1,6 +1,6 @@
 import { getDb } from '../db/index.js';
 import { today, addDays, startOfWeek } from '../utils/dates.js';
-import { ticketCounts } from './tickets.js';
+import { ticketCounts } from './ticket.js';
 
 /**
  * Builds the WHERE fragment shared by every analytics query so that the employee,

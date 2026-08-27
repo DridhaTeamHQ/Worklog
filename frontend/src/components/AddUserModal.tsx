@@ -5,6 +5,7 @@ import { ApiError } from '../api/client';
 import { useToast } from './Toast';
 import { Modal, Spinner } from './ui';
 import type { Role, User } from '../types';
+import { isManagerLevel } from '../types';
 
 /**
  * Generates a readable temporary password. Ambiguous characters (O/0, l/1) are left out
@@ -59,12 +60,23 @@ const COPY = {
     failMessage: 'Could not add the team member.',
   },
   manager: {
-    title: 'Add an admin',
+    title: 'Add a manager',
     description: 'Creates an account with manager access to this portal.',
-    submit: 'Add admin',
+    submit: 'Add manager',
     submitting: 'Adding…',
     namePlaceholder: 'e.g. Vikram Rao',
     titlePlaceholder: 'e.g. Delivery Manager',
+    deptPlaceholder: 'e.g. Management',
+    successTitle: 'Manager added',
+    failMessage: 'Could not add the manager.',
+  },
+  admin: {
+    title: 'Add an admin',
+    description: 'Creates an account with full administrative access, including the right to grant admin access to others.',
+    submit: 'Add admin',
+    submitting: 'Adding…',
+    namePlaceholder: 'e.g. Vikram Rao',
+    titlePlaceholder: 'e.g. Administrator',
     deptPlaceholder: 'e.g. Management',
     successTitle: 'Admin added',
     failMessage: 'Could not add the admin.',
@@ -74,7 +86,8 @@ const COPY = {
 export function AddUserModal({ open, onClose, onCreated, role, departments = [] }: Props) {
   const toast = useToast();
   const copy = COPY[role];
-  const isManager = role === 'manager';
+  // Both elevated tiers go through /api/admins; the role travels in the payload.
+  const isElevated = isManagerLevel(role);
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -125,8 +138,8 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
         jobTitle: jobTitle.trim() || undefined,
         phone: phone.trim() || undefined,
       };
-      const { data } = isManager
-        ? await adminApi.create(payload)
+      const { data } = isElevated
+        ? await adminApi.create({ ...payload, role })
         : await teamApi.create(payload);
       const createdUser = 'admin' in data ? data.admin : data.employee;
       toast.success(data.message);
@@ -180,7 +193,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
             <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
             <div className="min-w-0">
               <p className="font-semibold text-emerald-900">
-                {createdWith.user.name} can now sign in{isManager ? ' as a manager' : ''}
+                {createdWith.user.name} can now sign in{isElevated ? ` as ${role === 'admin' ? 'an admin' : 'a manager'}` : ''}
               </p>
               <p className="mt-0.5 text-sm text-emerald-800">
                 They can change this password from their profile at any time.

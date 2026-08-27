@@ -1,4 +1,24 @@
-export type Role = 'manager' | 'team_member';
+/**
+ * `admin` is a strict superset of `manager`: it reaches every manager screen and, on
+ * top of that, is the only role that can grant admin access.
+ */
+export type Role = 'admin' | 'manager' | 'team_member';
+
+/** Roles that reach the manager portal. Mirrors backend/src/utils/roles.js. */
+export const MANAGER_ROLES: Role[] = ['admin', 'manager'];
+
+/**
+ * Type predicates, not plain booleans: narrowing `Role` down to the elevated tiers
+ * lets callers pass the value straight to an API that only accepts those two.
+ */
+export const isManagerLevel = (role: Role | undefined): role is 'admin' | 'manager' =>
+  role === 'admin' || role === 'manager';
+
+export const isAdmin = (role: Role | undefined): role is 'admin' => role === 'admin';
+
+export const roleLabel = (role: Role | undefined): string =>
+  role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Team Member';
+
 export type Priority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'pending' | 'in_progress' | 'completed';
 /** `effective_status` may additionally be 'overdue', which the server derives. */
@@ -220,7 +240,7 @@ export interface ProductivityRow {
 }
 
 export interface ManagerDashboard {
-  role: 'manager';
+  role: 'manager' | 'admin';
   summary: ManagerSummary;
   breakdown: StatusBreakdown;
   activity: ActivityPoint[];

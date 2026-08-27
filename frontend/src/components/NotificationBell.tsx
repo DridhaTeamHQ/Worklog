@@ -6,6 +6,7 @@ import { useAuth } from '../context/AuthContext';
 import { relativeTime } from '../lib/format';
 import { EmptyState, Spinner } from './ui';
 import type { AppNotification } from '../types';
+import { isManagerLevel } from '../types';
 
 export function NotificationBell() {
   const { items, unread, loading, markRead, markAllRead, reload } = useNotifications();
@@ -34,13 +35,13 @@ export function NotificationBell() {
     setOpen(false);
     if (!n.is_read) await markRead(n.id);
 
-    const base = user?.role === 'manager' ? '/manager' : '/employee';
+    const base = isManagerLevel(user?.role) ? '/manager' : '/employee';
     if (n.related_ticket_id) {
       navigate(`${base}/tickets?highlight=${n.related_ticket_id}`);
       return;
     }
     if (n.related_task_id) {
-      navigate(user?.role === 'manager'
+      navigate(isManagerLevel(user?.role)
         ? `/manager/tasks?highlight=${n.related_task_id}`
         : `/employee/tasks-assigned?highlight=${n.related_task_id}`);
       return;
@@ -139,7 +140,7 @@ export function NotificationBell() {
             type="button"
             onClick={() => {
               setOpen(false);
-              navigate(user?.role === 'manager' ? '/manager/notifications' : '/employee/notifications');
+              navigate(isManagerLevel(user?.role) ? '/manager/notifications' : '/employee/notifications');
             }}
             className="block w-full bg-ink-50 px-4 py-3 text-center text-sm font-semibold text-brand-600 hover:bg-ink-100"
           >

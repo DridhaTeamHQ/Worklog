@@ -13,6 +13,7 @@
  */
 import nodemailer from 'nodemailer';
 import config from '../config/env.js';
+import { isAdmin, isManagerLevel } from '../utils/roles.js';
 
 let transport = null;
 let transportMode = null;
@@ -139,7 +140,8 @@ export async function sendWelcomeEmail({ name, email, password, managerName, rol
   const loginUrl = `${config.mail.appUrl}/login`;
   const firstName = String(name || '').trim().split(/\s+/)[0] || 'there';
   const addedBy = managerName ? `${managerName} has added you` : 'You have been added';
-  const isManager = role === 'manager';
+  const isAdminRole = isAdmin(role);
+  const isManager = isManagerLevel(role);
 
   const capabilities = isManager
     ? [
@@ -147,6 +149,7 @@ export async function sendWelcomeEmail({ name, email, password, managerName, rol
       'read the daily work reports the whole team submits',
       'triage the bug tickets your team raises',
       'add and manage team members',
+      ...(isAdminRole ? ['grant admin access to other people'] : []),
     ]
     : [
       'see the tasks assigned to you, with deadlines and priority',
@@ -154,9 +157,11 @@ export async function sendWelcomeEmail({ name, email, password, managerName, rol
       'submit your daily task report',
       'raise a ticket for any bug you hit',
     ];
-  const accessLine = isManager
-    ? 'You have been given manager access, so you will land on the Manager Dashboard.'
-    : '';
+  const accessLine = isAdminRole
+    ? 'You have been given admin access, so you will land on the Manager Dashboard with full administrative rights.'
+    : isManager
+      ? 'You have been given manager access, so you will land on the Manager Dashboard.'
+      : '';
 
   const subject = 'You have been added to Dridha Worklog';
 

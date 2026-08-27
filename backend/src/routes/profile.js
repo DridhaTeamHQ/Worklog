@@ -2,14 +2,10 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
-import { ok } from '../utils/http.js';
-import { asyncHandler } from '../utils/errors.js';
-import { findById, updateProfile } from '../services/users.js';
+import { getProfile, patchProfile } from '../controllers/profile.js';
 
 const router = Router();
 router.use(requireAuth);
-
-router.get('/', asyncHandler(async (req, res) => ok(res, await findById(req.user.id))));
 
 /**
  * A user may edit their own display details only. Role, email and active flag are
@@ -23,9 +19,7 @@ const patchSchema = z.object({
   profileImage: z.string().trim().max(500).optional().nullable(),
 });
 
-router.patch('/', validate(patchSchema), asyncHandler(async (req, res) => {
-  const user = await updateProfile(req.user.id, req.body);
-  return ok(res, user);
-}));
+router.get('/', getProfile);
+router.patch('/', validate(patchSchema), patchProfile);
 
 export default router;

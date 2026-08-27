@@ -16,7 +16,9 @@
     "start": "npm --prefix backend start",
     "typecheck": "npm --prefix frontend run typecheck",
     "test": "npm --prefix backend run test:flow",
-    "mail:test": "npm --prefix backend run mail:test --"
+    "mail:test": "npm --prefix backend run mail:test --",
+    "lint": "npm --prefix frontend run lint",
+    "lint:fix": "npm --prefix frontend run lint:fix"
   },
   "engines": {
     "node": ">=22.5.0"
