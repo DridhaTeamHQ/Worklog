@@ -78,10 +78,7 @@ export function ForgotPasswordPage() {
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
             <CheckSquare className="h-6 w-6" />
           </span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-base font-bold text-ink-900">Dridha Technologies</span>
-            <span className="text-sm text-ink-500">Worklog</span>
-          </span>
+          <span className="text-lg font-bold leading-tight text-ink-900">Taskr</span>
         </div>
 
         <div className="card p-6 sm:p-8">

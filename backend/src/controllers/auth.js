@@ -9,6 +9,7 @@ import { ok } from '../utils/http.js';
 import { asyncHandler, unauthorized, badRequest } from '../utils/errors.js';
 import {
   findByEmail, findById, verifyPassword, toPublicUser, changePassword,
+  findInvitedByEmail, setInitialPassword,
 } from '../models/user.js';
 import {
   createResetToken, findResetToken, isResetTokenUsable, consumeResetToken,
@@ -29,11 +30,55 @@ export const login = asyncHandler(async (req, res) => {
   const user = await findByEmail(email);
 
   // Same message and comparable timing for "no such user" and "wrong password" so the
-  // endpoint cannot be used to discover which emails exist.
+  // endpoint cannot be used to discover which emails exist. An invited account that
+  // has not been claimed has a NULL hash, so it lands on the same placeholder and is
+  // refused here exactly like an unknown address — claiming it is the only way in.
   const hash = user?.password_hash || '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidi';
   const passwordOk = await verifyPassword(password, hash);
   if (!user || !passwordOk || !user.is_active) {
     throw unauthorized('Incorrect email or password.');
+  }
+
+  const token = signToken(user);
+  setAuthCookie(res, token);
+  return ok(res, { token, user: toPublicUser(user) });
+});
+
+/**
+ * POST /api/auth/invite-status — has this email been added by a manager but never
+ * claimed?
+ *
+ * This is what puts the "Invited" button on the sign-in page. It answers truthfully
+ * only for accounts in that one state; a claimed account, a deactivated one and an
+ * address nobody has added all answer `invited: false` alike.
+ *
+ * NOTE: answering this at all tells an anonymous caller that a given address is a
+ * pending invite, which is a deliberate departure from the enumeration-blocking the
+ * rest of the auth surface keeps. It is rate limited to make sweeping a list of
+ * addresses impractical, and the window is small — it closes the moment the person
+ * sets their password. See the security note in the README.
+ */
+export const inviteStatus = asyncHandler(async (req, res) => {
+  const invite = await findInvitedByEmail(req.body.email);
+  // The first name only, so the button can greet them without publishing the roster.
+  const name = invite ? String(invite.name || '').trim().split(/\s+/)[0] : undefined;
+  return ok(res, { invited: Boolean(invite), name });
+});
+
+/**
+ * POST /api/auth/accept-invite — claim an invited account by setting its password.
+ *
+ * Succeeds only while the account still has no password; `setInitialPassword` makes
+ * that check part of the UPDATE, so a second attempt (or two racing requests) cannot
+ * claim it twice. On success the caller is signed straight in, because they have just
+ * proven nothing except that they chose the password — making them type it again
+ * would add ceremony, not security.
+ */
+export const acceptInvite = asyncHandler(async (req, res) => {
+  const { email, password } = req.body;
+  const user = await setInitialPassword(email, password);
+  if (!user) {
+    throw badRequest('That invitation is no longer available. If you have already set a password, sign in — or use "Forgot password?".');
   }
 
   const token = signToken(user);

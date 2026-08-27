@@ -1,10 +1,16 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, LogIn, CheckSquare } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, LogIn, CheckSquare, MailCheck } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
+import { authApi } from '../../api/endpoints';
 import { homeFor } from '../../components/RouteGuards';
 import { Spinner } from '../../components/ui';
+
+/** Long enough that typing an address is one request, short enough to feel immediate. */
+const INVITE_CHECK_DELAY_MS = 450;
+
+const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -16,6 +22,48 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
+
+  /** Set when the typed address is an account a manager added that nobody has claimed. */
+  const [invite, setInvite] = useState<{ email: string; name?: string } | null>(null);
+  const inviteRequest = useRef<AbortController | null>(null);
+
+  /*
+   * Watches the email field and asks the server whether that address is a pending
+   * invite. Debounced so typing an address is one request rather than one per
+   * keystroke, and the in-flight request is aborted whenever the value moves on, so a
+   * slow answer for an old address can never overwrite the answer for the current one.
+   */
+  useEffect(() => {
+    const typed = email.trim().toLowerCase();
+    inviteRequest.current?.abort();
+
+    if (!looksLikeEmail(typed)) {
+      setInvite(null);
+      return undefined;
+    }
+
+    const timer = window.setTimeout(() => {
+      // The body handles every outcome itself, so the promise is intentionally
+      // not awaited.
+      void (async () => {
+        const controller = new AbortController();
+        inviteRequest.current = controller;
+        try {
+          const { data } = await authApi.inviteStatus(typed, controller.signal);
+          setInvite(data.invited ? { email: typed, name: data.name } : null);
+        } catch {
+          // An aborted, rate-limited or failed check simply means no button. Signing
+          // in normally still works, so there is nothing useful to say here.
+          setInvite(null);
+        }
+      })();
+    }, INVITE_CHECK_DELAY_MS);
+
+    return () => {
+      window.clearTimeout(timer);
+      inviteRequest.current?.abort();
+    };
+  }, [email]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -60,10 +108,7 @@ export function LoginPage() {
           <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
             <CheckSquare className="h-6 w-6" />
           </span>
-          <span className="flex flex-col leading-tight">
-            <span className="text-lg font-bold text-white">Dridha Technologies</span>
-            <span className="text-sm text-ink-400">Worklog</span>
-          </span>
+          <span className="text-xl font-bold leading-tight text-white">Taskr</span>
         </div>
 
         <div className="relative">
@@ -89,7 +134,7 @@ export function LoginPage() {
         </div>
 
         <p className="relative text-xs text-ink-500">
-          © {new Date().getFullYear()} Dridha Technologies. Internal use only.
+          © {new Date().getFullYear()} Taskr. Internal use only.
         </p>
       </div>
 
@@ -100,10 +145,7 @@ export function LoginPage() {
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
               <CheckSquare className="h-6 w-6" />
             </span>
-            <span className="flex flex-col leading-tight">
-              <span className="text-base font-bold text-ink-900">Dridha Technologies</span>
-              <span className="text-sm text-ink-500">Worklog</span>
-            </span>
+            <span className="text-lg font-bold leading-tight text-ink-900">Taskr</span>
           </div>
 
           <h1 className="text-2xl font-bold text-ink-900">Sign in</h1>
@@ -132,6 +174,34 @@ export function LoginPage() {
               />
               {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
             </div>
+
+            {/*
+              Only rendered for an address the server confirmed is a pending invite.
+              It replaces nothing — signing in normally is still right there — but it
+              is the only route in for someone who has never set a password.
+            */}
+            {invite && (
+              <div className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3">
+                <div className="flex items-start gap-2.5">
+                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+                  <div className="min-w-0">
+                    <p className="text-sm font-semibold text-brand-900">
+                      {invite.name ? `Welcome, ${invite.name}` : 'You have been invited'}
+                    </p>
+                    <p className="mt-0.5 text-sm text-brand-800">
+                      Your account is ready but has no password yet.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => navigate(`/set-password?email=${encodeURIComponent(invite.email)}`)}
+                  className="btn-primary mt-3 w-full"
+                >
+                  Invited — set your password
+                </button>
+              </div>
+            )}
 
             <div>
               <div className="flex items-baseline justify-between">

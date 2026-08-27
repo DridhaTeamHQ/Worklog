@@ -5,10 +5,12 @@ import {
 } from 'recharts';
 import { BarChart3, TrendingUp, Users } from 'lucide-react';
 import { dashboardApi, teamApi } from '../../api/endpoints';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
 import { formatDateShort, todayIso, addDaysIso } from '../../lib/format';
 import type { AnalyticsPayload, TeamMember } from '../../types';
+import { isAdmin } from '../../types';
 
 /** One colour per status, matching the badges so the charts read the same way. */
 const STATUS_COLORS = {
@@ -19,6 +21,9 @@ const STATUS_COLORS = {
 };
 
 export function AnalyticsPage() {
+  const { user } = useAuth();
+  /** Only an admin spans more than one department, so only they get the filter. */
+  const canSeeAllDepartments = isAdmin(user?.role);
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -94,13 +99,17 @@ export function AnalyticsPage() {
             {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
           </select>
         </div>
-        <div>
-          <label className="label" htmlFor="a-dept">Department</label>
-          <select id="a-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
-            <option value="">All departments</option>
-            {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-          </select>
-        </div>
+        {/* A manager spans one department, so there is nothing to choose between;
+            the server confines their figures to it regardless. */}
+        {canSeeAllDepartments && (
+          <div>
+            <label className="label" htmlFor="a-dept">Department</label>
+            <select id="a-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
+              <option value="">All departments</option>
+              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+            </select>
+          </div>
+        )}
         <div>
           <label className="label" htmlFor="a-from">Assigned from</label>
           <input

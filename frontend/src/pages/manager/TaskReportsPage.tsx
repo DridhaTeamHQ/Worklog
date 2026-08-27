@@ -2,10 +2,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, CheckCircle2, Search } from 'lucide-react';
 import { reportApi, teamApi } from '../../api/endpoints';
+import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { Avatar, EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput } from '../../components/ui';
 import { formatDate, formatTime, reportLines, todayIso } from '../../lib/format';
 import type { DailyReport, TeamMember } from '../../types';
+import { isAdmin } from '../../types';
 
 type RangeKey = 'all' | 'today' | 'week' | 'month' | 'custom';
 
@@ -19,6 +21,9 @@ const RANGES: { value: RangeKey; label: string }[] = [
 
 /** Company-wide view of every daily report, grouped by date. */
 export function TaskReportsPage() {
+  const { user } = useAuth();
+  /** Only an admin spans more than one department, so only they get the filter. */
+  const canSeeAllDepartments = isAdmin(user?.role);
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);
@@ -107,13 +112,16 @@ export function TaskReportsPage() {
               {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
             </select>
           </div>
-          <div>
-            <label className="label" htmlFor="rp-dept">Department</label>
-            <select id="rp-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
-              <option value="">All departments</option>
-              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
-          </div>
+          {/* One department for a manager, so nothing to filter by. */}
+          {canSeeAllDepartments && (
+            <div>
+              <label className="label" htmlFor="rp-dept">Department</label>
+              <select id="rp-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
+                <option value="">All departments</option>
+                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
+              </select>
+            </div>
+          )}
           {range === 'custom' && (
             <>
               <div>

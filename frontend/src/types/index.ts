@@ -46,7 +46,12 @@ export interface TaskCounts {
   overdue: number;
 }
 
+/**
+ * `invited` means the account has been created but nobody has claimed it yet — the
+ * person has not chosen a password, so they have never signed in.
+ */
 export interface TeamMember extends User {
+  invited: boolean;
   counts: TaskCounts;
   current_status: EffectiveStatus | 'idle';
   last_report_date: string | null;
@@ -55,11 +60,13 @@ export interface TeamMember extends User {
 
 /** A user with manager access, plus how much work they have out with the team. */
 export interface Manager extends User {
+  invited: boolean;
   assigned_tasks: number;
   open_tasks: number;
 }
 
 export interface TeamMemberDetail extends User {
+  invited: boolean;
   counts: TaskCounts;
   report_count: number;
 }

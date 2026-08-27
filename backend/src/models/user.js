@@ -9,6 +9,13 @@ import { MANAGER_ROLES } from '../utils/roles.js';
 /** Columns that are safe to return to a client — never includes password_hash. */
 const PUBLIC_COLUMNS = `id, name, email, role, department, job_title, phone, profile_image, is_active, created_at, updated_at`;
 
+/**
+ * Whether the account is still waiting to be claimed, derived in SQL so the hash it
+ * is derived from never leaves the database. Selected alongside PUBLIC_COLUMNS by the
+ * roster queries, which is where a manager needs to see who has not signed in yet.
+ */
+const INVITED_COLUMN = `CASE WHEN password_hash IS NULL THEN 1 ELSE 0 END AS invited`;
+
 export const toPublicUser = (row) => {
   if (!row) return null;
   const { password_hash: _ignored, ...rest } = row;
@@ -37,17 +44,63 @@ export async function verifyPassword(plain, hash) {
   return bcrypt.compare(plain, hash);
 }
 
+/**
+ * Creates an account.
+ *
+ * `password` is optional. Omitting it creates an *invited* account: password_hash is
+ * NULL, which is the single source of truth for "this person has been added but has
+ * not claimed the account yet". Such an account cannot sign in — login compares
+ * against a hash, and there is none — until `setInitialPassword` fills it in.
+ */
 export async function createUser({ name, email, password, role, department, jobTitle, phone, profileImage }) {
   const db = await getDb();
   if (await findByEmail(email)) throw conflict('An account with that email already exists.');
   const ts = nowIso();
+  const passwordHash = password ? await hashPassword(password) : null;
   const id = await db.insert(
     `INSERT INTO users (name, email, password_hash, role, department, job_title, phone, profile_image, is_active, created_at, updated_at)
      VALUES (?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)`,
-    [name, email.toLowerCase(), await hashPassword(password), role, department ?? null,
+    [name, email.toLowerCase(), passwordHash, role, department ?? null,
       jobTitle ?? null, phone ?? null, profileImage ?? null, ts, ts],
   );
   return findById(id);
+}
+
+/**
+ * The invited account for an email, or null.
+ *
+ * "Invited" means all three of: the account exists, it is active, and it has no
+ * password yet. Anything else — unknown email, deactivated account, or one whose
+ * owner has already chosen a password — returns null, so a caller cannot tell those
+ * cases apart.
+ */
+export async function findInvitedByEmail(email) {
+  const db = await getDb();
+  const row = await db.get(
+    `SELECT id, name, email, role, is_active FROM users
+      WHERE LOWER(email) = LOWER(?) AND password_hash IS NULL`,
+    [email],
+  );
+  return row && row.is_active ? row : null;
+}
+
+/**
+ * Sets the password on an invited account, claiming it.
+ *
+ * The `password_hash IS NULL` guard is in the UPDATE rather than checked beforehand,
+ * so two requests racing to claim the same invite cannot both succeed — the second
+ * one matches no rows. Returns the claimed user, or null if the invite was already
+ * taken, the account does not exist, or it is deactivated.
+ */
+export async function setInitialPassword(email, password) {
+  const db = await getDb();
+  const res = await db.run(
+    `UPDATE users SET password_hash = ?, updated_at = ?
+      WHERE LOWER(email) = LOWER(?) AND password_hash IS NULL AND is_active = 1`,
+    [await hashPassword(password), nowIso(), email],
+  );
+  if (!res.changes) return null;
+  return findByEmail(email);
 }
 
 /**
@@ -128,7 +181,7 @@ export async function listTeamMembers({ search, department, status } = {}) {
   }
 
   const rows = await db.query(
-    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE ${where.join(' AND ')} ORDER BY name ASC`,
+    `SELECT ${PUBLIC_COLUMNS}, ${INVITED_COLUMN} FROM users WHERE ${where.join(' AND ')} ORDER BY name ASC`,
     params,
   );
   const counts = await taskCountsByEmployee();
@@ -148,6 +201,7 @@ export async function listTeamMembers({ search, department, status } = {}) {
           : c.total > 0 ? 'completed' : 'idle';
     return {
       ...toPublicUser(row),
+      invited: Boolean(row.invited),
       counts: c,
       current_status: currentStatus,
       last_report_date: lastReport.get(Number(row.id)) || null,
@@ -174,7 +228,7 @@ export async function listManagers({ search } = {}) {
   }
 
   const rows = await db.query(
-    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE ${where.join(' AND ')}
+    `SELECT ${PUBLIC_COLUMNS}, ${INVITED_COLUMN} FROM users WHERE ${where.join(' AND ')}
       ORDER BY CASE role WHEN 'admin' THEN 0 ELSE 1 END, name ASC`,
     params,
   );
@@ -193,16 +247,62 @@ export async function listManagers({ search } = {}) {
 
   return rows.map((row) => ({
     ...toPublicUser(row),
+    invited: Boolean(row.invited),
     ...(byManager.get(Number(row.id)) || { assigned_tasks: 0, open_tasks: 0 }),
   }));
 }
 
+/**
+ * Permanently removes a team member.
+ *
+ * Restricted to `role = 'team_member'` in the WHERE clause, not merely checked
+ * beforehand: `assigned_tasks.manager_id` also cascades, so deleting a manager-level
+ * account through this path would take every task they had ever assigned to anyone
+ * with it. Removing an employee only ever reaches their own rows.
+ *
+ * Returns what was destroyed, counted before the delete, so the caller can report it
+ * honestly rather than saying "deleted" and leaving the scale of it unsaid.
+ */
+export async function deleteTeamMember(employeeId) {
+  const db = await getDb();
+  const row = await db.get(
+    `SELECT id, name, email FROM users WHERE id = ? AND role = 'team_member'`,
+    [employeeId],
+  );
+  if (!row) throw notFound('That team member could not be found.');
+
+  const [reports, tasks, tickets] = await Promise.all([
+    db.get('SELECT COUNT(*) AS c FROM daily_task_reports WHERE employee_id = ?', [employeeId]),
+    db.get('SELECT COUNT(*) AS c FROM assigned_tasks WHERE employee_id = ?', [employeeId]),
+    db.get('SELECT COUNT(*) AS c FROM tickets WHERE reporter_id = ?', [employeeId]),
+  ]);
+
+  // Every child table references users(id) ON DELETE CASCADE, so this one statement
+  // takes their reports, tasks, tickets and notifications with it.
+  await db.run(`DELETE FROM users WHERE id = ? AND role = 'team_member'`, [employeeId]);
+
+  return {
+    name: row.name,
+    email: row.email,
+    removed: {
+      reports: Number(reports?.c || 0),
+      tasks: Number(tasks?.c || 0),
+      tickets: Number(tickets?.c || 0),
+    },
+  };
+}
+
 export async function getTeamMember(employeeId) {
   const db = await getDb();
-  const row = await db.get(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = ? AND role = 'team_member'`, [employeeId]);
+  const row = await db.get(
+    `SELECT ${PUBLIC_COLUMNS}, ${INVITED_COLUMN} FROM users WHERE id = ? AND role = 'team_member'`,
+    [employeeId],
+  );
   if (!row) throw notFound('That team member could not be found.');
   const counts = (await taskCountsByEmployee()).get(Number(employeeId))
     || { total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 };
   const reportCount = await db.get('SELECT COUNT(*) AS c FROM daily_task_reports WHERE employee_id = ?', [employeeId]);
-  return { ...toPublicUser(row), counts, report_count: Number(reportCount?.c || 0) };
+  return {
+    ...toPublicUser(row), invited: Boolean(row.invited), counts, report_count: Number(reportCount?.c || 0),
+  };
 }

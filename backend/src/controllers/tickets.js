@@ -8,6 +8,7 @@
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest, forbidden, notFound } from '../utils/errors.js';
 import { isManagerLevel, isTeamMember } from '../utils/roles.js';
+import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
   listTickets, getTicketById, createTicket, updateTicketStatus, updateTicket, deleteTicket,
   ticketCounts,
@@ -21,20 +22,41 @@ const parseId = (raw) => {
 
 export const list = asyncHandler(async (req, res) => {
   const q = req.validatedQuery;
-  const filters = isManagerLevel(req.user.role)
-    ? { ...q }
-    : { ...q, reporterId: req.user.id };
 
-  const { items, total } = await listTickets(filters);
-  const counts = await ticketCounts(
-    isManagerLevel(req.user.role) ? {} : { reporterId: req.user.id },
-  );
+  if (!isManagerLevel(req.user.role)) {
+    const own = { ...q, reporterId: req.user.id };
+    const { items, total } = await listTickets(own);
+    const counts = await ticketCounts({ reporterId: req.user.id });
+    return ok(res, items, { total, counts, limit: q.limit, offset: q.offset });
+  }
+
+  // A ticket belongs to the department of whoever raised it, so the same confinement
+  // that governs the roster governs the bug queue.
+  const scope = departmentScope(req.user);
+  if (isEmptyScope(scope)) {
+    return ok(res, [], {
+      total: 0,
+      counts: { total: 0, open: 0, in_progress: 0, resolved: 0, closed: 0, critical_open: 0, unresolved: 0 },
+      limit: q.limit,
+      offset: q.offset,
+    });
+  }
+
+  const department = scopedDepartment(scope, q.department);
+  const { items, total } = await listTickets({ ...q, department });
+  const counts = await ticketCounts({ department });
   return ok(res, items, { total, counts, limit: q.limit, offset: q.offset });
 });
 
 export const getOne = asyncHandler(async (req, res) => {
   const ticket = await getTicketById(parseId(req.params.id));
   if (!ticket) throw notFound('That ticket no longer exists.');
+  // Same wording as a missing ticket: whether an id exists in another department is
+  // not something a manager should be able to establish.
+  if (isManagerLevel(req.user.role)
+      && !withinScope(departmentScope(req.user), ticket.reporter_department)) {
+    throw notFound('That ticket no longer exists.');
+  }
   if (isTeamMember(req.user.role) && ticket.reporter_id !== req.user.id) {
     throw forbidden('You can only view tickets you raised.');
   }

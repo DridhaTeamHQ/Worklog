@@ -8,6 +8,7 @@
 import { ok } from '../utils/http.js';
 import { asyncHandler, badRequest, forbidden } from '../utils/errors.js';
 import { isManagerLevel, isTeamMember } from '../utils/roles.js';
+import { departmentScope, isEmptyScope, scopedDepartment } from '../utils/scope.js';
 import { today, resolveRange } from '../utils/dates.js';
 import { listReports, getReportForDate, saveReport, deleteReport } from '../models/report.js';
 
@@ -15,10 +16,16 @@ export const list = asyncHandler(async (req, res) => {
   const q = req.validatedQuery;
   const { from, to } = resolveRange(q.range, q.from, q.to);
 
+  const scope = departmentScope(req.user);
+  // A manager reads only their own department's reports; an employee only their own.
+  if (isManagerLevel(req.user.role) && isEmptyScope(scope)) {
+    return ok(res, [], { total: 0, limit: q.limit, offset: q.offset, from, to });
+  }
+
   const filters = {
     from, to, search: q.search, limit: q.limit, offset: q.offset,
     employeeId: isManagerLevel(req.user.role) ? q.employeeId : req.user.id,
-    department: isManagerLevel(req.user.role) ? q.department : undefined,
+    department: isManagerLevel(req.user.role) ? scopedDepartment(scope, q.department) : undefined,
   };
 
   const { items, total } = await listReports(filters);

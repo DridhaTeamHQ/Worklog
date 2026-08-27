@@ -118,7 +118,7 @@ export function AppLayout() {
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink-900 sm:text-base">
-                {isManager ? 'Manager Dashboard' : `Welcome, ${user?.name.split(' ')[0]}`}
+                {isManager ? `${roleLabel(user?.role)} Dashboard` : `Welcome, ${user?.name.split(' ')[0]}`}
               </p>
               <p className="hidden truncate text-xs text-ink-500 sm:block">
                 {isManager
@@ -148,9 +148,8 @@ export function BrandMark({ variant = 'dark' }: { variant?: 'dark' | 'light' }) 
       <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
         <CheckSquare className="h-5 w-5" />
       </span>
-      <span className="flex flex-col leading-tight">
-        <span className={`text-sm font-bold ${variant === 'dark' ? 'text-white' : 'text-ink-900'}`}>Dridha</span>
-        <span className={`text-[11px] font-medium ${variant === 'dark' ? 'text-ink-400' : 'text-ink-500'}`}>Worklog</span>
+      <span className={`text-base font-bold leading-tight ${variant === 'dark' ? 'text-white' : 'text-ink-900'}`}>
+        Taskr
       </span>
     </span>
   );

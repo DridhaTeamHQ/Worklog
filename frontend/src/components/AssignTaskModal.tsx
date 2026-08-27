@@ -97,8 +97,9 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
     const next: Record<string, string> = {};
     if (!employeeId) next.employeeId = 'Choose who this task is for.';
     if (!projectId) next.projectId = 'Choose the project this task belongs to.';
-    if (!title.trim()) next.title = 'Give the task a title.';
-    if (!description.trim()) next.description = 'Describe what needs to be done.';
+    // Title and description are deliberately not required: a manager may be assigning
+    // work before the detail exists, and both can be filled in later from the edit
+    // dialog. Only the assignee and the project are structurally necessary.
     if (startDate && deadline && deadline < startDate) next.deadline = 'The deadline cannot be earlier than the start date.';
     setErrors(next);
     if (Object.keys(next).length) return;
@@ -205,7 +206,7 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
         </div>
 
         <div>
-          <label className="label" htmlFor="t-title">Task title <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="t-title">Task title</label>
           <input
             id="t-title"
             value={title}
@@ -216,11 +217,13 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
             aria-invalid={!!errors.title}
             className={`input ${errors.title ? 'input-error' : ''}`}
           />
-          {errors.title && <p className="field-error">{errors.title}</p>}
+          {errors.title
+            ? <p className="field-error">{errors.title}</p>
+            : <p className="hint">Optional — the task key is used wherever this is blank.</p>}
         </div>
 
         <div>
-          <label className="label" htmlFor="t-desc">Task description <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="t-desc">Task description</label>
           <textarea
             id="t-desc"
             value={description}

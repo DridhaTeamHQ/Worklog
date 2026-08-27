@@ -7,6 +7,7 @@
 import { ok } from '../utils/http.js';
 import { asyncHandler } from '../utils/errors.js';
 import { isManagerLevel } from '../utils/roles.js';
+import { departmentScope, isEmptyScope, scopedDepartment } from '../utils/scope.js';
 import { today } from '../utils/dates.js';
 import {
   managerOverview, employeeOverview, productivityByEmployee,
@@ -18,13 +19,29 @@ import { listTickets } from '../models/ticket.js';
 
 export const overview = asyncHandler(async (req, res) => {
   if (isManagerLevel(req.user.role)) {
+    // Every figure on the manager dashboard is confined to their department, so the
+    // headline counts describe their own team rather than the whole company.
+    const scope = departmentScope(req.user);
+    const department = scope.restricted ? scope.department : undefined;
+    if (isEmptyScope(scope)) {
+      return ok(res, {
+        role: req.user.role,
+        summary: await managerOverview('\u0000no-such-department'),
+        breakdown: { pending: 0, in_progress: 0, completed: 0, overdue: 0 },
+        activity: await dailyActivity({ days: 14, department: '\u0000no-such-department' }),
+        recent_tasks: [],
+        recent_reports: [],
+        open_tickets: [],
+      });
+    }
+
     const [summary, recentTasks, recentReports, breakdown, activity, openTickets] = await Promise.all([
-      managerOverview(),
-      listTasks({ sort: 'created_desc', limit: 8 }),
-      listReports({ limit: 6 }),
-      statusBreakdown({}),
-      dailyActivity({ days: 14 }),
-      listTickets({ status: 'unresolved', sort: 'severity_desc', limit: 5 }),
+      managerOverview(department),
+      listTasks({ sort: 'created_desc', limit: 8, department }),
+      listReports({ limit: 6, department }),
+      statusBreakdown({ department }),
+      dailyActivity({ days: 14, department }),
+      listTickets({ status: 'unresolved', sort: 'severity_desc', limit: 5, department }),
     ]);
     return ok(res, {
       // The real role, so the client can tell an admin from a manager.
@@ -57,14 +74,19 @@ export const overview = asyncHandler(async (req, res) => {
 
 export const analytics = asyncHandler(async (req, res) => {
   const q = req.validatedQuery;
-  const filters = { employeeId: q.employeeId, department: q.department, from: q.from, to: q.to };
+  const scope = departmentScope(req.user);
+  // A manager cannot widen this by sending another department; theirs always wins.
+  const department = isEmptyScope(scope)
+    ? '\u0000no-such-department'
+    : scopedDepartment(scope, q.department);
+  const filters = { employeeId: q.employeeId, department, from: q.from, to: q.to };
 
   const [summary, productivity, breakdown, daily, weekly] = await Promise.all([
-    managerOverview(),
+    managerOverview(department),
     productivityByEmployee(filters),
     statusBreakdown(filters),
-    dailyActivity({ days: q.days, employeeId: q.employeeId, department: q.department }),
-    weeklyActivity({ weeks: q.weeks, employeeId: q.employeeId, department: q.department }),
+    dailyActivity({ days: q.days, employeeId: q.employeeId, department }),
+    weeklyActivity({ weeks: q.weeks, employeeId: q.employeeId, department }),
   ]);
 
   return ok(res, { summary, productivity, breakdown, daily, weekly, filters });

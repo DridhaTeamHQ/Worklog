@@ -7,6 +7,11 @@ interface AuthState {
   user: User | null;
   loading: boolean;
   login: (email: string, password: string) => Promise<User>;
+  /**
+   * Adopts a session the server already issued, for a flow that authenticates without
+   * a password being typed — claiming an invite is the only one today.
+   */
+  adoptSession: (token: string, user: User) => void;
   logout: () => Promise<void>;
   refresh: () => Promise<void>;
   setUser: (user: User) => void;
@@ -58,6 +63,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return data.user;
   }, []);
 
+  const adoptSession = useCallback((token: string, nextUser: User) => {
+    tokenStore.set(token);
+    setUser(nextUser);
+  }, []);
+
   const logout = useCallback(async () => {
     try { await authApi.logout(); } catch { /* signing out locally is what matters */ }
     tokenStore.clear();
@@ -70,8 +80,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ user, loading, login, logout, refresh, setUser }),
-    [user, loading, login, logout, refresh],
+    () => ({ user, loading, login, adoptSession, logout, refresh, setUser }),
+    [user, loading, login, adoptSession, logout, refresh],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

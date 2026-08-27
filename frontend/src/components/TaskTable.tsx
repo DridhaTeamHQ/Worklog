@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, StickyNote, Trash2, CalendarClock, Pencil } from 'lucide-react';
 import { Avatar } from './ui';
 import { PriorityMark } from './Badges';
-import { deadlineLabel, formatDateTime, STATUS_LABEL } from '../lib/format';
+import { deadlineLabel, formatDateTime, STATUS_LABEL, taskLabel } from '../lib/format';
 import type { Task, TaskStatus } from '../types';
 
 /**
@@ -185,7 +185,7 @@ export function TaskTable({
                       )}
 
                       <span className="min-w-0 flex-1 truncate text-ink-900" title={task.title}>
-                        {task.title}
+                        {taskLabel(task)}
                       </span>
 
                       {task.notes && (

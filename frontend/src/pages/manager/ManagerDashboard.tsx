@@ -10,7 +10,7 @@ import { dashboardApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
 import { PriorityBadge, StatusBadge, SeverityBadge } from '../../components/Badges';
-import { formatDate, formatDateShort, reportLines } from '../../lib/format';
+import { formatDate, formatDateShort, reportLines, taskLabel } from '../../lib/format';
 import type { ManagerDashboard as ManagerDashboardData } from '../../types';
 
 export function ManagerDashboard() {
@@ -210,7 +210,7 @@ export function ManagerDashboard() {
                           {task.task_key}
                         </span>
                       )}
-                      {task.title}
+                      {taskLabel(task)}
                     </p>
                     <p className="truncate text-xs text-ink-500">
                       {task.employee_name} · {task.project_name || 'No project'} · {formatDateShort(task.created_at)}

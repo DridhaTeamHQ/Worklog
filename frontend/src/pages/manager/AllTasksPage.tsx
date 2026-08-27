@@ -13,7 +13,7 @@ import { EditTaskModal } from '../../components/EditTaskModal';
 import {
   EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner,
 } from '../../components/ui';
-import { STATUS_LABEL } from '../../lib/format';
+import { STATUS_LABEL, taskLabel } from '../../lib/format';
 import type { Project, Task, TaskStatus, TeamMember } from '../../types';
 
 export function AllTasksPage() {
@@ -50,6 +50,8 @@ export function AllTasksPage() {
   const [editTask, setEditTask] = useState<Task | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
   const [deleting, setDeleting] = useState(false);
+  /** True while the "delete everything selected" confirmation is open. */
+  const [confirmBulkDelete, setConfirmBulkDelete] = useState(false);
 
   const highlightRef = useRef<HTMLTableRowElement | null>(null);
 
@@ -163,6 +165,36 @@ export function AllTasksPage() {
       toast.error(`${ids.length - failures.length} updated, ${failures.length} failed: ${failures.join(', ')}`);
     } else {
       toast.success(`${ids.length} task${ids.length === 1 ? '' : 's'} set to ${STATUS_LABEL[next]}.`);
+    }
+  };
+
+  /**
+   * Deletes every selected task. Failures are collected rather than thrown so one
+   * refusal cannot strand the rest half-done and unreported.
+   */
+  const bulkDelete = async () => {
+    const ids = [...selected];
+    if (!ids.length) return;
+    setBulkBusy(true);
+    const failures: string[] = [];
+    const deleted: number[] = [];
+    for (const id of ids) {
+      try {
+        await taskApi.remove(id);
+        deleted.push(id);
+      } catch {
+        failures.push(tasks.find((t) => t.id === id)?.task_key ?? `#${id}`);
+      }
+    }
+    setTasks((prev) => prev.filter((t) => !deleted.includes(t.id)));
+    setBulkBusy(false);
+    setSelected(new Set());
+    setConfirmBulkDelete(false);
+    void loadProjects();
+    if (failures.length) {
+      toast.error(`${deleted.length} deleted, ${failures.length} failed: ${failures.join(', ')}`);
+    } else {
+      toast.success(`${deleted.length} task${deleted.length === 1 ? '' : 's'} deleted.`);
     }
   };
 
@@ -325,6 +357,15 @@ export function AllTasksPage() {
                       {STATUS_LABEL[s]}
                     </button>
                   ))}
+                  <span className="mx-1 h-5 w-px bg-brand-300" aria-hidden />
+                  <button
+                    type="button"
+                    disabled={bulkBusy}
+                    onClick={() => setConfirmBulkDelete(true)}
+                    className="btn-danger btn-sm"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" /> Delete
+                  </button>
                   {bulkBusy && <Spinner className="h-4 w-4 text-brand-700" />}
                 </div>
                 <button
@@ -418,6 +459,36 @@ export function AllTasksPage() {
       />
 
       <Modal
+        open={confirmBulkDelete}
+        onClose={() => setConfirmBulkDelete(false)}
+        title={`Delete ${selected.size} task${selected.size === 1 ? '' : 's'}?`}
+        description="They are removed from their assignees' lists as well. This cannot be undone."
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setConfirmBulkDelete(false)} className="btn-secondary">
+              Cancel
+            </button>
+            <button type="button" onClick={() => void bulkDelete()} disabled={bulkBusy} className="btn-danger">
+              <Trash2 className="h-4 w-4" />
+              {bulkBusy ? 'Deleting…' : `Delete ${selected.size} task${selected.size === 1 ? '' : 's'}`}
+            </button>
+          </div>
+        )}
+      >
+        {/* Named rather than counted: deleting the wrong five is easy to do blind. */}
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-3">
+          {tasks.filter((t) => selected.has(t.id)).map((t) => (
+            <li key={t.id} className="flex items-baseline gap-2 text-sm">
+              {t.task_key && <span className="font-mono text-xs text-brand-700">{t.task_key}</span>}
+              <span className="min-w-0 truncate text-ink-900">{taskLabel(t)}</span>
+              <span className="ml-auto shrink-0 text-xs text-ink-500">{t.employee_name}</span>
+            </li>
+          ))}
+        </ul>
+      </Modal>
+
+      <Modal
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         title="Delete this task?"
@@ -438,7 +509,7 @@ export function AllTasksPage() {
               {confirmDelete.task_key && (
                 <span className="mr-2 font-mono text-xs text-brand-700">{confirmDelete.task_key}</span>
               )}
-              {confirmDelete.title}
+              {taskLabel(confirmDelete)}
             </p>
             <p className="mt-1 text-sm text-ink-600">Assigned to {confirmDelete.employee_name}</p>
           </div>

@@ -123,5 +123,18 @@ export function avatarTint(seed: string): string {
   return palette[hash % palette.length];
 }
 
+/**
+ * What to show where a task is named.
+ *
+ * A title is optional at assignment time, so an untitled task falls back to its key —
+ * which is how people refer to it anyway — and only reaches the generic wording when
+ * it has neither.
+ */
+export function taskLabel(task: { title?: string | null; task_key?: string | null }): string {
+  const title = task.title?.trim();
+  if (title) return title;
+  return task.task_key?.trim() || 'Untitled task';
+}
+
 export const pluralize = (n: number, singular: string, plural = `${singular}s`) =>
   `${n} ${n === 1 ? singular : plural}`;

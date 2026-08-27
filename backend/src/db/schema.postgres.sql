@@ -6,7 +6,10 @@ CREATE TABLE IF NOT EXISTS users (
   id             SERIAL PRIMARY KEY,
   name           TEXT NOT NULL,
   email          TEXT NOT NULL UNIQUE,
-  password_hash  TEXT NOT NULL,
+  -- NULL until the person accepts their invite and chooses a password. An account
+  -- in that state cannot sign in: every credential check compares against a hash,
+  -- and there is none to compare with yet.
+  password_hash  TEXT,
   role           TEXT NOT NULL CHECK (role IN ('admin', 'manager', 'team_member')),
   department     TEXT,
   job_title      TEXT,

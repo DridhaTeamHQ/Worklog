@@ -17,29 +17,48 @@ function taskFilters({ employeeId, department, from, to }) {
 }
 
 /** Headline cards on the manager dashboard. */
-export async function managerOverview() {
+/**
+ * The company-wide figures behind the manager dashboard.
+ *
+ * `department` confines every count to one department, which is how a manager's
+ * dashboard reports on their own team rather than the whole company. Left undefined —
+ * an admin — nothing is narrowed.
+ */
+export async function managerOverview(department) {
   const db = await getDb();
   const t = today();
 
-  const team = await db.get("SELECT COUNT(*) AS c FROM users WHERE role = 'team_member' AND is_active = 1");
+  // Applied to each count separately: the tables reach `users` by different columns,
+  // so there is no single join to hang this off.
+  const dept = department ? ' AND e.department = ?' : '';
+  const deptParam = department ? [department] : [];
+
+  const team = await db.get(
+    `SELECT COUNT(*) AS c FROM users e WHERE e.role = 'team_member' AND e.is_active = 1${dept}`,
+    deptParam,
+  );
   const tasks = await db.get(
     `SELECT
        COUNT(*) AS total,
-       SUM(CASE WHEN substr(created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS assigned_today,
-       SUM(CASE WHEN status = 'completed' AND substr(COALESCE(completed_at, updated_at), 1, 10) = ? THEN 1 ELSE 0 END) AS completed_today,
-       SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS pending,
-       SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-       SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS completed,
-       SUM(CASE WHEN status <> 'completed' AND deadline IS NOT NULL AND deadline < ? THEN 1 ELSE 0 END) AS overdue
-     FROM assigned_tasks`,
-    [t, t, t],
+       SUM(CASE WHEN substr(a.created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS assigned_today,
+       SUM(CASE WHEN a.status = 'completed' AND substr(COALESCE(a.completed_at, a.updated_at), 1, 10) = ? THEN 1 ELSE 0 END) AS completed_today,
+       SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN a.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+       SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
+       SUM(CASE WHEN a.status <> 'completed' AND a.deadline IS NOT NULL AND a.deadline < ? THEN 1 ELSE 0 END) AS overdue
+     FROM assigned_tasks a
+     JOIN users e ON e.id = a.employee_id
+     WHERE 1 = 1${dept}`,
+    [t, t, t, ...deptParam],
   );
   const reports = await db.get(
-    'SELECT COUNT(*) AS c FROM daily_task_reports WHERE report_date = ?',
-    [t],
+    `SELECT COUNT(*) AS c FROM daily_task_reports d
+       JOIN users e ON e.id = d.employee_id
+      WHERE d.report_date = ?${dept}`,
+    [t, ...deptParam],
   );
 
-  const tickets = await ticketCounts();
+  const tickets = await ticketCounts({ department });
 
   const n = (v) => Number(v || 0);
   return {

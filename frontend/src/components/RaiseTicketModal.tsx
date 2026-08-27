@@ -4,6 +4,7 @@ import { taskApi, ticketApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
 import { Modal, Spinner } from './ui';
+import { taskLabel } from '../lib/format';
 import type { Task, Ticket, TicketSeverity } from '../types';
 
 const SEVERITIES: { value: TicketSeverity; label: string; hint: string }[] = [
@@ -211,7 +212,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
                 {projectId ? 'Select the task you were working on…' : 'Choose a project first'}
               </option>
               {tasksInProject.map((t) => (
-                <option key={t.id} value={t.id}>{t.task_key} · {t.title}</option>
+                <option key={t.id} value={t.id}>{t.task_key} · {taskLabel(t)}</option>
               ))}
             </select>
             {errors.taskId
@@ -224,7 +225,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
               <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Working on</p>
               <p className="mt-1 text-sm text-ink-700">
                 <span className="font-mono text-xs font-semibold text-brand-700">{selectedTask.task_key}</span>
-                {' '}{selectedTask.title}
+                {' '}{taskLabel(selectedTask)}
               </p>
             </div>
           )}

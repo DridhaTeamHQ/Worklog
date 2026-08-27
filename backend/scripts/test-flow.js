@@ -19,7 +19,9 @@ const API = `${BASE}/api`;
  * drive. It needs a manager-level account and two team members that already exist
  * in the target database.
  *
- *   TEST_MANAGER_EMAIL / TEST_MANAGER_PASSWORD
+ *   TEST_MANAGER_EMAIL / TEST_MANAGER_PASSWORD   (must be an ADMIN: the suite
+ *                                                 creates and deletes accounts, and
+ *                                                 that is an admin-only power)
  *   TEST_EMPLOYEE_EMAIL / TEST_EMPLOYEE_PASSWORD
  *   TEST_OTHER_EMPLOYEE_EMAIL   (a second team member, shares the employee password)
  */
@@ -96,7 +98,8 @@ async function run() {
   step('1. Manager logs in');
   const mLogin = await api('/auth/login', { method: 'POST', body: MANAGER });
   check('manager login succeeds', mLogin.status === 200 && !!mLogin.data?.token, mLogin.body);
-  check('manager role is manager', mLogin.data?.user?.role === 'manager');
+  // Creating and removing accounts is admin-only, so the driving account must be one.
+  check('the driving account is an admin', mLogin.data?.user?.role === 'admin', mLogin.data?.user?.role);
   check('password hash is never returned', !JSON.stringify(mLogin.body).includes('password_hash'));
   const managerToken = mLogin.data?.token;
 
@@ -109,7 +112,8 @@ async function run() {
   /* ---------------------------------------------------------- manager dashboard */
   step('2. Manager dashboard loads');
   const mDash = await api('/dashboard', { token: managerToken });
-  check('dashboard returns the manager payload', mDash.status === 200 && mDash.data?.role === 'manager', mDash.body);
+  check('dashboard returns the manager-level payload',
+    mDash.status === 200 && ['admin', 'manager'].includes(mDash.data?.role), mDash.body);
   check('summary counts team members', (mDash.data?.summary?.total_team_members ?? 0) >= 3, mDash.data?.summary);
 
   /* --------------------------------------------------------- select an employee */
@@ -126,64 +130,127 @@ async function run() {
   check('detail includes the employee daily reports', Array.isArray(detail.data?.reports));
 
   /* --------------------------------------------------------- add a team member */
-  step('3a. Manager adds a team member');
+  step('3a. Manager invites a team member');
   const newEmail = `probe.${Date.now()}@company.com`;
+  // Chosen by the new joiner when they claim the invite — never sent by the manager.
   const newPassword = 'ProbePass@2026';
 
   const addMember = await api('/team', {
     method: 'POST',
     token: managerToken,
-    body: { name: 'Probe Employee', email: newEmail, password: newPassword, department: 'QA', jobTitle: 'Test Engineer' },
+    body: { name: 'Probe Employee', email: newEmail, department: 'QA', jobTitle: 'Test Engineer' },
   });
-  check('manager can add a team member (201)', addMember.status === 201, addMember.body);
+  check('manager can add a team member with no password (201)', addMember.status === 201, addMember.body);
   check('new account is a team member', addMember.data?.employee?.role === 'team_member', addMember.data?.employee?.role);
   check('new account is active', addMember.data?.employee?.is_active === true);
   check('password hash is not returned', !JSON.stringify(addMember.body).includes('password_hash'));
   const addedId = addMember.data?.employee?.id;
 
-  // Onboarding email. The suite runs in whichever mail mode the server is configured
+  // Invitation email. The suite runs in whichever mail mode the server is configured
   // with: 'smtp' when SMTP_HOST is set, otherwise 'log', where the message is written
   // to the server log rather than sent. Either way the account must work.
-  check('the response reports what happened to the welcome email',
+  check('the response reports what happened to the invite email',
     typeof addMember.data?.email?.delivered === 'boolean' && ['smtp', 'log'].includes(addMember.data?.email?.mode),
     addMember.data?.email);
   check('the confirmation message matches the delivery outcome',
     addMember.data.email.delivered
-      ? addMember.data.message.includes('emailed their sign-in details')
+      ? addMember.data.message.includes('emailed a link to set their password')
       : addMember.data.message === 'Probe Employee has been added to the team.',
     { delivered: addMember.data.email.delivered, message: addMember.data.message });
-  check('the temporary password is never echoed back in the account payload',
-    !JSON.stringify(addMember.data.employee).includes(newPassword));
 
   const dupeEmail = await api('/team', {
     method: 'POST', token: managerToken,
-    body: { name: 'Duplicate', email: newEmail, password: newPassword },
+    body: { name: 'Duplicate', email: newEmail, department: 'QA', jobTitle: 'Test Engineer' },
   });
   check('duplicate email is rejected (409)', dupeEmail.status === 409, dupeEmail.body);
 
   const badEmail = await api('/team', {
     method: 'POST', token: managerToken,
-    body: { name: 'Bad', email: 'not-an-email', password: newPassword },
+    body: { name: 'Bad', email: 'not-an-email', department: 'QA', jobTitle: 'Test Engineer' },
   });
   check('invalid email is rejected (400)', badEmail.status === 400, badEmail.body);
 
-  const weakPassword = await api('/team', {
+  const missingDept = await api('/team', {
     method: 'POST', token: managerToken,
-    body: { name: 'Weak', email: `weak.${Date.now()}@company.com`, password: 'short' },
+    body: { name: 'No Dept', email: `nodept.${Date.now()}@company.com`, jobTitle: 'Test Engineer' },
   });
-  check('short password is rejected (400)', weakPassword.status === 400, weakPassword.body);
+  check('a missing department is rejected (400)', missingDept.status === 400, missingDept.body);
+
+  const missingTitle = await api('/team', {
+    method: 'POST', token: managerToken,
+    body: { name: 'No Title', email: `notitle.${Date.now()}@company.com`, department: 'QA' },
+  });
+  check('a missing job title is rejected (400)', missingTitle.status === 400, missingTitle.body);
 
   const roleInjection = await api('/team', {
     method: 'POST', token: managerToken,
-    body: { name: 'Sneaky', email: `sneaky.${Date.now()}@company.com`, password: newPassword, role: 'manager' },
+    body: {
+      name: 'Sneaky', email: `sneaky.${Date.now()}@company.com`,
+      department: 'QA', jobTitle: 'Test Engineer', role: 'manager',
+    },
   });
   check('role cannot be forced through this endpoint',
     roleInjection.status === 201 && roleInjection.data?.employee?.role === 'team_member',
     roleInjection.data?.employee?.role);
 
+  /* ------------------------------------------------------- claiming the invite */
+  step('3b. The new joiner claims the invite and sets their own password');
+
+  const invitedFlag = await api('/team', { token: managerToken });
+  check('the roster marks them as invited until they claim it',
+    invitedFlag.data?.find((m) => m.id === addedId)?.invited === true,
+    invitedFlag.data?.find((m) => m.id === addedId)?.invited);
+
+  const preClaimLogin = await api('/auth/login', {
+    method: 'POST', body: { email: newEmail, password: newPassword },
+  });
+  check('an unclaimed account cannot sign in (401)', preClaimLogin.status === 401, preClaimLogin.body);
+
+  const inviteProbe = await api('/auth/invite-status', { method: 'POST', body: { email: newEmail } });
+  check('invite-status reports a pending invite without a token',
+    inviteProbe.status === 200 && inviteProbe.data?.invited === true, inviteProbe.body);
+  check('invite-status returns only the first name', inviteProbe.data?.name === 'Probe', inviteProbe.data);
+
+  const unknownProbe = await api('/auth/invite-status', {
+    method: 'POST', body: { email: `nobody.${Date.now()}@company.com` },
+  });
+  check('invite-status reports false for an address nobody added',
+    unknownProbe.status === 200 && unknownProbe.data?.invited === false, unknownProbe.body);
+
+  const claimedProbe = await api('/auth/invite-status', { method: 'POST', body: { email: MANAGER.email } });
+  check('invite-status reports false for an account that already has a password',
+    claimedProbe.status === 200 && claimedProbe.data?.invited === false, claimedProbe.body);
+
+  const shortClaim = await api('/auth/accept-invite', {
+    method: 'POST', body: { email: newEmail, password: 'short' },
+  });
+  check('a short password is rejected when claiming (400)', shortClaim.status === 400, shortClaim.body);
+
+  const claim = await api('/auth/accept-invite', {
+    method: 'POST', body: { email: newEmail, password: newPassword },
+  });
+  check('the invite can be claimed (200)', claim.status === 200, claim.body);
+  check('claiming signs them straight in', !!claim.data?.token && claim.data?.user?.role === 'team_member', claim.body);
+  check('no password hash is returned when claiming', !JSON.stringify(claim.body).includes('password_hash'));
+
+  const replayClaim = await api('/auth/accept-invite', {
+    method: 'POST', body: { email: newEmail, password: 'SomeoneElse@2026' },
+  });
+  check('a claimed invite cannot be claimed again (400)', replayClaim.status === 400, replayClaim.body);
+
+  const afterClaimProbe = await api('/auth/invite-status', { method: 'POST', body: { email: newEmail } });
+  check('invite-status stops reporting them once claimed',
+    afterClaimProbe.data?.invited === false, afterClaimProbe.body);
+
   const newMemberLogin = await api('/auth/login', { method: 'POST', body: { email: newEmail, password: newPassword } });
-  check('the new team member can sign in', newMemberLogin.status === 200 && !!newMemberLogin.data?.token, newMemberLogin.body);
+  check('the new team member can sign in with the password they chose',
+    newMemberLogin.status === 200 && !!newMemberLogin.data?.token, newMemberLogin.body);
   check('they land in the team member portal', newMemberLogin.data?.user?.role === 'team_member');
+
+  const claimedFlag = await api('/team', { token: managerToken });
+  check('the roster no longer marks them as invited',
+    claimedFlag.data?.find((m) => m.id === addedId)?.invited === false,
+    claimedFlag.data?.find((m) => m.id === addedId)?.invited);
 
   const newMemberDash = await api('/dashboard', { token: newMemberLogin.data?.token });
   check('their dashboard loads with no work yet',
@@ -205,7 +272,9 @@ async function run() {
   const adminsBefore = await api('/admins', { token: managerToken });
   check('manager can list admins', adminsBefore.status === 200 && Array.isArray(adminsBefore.data), adminsBefore.body);
   check('the configured manager is listed', adminsBefore.data.some((a) => a.email === MANAGER.email));
-  check('every listed admin holds the manager role', adminsBefore.data.every((a) => a.role === 'manager'), adminsBefore.data?.map((a) => a.role));
+  // The list is everyone with manager-level access, which includes admins by design.
+  check('every listed account holds manager-level access',
+    adminsBefore.data.every((a) => ['admin', 'manager'].includes(a.role)), adminsBefore.data?.map((a) => a.role));
   check('admin rows carry their assignment counts', typeof adminsBefore.data[0]?.assigned_tasks === 'number', adminsBefore.data?.[0]);
   const adminCountBefore = adminsBefore.data.length;
 
@@ -215,13 +284,25 @@ async function run() {
   const addAdmin = await api('/admins', {
     method: 'POST',
     token: managerToken,
-    body: { name: 'Probe Admin', email: newAdminEmail, password: newAdminPassword, department: 'Management', jobTitle: 'Delivery Manager' },
+    body: { name: 'Probe Admin', email: newAdminEmail, department: 'Management', jobTitle: 'Delivery Manager' },
   });
-  check('manager can add an admin (201)', addAdmin.status === 201, addAdmin.body);
+  check('manager can add an admin with no password (201)', addAdmin.status === 201, addAdmin.body);
   check('the new account holds the manager role', addAdmin.data?.admin?.role === 'manager', addAdmin.data?.admin?.role);
-  check('the welcome email outcome is reported', typeof addAdmin.data?.email?.delivered === 'boolean', addAdmin.data?.email);
+  check('the invite email outcome is reported', typeof addAdmin.data?.email?.delivered === 'boolean', addAdmin.data?.email);
   check('no password hash is returned', !JSON.stringify(addAdmin.body).includes('password_hash'));
   const addedAdminId = addAdmin.data?.admin?.id;
+
+  // Elevated accounts are invited exactly like a team member: no password is set for
+  // them, and they choose their own before they can sign in.
+  const adminPreClaim = await api('/auth/login', {
+    method: 'POST', body: { email: newAdminEmail, password: newAdminPassword },
+  });
+  check('an unclaimed admin account cannot sign in (401)', adminPreClaim.status === 401, adminPreClaim.body);
+
+  const adminClaim = await api('/auth/accept-invite', {
+    method: 'POST', body: { email: newAdminEmail, password: newAdminPassword },
+  });
+  check('the admin invite can be claimed (200)', adminClaim.status === 200, adminClaim.body);
 
   const adminLogin = await api('/auth/login', { method: 'POST', body: { email: newAdminEmail, password: newAdminPassword } });
   check('the new admin can sign in', adminLogin.status === 200 && !!adminLogin.data?.token, adminLogin.body);
@@ -232,19 +313,25 @@ async function run() {
   check('the new admin gets the manager dashboard', adminDash.status === 200 && adminDash.data?.role === 'manager', adminDash.data?.role);
 
   const adminSeesTeam = await api('/team', { token: newAdminToken });
-  check('the new admin can read the team list', adminSeesTeam.status === 200 && adminSeesTeam.data.length >= 3);
+  check('the new manager can read a team list', adminSeesTeam.status === 200, adminSeesTeam.body);
+  // They are a manager, not an admin, so the roster is confined to their department.
+  check('the new manager only sees their own department',
+    adminSeesTeam.data.every((m) => m.department === 'Management'),
+    adminSeesTeam.data?.map((m) => m.department));
 
   const adminSeesTickets = await api('/tickets', { token: newAdminToken });
   check('the new admin can read every ticket', adminSeesTickets.status === 200);
 
   const adminAddsAdmin = await api('/admins', {
     method: 'POST', token: newAdminToken,
-    body: { name: 'Chained Admin', email: `chained.${Date.now()}@company.com`, password: newAdminPassword },
+    body: { name: 'Chained Admin', email: `chained.${Date.now()}@company.com` },
   });
-  check('a newly added admin can grant access onward', adminAddsAdmin.status === 201, adminAddsAdmin.body);
+  // Account creation is admin-only: a manager cannot pass access on.
+  check('a manager cannot grant access onward (403)', adminAddsAdmin.status === 403, adminAddsAdmin.body);
 
   const adminsAfter = await api('/admins', { token: managerToken });
-  check('the admin list grows', adminsAfter.data.length === adminCountBefore + 2, { before: adminCountBefore, after: adminsAfter.data.length });
+  check('the admin list grows by the one the admin created',
+    adminsAfter.data.length === adminCountBefore + 1, { before: adminCountBefore, after: adminsAfter.data.length });
 
   const teamListUnchanged = await api('/team', { token: managerToken });
   check('admins do not appear in the team member list',
@@ -252,15 +339,15 @@ async function run() {
 
   const dupeAdmin = await api('/admins', {
     method: 'POST', token: managerToken,
-    body: { name: 'Duplicate', email: newAdminEmail, password: newAdminPassword },
+    body: { name: 'Duplicate', email: newAdminEmail },
   });
   check('a duplicate admin email is rejected (409)', dupeAdmin.status === 409, dupeAdmin.body);
 
-  const weakAdmin = await api('/admins', {
+  const namelessAdmin = await api('/admins', {
     method: 'POST', token: managerToken,
-    body: { name: 'Weak', email: `weak.admin.${Date.now()}@company.com`, password: 'short' },
+    body: { email: `nameless.admin.${Date.now()}@company.com` },
   });
-  check('a short admin password is rejected (400)', weakAdmin.status === 400);
+  check('an admin with no name is rejected (400)', namelessAdmin.status === 400, namelessAdmin.body);
 
   /* --------------------------------------------------------------------- projects */
   step('3b. Projects');
@@ -599,13 +686,16 @@ async function run() {
 
   const empAddsAdmin = await api('/admins', {
     method: 'POST', token: employeeToken,
-    body: { name: 'Self Promotion', email: `promote.${Date.now()}@company.com`, password: 'RoguePass@2026' },
+    body: { name: 'Self Promotion', email: `promote.${Date.now()}@company.com` },
   });
   check('employee cannot grant admin access (403)', empAddsAdmin.status === 403, empAddsAdmin.body);
 
   const empAddsMember = await api('/team', {
     method: 'POST', token: employeeToken,
-    body: { name: 'Rogue Hire', email: `rogue.${Date.now()}@company.com`, password: 'RoguePass@2026' },
+    body: {
+      name: 'Rogue Hire', email: `rogue.${Date.now()}@company.com`,
+      department: 'QA', jobTitle: 'Test Engineer',
+    },
   });
   check('employee cannot add a team member (403)', empAddsMember.status === 403, empAddsMember.body);
 
@@ -794,6 +884,172 @@ async function run() {
   await api(`/tickets/${ticketId}`, { method: 'DELETE', token: managerToken });
 
   /* ------------------------------------------------------------ misc hardening */
+  /* ----------------------------------------------- optional task fields */
+  step('12b. Assigning with only the structural fields');
+
+  const bareTask = await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: employee.id, projectId: project.id },
+  });
+  check('a task assigns with no title, description or priority (201)', bareTask.status === 201, bareTask.body);
+  check('the untitled task still gets a key', !!bareTask.data?.task?.task_key, bareTask.data?.task?.task_key);
+  check('title falls back to empty rather than null', bareTask.data?.task?.title === '', bareTask.data?.task?.title);
+  check('description falls back to empty rather than null', bareTask.data?.task?.description === '', bareTask.data?.task?.description);
+  check('priority defaults to medium', bareTask.data?.task?.priority === 'medium', bareTask.data?.task?.priority);
+  const bareTaskId = bareTask.data?.task?.id;
+
+  const noAssignee = await api('/tasks', {
+    method: 'POST', token: managerToken, body: { projectId: project.id },
+  });
+  check('the assignee is still required (400)', noAssignee.status === 400, noAssignee.body);
+
+  const noProject = await api('/tasks', {
+    method: 'POST', token: managerToken, body: { employeeId: employee.id },
+  });
+  check('the project is still required (400)', noProject.status === 400, noProject.body);
+
+  if (bareTaskId) {
+    const cleanup = await api(`/tasks/${bareTaskId}`, { method: 'DELETE', token: managerToken });
+    check('the untitled task can be deleted again', cleanup.status === 200, cleanup.body);
+  }
+
+  /* --------------------------------------------- removing a team member */
+  step('12c. Manager removes a team member');
+
+  const doomedEmail = `doomed.${Date.now()}@company.com`;
+  const doomed = await api('/team', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Doomed Hire', email: doomedEmail, department: 'QA', jobTitle: 'Test Engineer' },
+  });
+  const doomedId = doomed.data?.employee?.id;
+  check('a throwaway team member is created', doomed.status === 201 && !!doomedId, doomed.body);
+
+  const doomedTask = await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: doomedId, projectId: project.id, title: 'Work that dies with them' },
+  });
+  check('they are given a task first', doomedTask.status === 201, doomedTask.body);
+
+  const empDeletes = await api(`/team/${doomedId}`, { method: 'DELETE', token: employeeToken });
+  check('a team member cannot delete anyone (403)', empDeletes.status === 403, empDeletes.body);
+
+  // The endpoint is scoped to team members in SQL, so a manager-level id is simply not
+  // found by it — which is what keeps `assigned_tasks.manager_id` from cascading.
+  const deleteManager = await api(`/team/${mLogin.data.user.id}`, { method: 'DELETE', token: managerToken });
+  check('a manager-level account cannot be deleted through /team (404)', deleteManager.status === 404, deleteManager.body);
+
+  const managerStillThere = await api('/auth/me', { token: managerToken });
+  check('the manager account survived that attempt', managerStillThere.status === 200, managerStillThere.body);
+
+  const removed = await api(`/team/${doomedId}`, { method: 'DELETE', token: managerToken });
+  check('the manager can delete a team member (200)', removed.status === 200, removed.body);
+  check('the response counts what went with them', removed.data?.removed?.tasks >= 1, removed.data?.removed);
+
+  const rosterAfterDelete = await api('/team', { token: managerToken });
+  check('they are gone from the roster', !rosterAfterDelete.data?.some((m) => m.id === doomedId));
+
+  const deleteAgain = await api(`/team/${doomedId}`, { method: 'DELETE', token: managerToken });
+  check('deleting them twice returns 404', deleteAgain.status === 404, deleteAgain.body);
+
+  const theirTasksGone = await api(`/tasks?employeeId=${doomedId}`, { token: managerToken });
+  check('their tasks went with them', (theirTasksGone.data?.length ?? 0) === 0, theirTasksGone.data?.length);
+
+  /* ------------------------------------------- a manager's department scope */
+  step('12d. A manager sees only their own department');
+
+  // Built here rather than assumed: two departments, a manager confined to one, and
+  // an employee in each, so leakage in either direction is visible.
+  const stamp = Date.now();
+  const scopeDept = `ScopeA-${stamp}`;
+  const otherDept = `ScopeB-${stamp}`;
+
+  const scopedMgrEmail = `scoped.mgr.${stamp}@company.com`;
+  const scopedMgrPassword = 'ScopedMgr@2026';
+  const mkMgr = await api('/admins', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Scoped Manager', email: scopedMgrEmail, department: scopeDept, jobTitle: 'Lead', role: 'manager' },
+  });
+  check('an admin can create a manager in a department', mkMgr.status === 201, mkMgr.body);
+  await api('/auth/accept-invite', { method: 'POST', body: { email: scopedMgrEmail, password: scopedMgrPassword } });
+  const scopedMgrLogin = await api('/auth/login', { method: 'POST', body: { email: scopedMgrEmail, password: scopedMgrPassword } });
+  const scopedMgrToken = scopedMgrLogin.data?.token;
+  check('the scoped manager can sign in', !!scopedMgrToken, scopedMgrLogin.body);
+
+  const insideEmail = `inside.${stamp}@company.com`;
+  const outsideEmail = `outside.${stamp}@company.com`;
+  const inside = await api('/team', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Inside Person', email: insideEmail, department: scopeDept, jobTitle: 'Engineer' },
+  });
+  const outside = await api('/team', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Outside Person', email: outsideEmail, department: otherDept, jobTitle: 'Engineer' },
+  });
+  check('both employees are created', inside.status === 201 && outside.status === 201);
+  const insideId = inside.data?.employee?.id;
+  const outsideId = outside.data?.employee?.id;
+
+  await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: outsideId, projectId: project.id, title: `Outside work ${stamp}` },
+  });
+
+  const mgrRoster = await api('/team', { token: scopedMgrToken });
+  check('the roster is confined to their department',
+    mgrRoster.status === 200 && mgrRoster.data.every((m) => m.department === scopeDept),
+    mgrRoster.data?.map((m) => m.department));
+  check('their own department member is present', mgrRoster.data.some((m) => m.id === insideId));
+  check('the other department is absent', !mgrRoster.data.some((m) => m.id === outsideId));
+
+  const widen = await api(`/team?department=${encodeURIComponent(otherDept)}`, { token: scopedMgrToken });
+  check('the department query string cannot widen the roster',
+    widen.data.every((m) => m.department === scopeDept), widen.data?.map((m) => m.department));
+
+  const outsideDetail = await api(`/team/${outsideId}`, { token: scopedMgrToken });
+  check('an employee outside the department is not found (404)', outsideDetail.status === 404, outsideDetail.body);
+
+  const outsideReports = await api(`/team/${outsideId}/reports`, { token: scopedMgrToken });
+  check('their reports are not reachable either (404)', outsideReports.status === 404, outsideReports.body);
+
+  const mgrTasks = await api('/tasks', { token: scopedMgrToken });
+  check('tasks are confined to the department',
+    mgrTasks.data.every((t) => t.employee_department === scopeDept),
+    mgrTasks.data?.map((t) => t.employee_department));
+
+  const crossAssign = await api('/tasks', {
+    method: 'POST', token: scopedMgrToken,
+    body: { employeeId: outsideId, projectId: project.id, title: 'Cross-department assignment' },
+  });
+  check('assigning outside the department is refused (403)', crossAssign.status === 403, crossAssign.body);
+
+  const mgrAddsMember = await api('/team', {
+    method: 'POST', token: scopedMgrToken,
+    body: { name: 'Manager Hire', email: `mgrhire.${stamp}@company.com`, department: scopeDept, jobTitle: 'Engineer' },
+  });
+  check('a manager cannot add a team member (403)', mgrAddsMember.status === 403, mgrAddsMember.body);
+
+  const mgrAddsAdmin = await api('/admins', {
+    method: 'POST', token: scopedMgrToken,
+    body: { name: 'Manager Grant', email: `mgrgrant.${stamp}@company.com` },
+  });
+  check('a manager cannot add a manager (403)', mgrAddsAdmin.status === 403, mgrAddsAdmin.body);
+
+  const mgrListsAdmins = await api('/admins', { token: scopedMgrToken });
+  check('a manager cannot list who holds access (403)', mgrListsAdmins.status === 403, mgrListsAdmins.body);
+
+  const mgrDeletes = await api(`/team/${insideId}`, { method: 'DELETE', token: scopedMgrToken });
+  check('a manager cannot delete even their own report (403)', mgrDeletes.status === 403, mgrDeletes.body);
+
+  const mgrDash = await api('/dashboard', { token: scopedMgrToken });
+  check('their dashboard counts only their department',
+    mgrDash.data?.summary?.total_team_members === mgrRoster.data.length,
+    { dashboard: mgrDash.data?.summary?.total_team_members, roster: mgrRoster.data.length });
+
+  // Cleanup: the admin removes what this section created.
+  for (const id of [insideId, outsideId]) {
+    if (id) await api(`/team/${id}`, { method: 'DELETE', token: managerToken });
+  }
+
   step('13. Input handling');
   const injection = await api(`/tasks?search=${encodeURIComponent("'; DROP TABLE assigned_tasks; --")}`, { token: managerToken });
   check('SQL injection attempt is treated as literal text', injection.status === 200 && Array.isArray(injection.data), injection.body);

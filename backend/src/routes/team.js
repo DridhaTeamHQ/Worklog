@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireManager } from '../middleware/auth.js';
+import { requireAuth, requireManager, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText, isoDate } from '../middleware/validate.js';
 import {
-  list, departments, create, getOne, memberReports, memberTasks,
+  list, departments, create, getOne, memberReports, memberTasks, remove,
 } from '../controllers/team.js';
 
 const router = Router();
@@ -16,12 +16,20 @@ const listQuery = z.object({
   department: z.string().trim().min(1).optional(),
 });
 
+/*
+ * No password field: the manager identifies the person, and the person chooses their
+ * own password when they claim the invite. Anything sent as `password` is dropped by
+ * the validator rather than honoured, so this endpoint cannot be used to set one.
+ *
+ * Department and job title are required here, unlike on the elevated tiers — an
+ * employee's roster row is filtered and grouped by both, so a blank one leaves a hole
+ * in every team view.
+ */
 const createSchema = z.object({
   name: safeText(120, 'Name'),
   email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(190),
-  password: z.string().min(8, 'Use at least 8 characters.').max(200),
-  department: optionalText(120),
-  jobTitle: optionalText(120),
+  department: safeText(120, 'Department'),
+  jobTitle: safeText(120, 'Job title'),
   phone: optionalText(40),
 });
 
@@ -37,9 +45,11 @@ const reportQuery = z.object({
 router.get('/', validate(listQuery, 'query'), list);
 // Static path before '/:id', or 'departments' would be read as an id.
 router.get('/departments', departments);
-router.post('/', validate(createSchema), create);
+// Admin-only. A manager runs their department but does not decide who is in it.
+router.post('/', requireAdmin, validate(createSchema), create);
 router.get('/:id', getOne);
 router.get('/:id/reports', validate(reportQuery, 'query'), memberReports);
 router.get('/:id/tasks', memberTasks);
+router.delete('/:id', requireAdmin, remove);
 
 export default router;

@@ -38,7 +38,7 @@ const SELECT_TICKET = `
  * stops one person reading another's bug reports.
  */
 export async function listTickets({
-  reporterId, projectId, taskId, status, severity, search,
+  reporterId, projectId, taskId, status, severity, search, department,
   sort = 'created_desc', limit = 100, offset = 0,
 } = {}) {
   const db = await getDb();
@@ -46,6 +46,9 @@ export async function listTickets({
   const params = [];
 
   if (reporterId) { where.push('t.reporter_id = ?'); params.push(reporterId); }
+  // Filters on the reporter's department, which is what confines a manager to
+  // the tickets their own people raised.
+  if (department) { where.push('r.department = ?'); params.push(department); }
   if (projectId) { where.push('t.project_id = ?'); params.push(projectId); }
   if (taskId) { where.push('t.task_id = ?'); params.push(taskId); }
   if (severity) { where.push('t.severity = ?'); params.push(severity); }
@@ -253,19 +256,25 @@ export async function deleteTicket({ ticketId, actor }) {
 }
 
 /** Counts for the dashboards. `reporterId` scopes it to one person. */
-export async function ticketCounts({ reporterId } = {}) {
+export async function ticketCounts({ reporterId, department } = {}) {
   const db = await getDb();
-  const where = reporterId ? 'WHERE reporter_id = ?' : '';
-  const params = reporterId ? [reporterId] : [];
+  const where = [];
+  const params = [];
+  if (reporterId) { where.push('t.reporter_id = ?'); params.push(reporterId); }
+  // Same rule as listTickets: a ticket belongs to the department of whoever raised it.
+  if (department) { where.push('r.department = ?'); params.push(department); }
+  const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';
   const row = await db.get(
     `SELECT
        COUNT(*) AS total,
-       SUM(CASE WHEN status = 'open' THEN 1 ELSE 0 END) AS open,
-       SUM(CASE WHEN status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
-       SUM(CASE WHEN status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
-       SUM(CASE WHEN status = 'closed' THEN 1 ELSE 0 END) AS closed,
-       SUM(CASE WHEN status IN ('open', 'in_progress') AND severity = 'critical' THEN 1 ELSE 0 END) AS critical_open
-     FROM tickets ${where}`,
+       SUM(CASE WHEN t.status = 'open' THEN 1 ELSE 0 END) AS open,
+       SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
+       SUM(CASE WHEN t.status = 'resolved' THEN 1 ELSE 0 END) AS resolved,
+       SUM(CASE WHEN t.status = 'closed' THEN 1 ELSE 0 END) AS closed,
+       SUM(CASE WHEN t.status IN ('open', 'in_progress') AND t.severity = 'critical' THEN 1 ELSE 0 END) AS critical_open
+     FROM tickets t
+     JOIN users r ON r.id = t.reporter_id
+     ${clause}`,
     params,
   );
   const n = (v) => Number(v || 0);

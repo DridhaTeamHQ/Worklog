@@ -100,8 +100,7 @@ function layout({ heading, bodyHtml, footerNote }) {
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border:1px solid #e2e8f0;border-radius:12px;overflow:hidden;">
             <tr>
               <td style="background:#0f172a;padding:20px 28px;">
-                <span style="color:#ffffff;font-size:16px;font-weight:700;">Dridha</span>
-                <span style="color:#94a3b8;font-size:16px;"> Worklog</span>
+                <span style="color:#ffffff;font-size:16px;font-weight:700;">Taskr</span>
               </td>
             </tr>
             <tr>
@@ -133,10 +132,13 @@ const button = (href, label) => `
   </table>`;
 
 /**
- * Welcome email for a newly added team member, carrying the temporary password the
- * manager set. Sent once, at account creation.
+ * Invitation email for a newly added account.
+ *
+ * Carries no password — there is none to carry. It points at the sign-in page, where
+ * entering this address reveals the "Invited" button that lets the person set their
+ * own. Sent once, at account creation.
  */
-export async function sendWelcomeEmail({ name, email, password, managerName, role = 'team_member' }) {
+export async function sendInviteEmail({ name, email, managerName, role = 'team_member' }) {
   const loginUrl = `${config.mail.appUrl}/login`;
   const firstName = String(name || '').trim().split(/\s+/)[0] || 'there';
   const addedBy = managerName ? `${managerName} has added you` : 'You have been added';
@@ -158,25 +160,24 @@ export async function sendWelcomeEmail({ name, email, password, managerName, rol
       'raise a ticket for any bug you hit',
     ];
   const accessLine = isAdminRole
-    ? 'You have been given admin access, so you will land on the Manager Dashboard with full administrative rights.'
+    ? 'You have been given admin access, so you will land on the Admin Dashboard with full administrative rights.'
     : isManager
       ? 'You have been given manager access, so you will land on the Manager Dashboard.'
       : '';
 
-  const subject = 'You have been added to Dridha Worklog';
+  const subject = 'You have been invited to Taskr';
 
   const text = [
     `Hi ${firstName},`,
     '',
-    `${addedBy} to Dridha Worklog, the internal task and daily work reporting portal.`,
+    `${addedBy} to Taskr, the internal task and daily work reporting portal.`,
     '',
-    'Sign in with these details:',
-    `  Sign-in page:        ${loginUrl}`,
-    `  Email:               ${email}`,
-    `  Temporary password:  ${password}`,
+    'To get in, choose your own password:',
+    `  1. Open ${loginUrl}`,
+    `  2. Enter your work email: ${email}`,
+    '  3. Click the "Invited" button that appears, and set a password',
     '',
-    'Please change your password after signing in — you can do it from Profile,',
-    'or use "Forgot password?" on the sign-in page at any time.',
+    'Nobody has set a password for you, and this email does not contain one.',
     '',
     ...(accessLine ? [accessLine, ''] : []),
     'Once you are in, you can:',
@@ -184,30 +185,27 @@ export async function sendWelcomeEmail({ name, email, password, managerName, rol
     '',
     'If you were not expecting this email, please contact your manager.',
     '',
-    '— Dridha Worklog',
+    '— Taskr',
   ].join('\n');
 
   const html = layout({
-    heading: `Welcome to Worklog, ${escapeHtml(firstName)}`,
+    heading: `You are invited to Taskr, ${escapeHtml(firstName)}`,
     bodyHtml: `
       <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
-        ${escapeHtml(addedBy)} to <strong>Dridha Worklog</strong>, the internal task and daily
+        ${escapeHtml(addedBy)} to <strong>Taskr</strong>, the internal task and daily
         work reporting portal.
       </p>
-      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin:0 0 4px;">
-        <tr>
-          <td style="font-size:13px;color:#64748b;padding-bottom:6px;">Email</td>
-          <td style="font-size:13px;color:#0f172a;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;padding-bottom:6px;">${escapeHtml(email)}</td>
-        </tr>
-        <tr>
-          <td style="font-size:13px;color:#64748b;">Temporary password</td>
-          <td style="font-size:14px;color:#0f172a;font-weight:700;font-family:ui-monospace,SFMono-Regular,Menlo,monospace;text-align:right;">${escapeHtml(password)}</td>
-        </tr>
-      </table>
-      ${button(loginUrl, 'Sign in to Worklog')}
-      <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
-        Please change this password once you are in — it is under <strong>Profile</strong>, and
-        "Forgot password?" on the sign-in page works at any time.
+      <p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#334155;">
+        To get in, choose your own password:
+      </p>
+      <ol style="margin:0 0 4px;padding-left:20px;font-size:14px;line-height:1.7;color:#334155;">
+        <li>Open the sign-in page</li>
+        <li>Enter your work email: <strong style="font-family:ui-monospace,SFMono-Regular,Menlo,monospace;">${escapeHtml(email)}</strong></li>
+        <li>Click the <strong>Invited</strong> button that appears, and set a password</li>
+      </ol>
+      ${button(loginUrl, 'Set your password')}
+      <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;">
+        Nobody has set a password for you, and this email does not contain one.
       </p>
       ${accessLine ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(accessLine)}</p>` : ''}
       <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#334155;">Once you are in, you can:</p>
@@ -225,12 +223,12 @@ export async function sendPasswordResetEmail({ name, email, token }) {
   const resetUrl = `${config.mail.appUrl}/forgot-password?token=${encodeURIComponent(token)}`;
   const firstName = String(name || '').trim().split(/\s+/)[0] || 'there';
 
-  const subject = 'Reset your Worklog password';
+  const subject = 'Reset your Taskr password';
 
   const text = [
     `Hi ${firstName},`,
     '',
-    'We received a request to reset your Dridha Worklog password.',
+    'We received a request to reset your Taskr password.',
     '',
     `Open this link to choose a new one: ${resetUrl}`,
     '',
@@ -239,14 +237,14 @@ export async function sendPasswordResetEmail({ name, email, token }) {
     'The link is valid for 30 minutes and can only be used once.',
     'If you did not request this, you can ignore this email — your password will not change.',
     '',
-    '— Dridha Worklog',
+    '— Taskr',
   ].join('\n');
 
   const html = layout({
     heading: 'Reset your password',
     bodyHtml: `
       <p style="margin:0 0 16px;font-size:14px;line-height:1.6;color:#334155;">
-        Hi ${escapeHtml(firstName)}, we received a request to reset your Worklog password.
+        Hi ${escapeHtml(firstName)}, we received a request to reset your Taskr password.
       </p>
       ${button(resetUrl, 'Choose a new password')}
       <p style="margin:0 0 16px;font-size:13px;line-height:1.6;color:#64748b;">

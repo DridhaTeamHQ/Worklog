@@ -33,7 +33,7 @@ export const config = {
   isProd,
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 4000),
-  appName: process.env.APP_NAME || 'Dridha Worklog',
+  appName: process.env.APP_NAME || 'Taskr',
   corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
     .split(',')
     .map((s) => s.trim())
@@ -68,7 +68,7 @@ export const config = {
     secure: bool(process.env.SMTP_SECURE, Number(process.env.SMTP_PORT) === 465),
     user: process.env.SMTP_USER || '',
     pass: process.env.SMTP_PASS || '',
-    from: process.env.MAIL_FROM || 'Dridha Worklog <no-reply@company.com>',
+    from: process.env.MAIL_FROM || 'Taskr <no-reply@company.com>',
     replyTo: process.env.MAIL_REPLY_TO || '',
     // Where the emails tell people to sign in.
     appUrl: (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, ''),

@@ -18,6 +18,18 @@ export const authApi = {
     api.post<{ message: string }>('/auth/reset-password', { token, password }, { skipAuthRedirect: true }),
   changePassword: (currentPassword: string, newPassword: string) =>
     api.post<{ message: string }>('/auth/change-password', { currentPassword, newPassword }),
+
+  /**
+   * Whether this address is an account a manager added that nobody has claimed yet.
+   * Drives the "Invited" button on the sign-in page. Answers false for every other
+   * case, including an address that does not exist.
+   */
+  inviteStatus: (email: string, signal?: AbortSignal) =>
+    api.post<{ invited: boolean; name?: string }>('/auth/invite-status', { email }, { skipAuthRedirect: true, signal }),
+
+  /** Claims an invited account by setting its password, and signs them straight in. */
+  acceptInvite: (email: string, password: string) =>
+    api.post<{ token: string; user: User }>('/auth/accept-invite', { email, password }, { skipAuthRedirect: true }),
 };
 
 /* ---------------------------------------------------------------- dashboard */
@@ -104,10 +116,15 @@ export const notificationApi = {
 
 /* --------------------------------------------------------------------- team */
 
+/**
+ * No password: the account is created without one and the person sets their own when
+ * they claim the invite. Department and job title are required by the team endpoint
+ * and optional on the elevated tiers, so they are typed as optional here and enforced
+ * per-role by the form and by the server.
+ */
 export interface NewTeamMemberInput {
   name: string;
   email: string;
-  password: string;
   department?: string;
   jobTitle?: string;
   phone?: string;
@@ -119,7 +136,7 @@ export const teamApi = {
   create: (input: NewTeamMemberInput) =>
     api.post<{
       employee: User;
-      /** Whether the welcome email actually went out. `mode` is 'smtp' or 'log'. */
+      /** Whether the invite email actually went out. `mode` is 'smtp' or 'log'. */
       email: { delivered: boolean; mode: string; error?: string };
       message: string;
     }>('/team', input),
@@ -129,6 +146,16 @@ export const teamApi = {
   reports: (id: number, params: ReportFilters = {}, signal?: AbortSignal) =>
     api.get<DailyReport[]>(`/team/${id}/reports`, params as Record<string, string | number | undefined>, signal),
   tasks: (id: number) => api.get<Task[]>(`/team/${id}/tasks`),
+  /**
+   * Permanently removes a team member. Everything of theirs goes with them — the
+   * server reports the counts so the confirmation can say what was actually lost.
+   */
+  remove: (id: number) =>
+    api.delete<{
+      id: number;
+      removed: { reports: number; tasks: number; tickets: number };
+      message: string;
+    }>(`/team/${id}`),
 };
 
 /* ------------------------------------------------------------------- admins */

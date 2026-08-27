@@ -139,7 +139,7 @@ async function main() {
     name: 'Test Recipient',
     email: recipient,
     password: 'TempPass@123',
-    managerName: 'Worklog Setup Check',
+    managerName: 'Taskr Setup Check',
   });
 
   if (result.delivered) {

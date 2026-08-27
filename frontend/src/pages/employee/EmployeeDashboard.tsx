@@ -9,7 +9,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
 import { StatusBadge, PriorityBadge } from '../../components/Badges';
-import { deadlineLabel, formatDate, formatTime, reportLines } from '../../lib/format';
+import { deadlineLabel, formatDate, formatTime, reportLines, taskLabel } from '../../lib/format';
 import type { EmployeeDashboard as EmployeeDashboardData } from '../../types';
 
 export function EmployeeDashboard() {
@@ -189,7 +189,7 @@ export function EmployeeDashboard() {
                               {task.task_key}
                             </span>
                           )}
-                          {task.title}
+                          {taskLabel(task)}
                         </p>
                         <PriorityBadge priority={task.priority} />
                       </div>

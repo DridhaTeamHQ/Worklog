@@ -115,6 +115,58 @@ async function ensureRoleConstraint(db) {
 }
 
 /**
+ * Drops the NOT NULL on `users.password_hash`.
+ *
+ * An invited account has no password until the person chooses one, and NULL is how
+ * that is recorded. A database created before invites existed still refuses the
+ * insert, so the constraint is relaxed in place without touching any row.
+ *
+ * Returns true when it actually changed something.
+ */
+async function ensurePasswordHashNullable(db) {
+  if (db.dialect === 'postgres') {
+    // Scoped to the current schema on purpose. A managed Postgres can hold several
+    // tables called "users" that this role can see — Supabase ships `auth.users` —
+    // and an unqualified lookup would read whichever one the planner returned first.
+    const row = await db.get(
+      `SELECT is_nullable FROM information_schema.columns
+        WHERE table_schema = current_schema()
+          AND table_name = 'users' AND column_name = 'password_hash'`,
+    );
+    if (!row || row.is_nullable === 'YES') return false;
+    await db.exec('ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL');
+    return true;
+  }
+
+  // SQLite cannot relax a column constraint, so the table is rebuilt — the same
+  // approach `ensureRoleConstraint` uses, and equally a no-op on a fresh database.
+  const table = await db.get(
+    "SELECT sql FROM sqlite_master WHERE type = 'table' AND name = 'users'",
+  );
+  if (!table?.sql) return false;
+
+  const rebuilt = table.sql.replace(/(password_hash\s+TEXT)\s+NOT\s+NULL/i, '$1');
+  if (rebuilt === table.sql) return false;
+
+  // Foreign keys off for the swap: every child table references users(id) ON DELETE
+  // CASCADE, and dropping the old table with them enabled would cascade the database
+  // away. Columns are listed explicitly so the copy does not depend on column order.
+  await db.exec('PRAGMA foreign_keys = OFF');
+  try {
+    await db.exec(rebuilt.replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?users/i, 'CREATE TABLE users_pwfix'));
+    await db.exec(`INSERT INTO users_pwfix
+      (id, name, email, password_hash, role, department, job_title, phone, profile_image, is_active, created_at, updated_at)
+      SELECT id, name, email, password_hash, role, department, job_title, phone, profile_image, is_active, created_at, updated_at
+      FROM users`);
+    await db.exec('DROP TABLE users');
+    await db.exec('ALTER TABLE users_pwfix RENAME TO users');
+  } finally {
+    await db.exec('PRAGMA foreign_keys = ON');
+  }
+  return true;
+}
+
+/**
  * Moves any task that predates projects into a default project and numbers it, so
  * every task ends up with a stable key like GEN-1. Runs only when such tasks exist.
  */
@@ -200,13 +252,16 @@ export async function migrate({ fresh = false } = {}) {
   // Databases created before the admin role existed still reject role = 'admin'.
   const roleConstraintUpgraded = await ensureRoleConstraint(db);
 
+  // Databases created before invites existed still require a password_hash.
+  const passwordHashRelaxed = await ensurePasswordHashNullable(db);
+
   for (const statement of statements.filter((s) => !isCreateTable(s))) {
     await db.exec(statement);
   }
 
   const backfilled = await backfillProjects(db);
 
-  return { driver: config.db.client, fresh, added, backfilled, roleConstraintUpgraded };
+  return { driver: config.db.client, fresh, added, backfilled, roleConstraintUpgraded, passwordHashRelaxed };
 }
 
 const isEntry = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
@@ -218,6 +273,7 @@ if (isEntry) {
       if (r.added.length) console.log(`[migrate] added columns: ${r.added.join(', ')}`);
       if (r.backfilled) console.log(`[migrate] moved ${r.backfilled} existing task(s) into the ${DEFAULT_PROJECT.key} project`);
       if (r.roleConstraintUpgraded) console.log("[migrate] users.role now accepts 'admin'");
+      if (r.passwordHashRelaxed) console.log('[migrate] users.password_hash is now nullable (invited accounts)');
       if (config.db.client === 'sqlite') console.log(`[migrate] file: ${config.db.sqliteFile}`);
       await closeDb();
     })

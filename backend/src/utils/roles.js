@@ -35,12 +35,13 @@ export const isTeamMember = (role) => role === ROLES.TEAM_MEMBER;
 /**
  * Which roles a given actor may create.
  *
- * Only an admin can mint another admin; managers keep the ability to add managers and
- * team members that they have always had.
+ * Account creation is an admin-only power. A manager runs their own department — they
+ * assign work, read reports and triage tickets within it — but they do not decide who
+ * is in the company, which is why this returns nothing for them. Making it structural
+ * rather than a UI decision means a hand-written POST is refused too.
  */
 export function grantableRoles(actorRole) {
   if (isAdmin(actorRole)) return [ROLES.ADMIN, ROLES.MANAGER, ROLES.TEAM_MEMBER];
-  if (actorRole === ROLES.MANAGER) return [ROLES.MANAGER, ROLES.TEAM_MEMBER];
   return [];
 }
 

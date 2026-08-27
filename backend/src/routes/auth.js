@@ -6,6 +6,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate, safeText } from '../middleware/validate.js';
 import {
   login, logout, me, forgotPassword, resetPassword, changeOwnPassword,
+  inviteStatus, acceptInvite,
 } from '../controllers/auth.js';
 
 const router = Router();
@@ -19,6 +20,20 @@ const loginLimiter = rateLimit({
   message: { success: false, error: { message: 'Too many sign-in attempts. Please try again in a few minutes.' } },
 });
 
+/**
+ * The invite endpoints answer whether a given address is a pending invite, so they
+ * are the one place an address can be probed. Held tighter than sign-in: a manager
+ * onboarding a joiner hits this a handful of times, while sweeping a company address
+ * list needs thousands.
+ */
+const inviteLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: config.isProd ? 20 : 200,
+  standardHeaders: true,
+  legacyHeaders: false,
+  message: { success: false, error: { message: 'Too many attempts. Please try again in a few minutes.' } },
+});
+
 const forgotLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: config.isProd ? 5 : 50,
@@ -29,6 +44,15 @@ const forgotLimiter = rateLimit({
 const loginSchema = z.object({
   email: z.string().trim().toLowerCase().email('Enter a valid email address.'),
   password: z.string().min(1, 'Password is required.').max(200),
+});
+
+const inviteStatusSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(190),
+});
+
+const acceptInviteSchema = z.object({
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(190),
+  password: z.string().min(8, 'Use at least 8 characters.').max(200),
 });
 
 const forgotSchema = z.object({
@@ -46,6 +70,8 @@ const changeSchema = z.object({
 });
 
 router.post('/login', loginLimiter, validate(loginSchema), login);
+router.post('/invite-status', inviteLimiter, validate(inviteStatusSchema), inviteStatus);
+router.post('/accept-invite', inviteLimiter, validate(acceptInviteSchema), acceptInvite);
 router.post('/logout', logout);
 router.get('/me', requireAuth, me);
 router.post('/forgot-password', forgotLimiter, validate(forgotSchema), forgotPassword);

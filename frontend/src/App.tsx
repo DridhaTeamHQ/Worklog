@@ -7,6 +7,7 @@ import { RequireAuth, RequireRole, RedirectIfAuthed, homeFor } from './component
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
+import { SetPasswordPage } from './pages/auth/SetPasswordPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
 
@@ -33,6 +34,8 @@ export default function App() {
             <Routes>
               <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
               <Route path="/forgot-password" element={<RedirectIfAuthed><ForgotPasswordPage /></RedirectIfAuthed>} />
+              {/* Where the "Invited" button on the sign-in page leads. */}
+              <Route path="/set-password" element={<RedirectIfAuthed><SetPasswordPage /></RedirectIfAuthed>} />
 
               <Route element={<RequireAuth />}>
                 <Route element={<AppLayout />}>

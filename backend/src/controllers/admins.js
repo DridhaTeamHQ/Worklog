@@ -8,7 +8,7 @@ import { ok, created } from '../utils/http.js';
 import { asyncHandler, forbidden } from '../utils/errors.js';
 import { ROLES, grantableRoles, roleLabel } from '../utils/roles.js';
 import { listManagers, createUser } from '../models/user.js';
-import { sendWelcomeEmail } from '../services/mail.js';
+import { sendInviteEmail } from '../services/mail.js';
 
 export const list = asyncHandler(async (req, res) => {
   const managers = await listManagers(req.validatedQuery);
@@ -39,11 +39,11 @@ export const create = asyncHandler(async (req, res) => {
   const user = await createUser({ ...req.body, role: requested });
   const label = roleLabel(requested).toLowerCase();
 
-  // Best-effort, exactly as for a team member: the account exists either way.
-  const mail = await sendWelcomeEmail({
+  // Best-effort, exactly as for a team member: the account exists either way, and it
+  // has no password until they claim the invite themselves.
+  const mail = await sendInviteEmail({
     name: user.name,
     email: user.email,
-    password: req.body.password,
     managerName: req.user.name,
     role: requested,
   });
@@ -52,7 +52,7 @@ export const create = asyncHandler(async (req, res) => {
     admin: user,
     email: { delivered: mail.delivered, mode: mail.mode, error: mail.error },
     message: mail.delivered
-      ? `${user.name} now has ${label} access and has been emailed their sign-in details.`
+      ? `${user.name} now has ${label} access and has been emailed a link to set their password.`
       : `${user.name} now has ${label} access.`,
   });
 });

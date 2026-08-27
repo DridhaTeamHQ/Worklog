@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireManager } from '../middleware/auth.js';
-import { validate, safeText, optionalText, isoDate } from '../middleware/validate.js';
+import { validate, optionalText, isoDate } from '../middleware/validate.js';
 import { PRIORITIES, STATUSES, FILTER_STATUSES } from '../utils/constants.js';
 import { list, getOne, assign, setStatus, update, remove } from '../controllers/tasks.js';
 
@@ -24,13 +24,26 @@ const listQuery = z.object({
   offset: z.coerce.number().int().min(0).default(0),
 });
 
+/*
+ * Only the assignee and the project are required.
+ *
+ * Those two are structural rather than editorial: `assigned_tasks.employee_id` is NOT
+ * NULL because a task without an owner is not a task, and the human-facing key
+ * (SHMOB-12) is issued from the project, so a task without one cannot be referred to.
+ * Everything else — title, description, notes, priority, dates — is something a
+ * manager may not know yet at the moment they assign the work, so none of it is
+ * demanded up front and all of it can be filled in later from the edit dialog.
+ *
+ * Title and description fall back to an empty string rather than NULL, because both
+ * columns are NOT NULL; the UI shows the task key wherever an untitled task is listed.
+ */
 const assignSchema = z.object({
   employeeId: z.coerce.number().int().positive(),
   projectId: z.coerce.number().int().positive(),
-  title: safeText(160, 'Task title'),
-  description: safeText(4000, 'Task description'),
+  title: optionalText(160).transform((v) => v ?? ''),
+  description: optionalText(4000).transform((v) => v ?? ''),
   notes: optionalText(2000),
-  priority: z.enum(PRIORITIES),
+  priority: z.enum(PRIORITIES).default('medium'),
   startDate: isoDate.optional().nullable(),
   deadline: isoDate.optional().nullable(),
 }).refine(
@@ -41,8 +54,8 @@ const assignSchema = z.object({
 const statusSchema = z.object({ status: z.enum(STATUSES) });
 
 const patchSchema = z.object({
-  title: safeText(160, 'Task title').optional(),
-  description: safeText(4000, 'Task description').optional(),
+  title: optionalText(160).transform((v) => v ?? ''),
+  description: optionalText(4000).transform((v) => v ?? ''),
   notes: optionalText(2000),
   priority: z.enum(PRIORITIES).optional(),
   startDate: isoDate.optional().nullable(),
