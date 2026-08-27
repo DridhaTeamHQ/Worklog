@@ -167,45 +167,8 @@ export function LoginPage() {
               {submitting ? <><Spinner className="h-4 w-4" /> Signing in…</> : <><LogIn className="h-4 w-4" /> Login</>}
             </button>
           </form>
-
-          <DemoAccounts onPick={(e, p) => { setEmail(e); setPassword(p); }} />
         </div>
       </div>
-    </div>
-  );
-}
-
-/**
- * Development convenience only. It is compiled out of production builds, so the demo
- * credentials never ship to a real deployment.
- */
-function DemoAccounts({ onPick }: { onPick: (email: string, password: string) => void }) {
-  if (import.meta.env.PROD) return null;
-
-  const accounts = [
-    { label: 'Manager', email: 'manager@company.com', password: 'Manager@123' },
-    { label: 'Team member', email: 'employee1@company.com', password: 'Employee@123' },
-  ];
-
-  return (
-    <div className="mt-8 rounded-lg border border-dashed border-ink-300 bg-ink-50 p-4">
-      <p className="text-xs font-semibold uppercase tracking-wide text-ink-500">Demo accounts</p>
-      <div className="mt-2.5 space-y-1.5">
-        {accounts.map((a) => (
-          <button
-            key={a.email}
-            type="button"
-            onClick={() => onPick(a.email, a.password)}
-            className="flex w-full items-center justify-between rounded-md px-2 py-1.5 text-left text-xs text-ink-600 transition-colors hover:bg-white"
-          >
-            <span><span className="font-semibold text-ink-800">{a.label}</span> · {a.email}</span>
-            <span className="font-medium text-brand-600">Use</span>
-          </button>
-        ))}
-      </div>
-      <p className="mt-2 text-[11px] text-ink-400">
-        Seeded by <code className="font-mono">npm run seed</code>; passwords are set in the backend .env file.
-      </p>
     </div>
   );
 }

@@ -6,7 +6,7 @@ import { useToast } from './Toast';
 import { Modal, Spinner } from './ui';
 import type { Project } from '../types';
 
-/** Derives a sensible key from the name: "Shortly – Mobile" -> "SHMOB". */
+/** Derives a sensible key from the name: "Internal Platform" -> "INPLA". */
 function suggestKey(name: string): string {
   const words = name.replace(/[^A-Za-z0-9 ]/g, ' ').split(/\s+/).filter(Boolean);
   if (words.length === 0) return '';
@@ -104,7 +104,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: Props) {
             value={name}
             onChange={(e) => handleName(e.target.value)}
             maxLength={120}
-            placeholder="e.g. Shortly – Mobile"
+            placeholder="Project name"
             autoFocus
             aria-invalid={!!errors.name}
             className={`input ${errors.name ? 'input-error' : ''}`}

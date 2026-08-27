@@ -74,10 +74,17 @@ export const config = {
     appUrl: (process.env.APP_URL || 'http://localhost:5173').replace(/\/$/, ''),
   },
 
+  /**
+   * The first admin, created by `npm run seed` on an empty database.
+   *
+   * There are deliberately no default credentials: an unset value fails the seed with
+   * an explanation rather than quietly creating a well-known account that would be
+   * live on any deployment that forgot to configure this.
+   */
   seed: {
-    managerEmail: process.env.SEED_MANAGER_EMAIL || 'manager@company.com',
-    managerPassword: process.env.SEED_MANAGER_PASSWORD || 'Manager@123',
-    employeePassword: process.env.SEED_EMPLOYEE_PASSWORD || 'Employee@123',
+    email: (process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase(),
+    password: process.env.SEED_ADMIN_PASSWORD || '',
+    name: (process.env.SEED_ADMIN_NAME || 'Admin').trim(),
   },
 };
 

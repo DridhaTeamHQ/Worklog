@@ -13,9 +13,36 @@
 const BASE = (process.argv[2] || process.env.API_URL || 'http://localhost:4000').replace(/\/$/, '');
 const API = `${BASE}/api`;
 
-const MANAGER = { email: process.env.SEED_MANAGER_EMAIL || 'manager@company.com', password: process.env.SEED_MANAGER_PASSWORD || 'Manager@123' };
-const EMPLOYEE = { email: 'employee1@company.com', password: process.env.SEED_EMPLOYEE_PASSWORD || 'Employee@123' };
-const OTHER_EMPLOYEE_EMAIL = 'employee2@company.com';
+/*
+ * Accounts come from the environment. There are no built-in credentials: the app
+ * ships no sample users, so this suite has to be told which existing accounts to
+ * drive. It needs a manager-level account and two team members that already exist
+ * in the target database.
+ *
+ *   TEST_MANAGER_EMAIL / TEST_MANAGER_PASSWORD
+ *   TEST_EMPLOYEE_EMAIL / TEST_EMPLOYEE_PASSWORD
+ *   TEST_OTHER_EMPLOYEE_EMAIL   (a second team member, shares the employee password)
+ */
+const MANAGER = { email: process.env.TEST_MANAGER_EMAIL, password: process.env.TEST_MANAGER_PASSWORD };
+const EMPLOYEE = { email: process.env.TEST_EMPLOYEE_EMAIL, password: process.env.TEST_EMPLOYEE_PASSWORD };
+const OTHER_EMPLOYEE_EMAIL = process.env.TEST_OTHER_EMPLOYEE_EMAIL;
+
+const missing = [
+  ['TEST_MANAGER_EMAIL', MANAGER.email],
+  ['TEST_MANAGER_PASSWORD', MANAGER.password],
+  ['TEST_EMPLOYEE_EMAIL', EMPLOYEE.email],
+  ['TEST_EMPLOYEE_PASSWORD', EMPLOYEE.password],
+  ['TEST_OTHER_EMPLOYEE_EMAIL', OTHER_EMPLOYEE_EMAIL],
+].filter(([, v]) => !v).map(([k]) => k);
+
+if (missing.length) {
+  console.error('[test-flow] missing required environment variables:');
+  for (const k of missing) console.error(`  ${k}`);
+  console.error('');
+  console.error('  This suite drives real accounts against a live API and writes real rows.');
+  console.error('  Point it at a local or staging database, never at production.');
+  process.exit(1);
+}
 
 let passed = 0;
 let failed = 0;
@@ -177,7 +204,7 @@ async function run() {
 
   const adminsBefore = await api('/admins', { token: managerToken });
   check('manager can list admins', adminsBefore.status === 200 && Array.isArray(adminsBefore.data), adminsBefore.body);
-  check('the seeded manager is listed', adminsBefore.data.some((a) => a.email === MANAGER.email));
+  check('the configured manager is listed', adminsBefore.data.some((a) => a.email === MANAGER.email));
   check('every listed admin holds the manager role', adminsBefore.data.every((a) => a.role === 'manager'), adminsBefore.data?.map((a) => a.role));
   check('admin rows carry their assignment counts', typeof adminsBefore.data[0]?.assigned_tasks === 'number', adminsBefore.data?.[0]);
   const adminCountBefore = adminsBefore.data.length;

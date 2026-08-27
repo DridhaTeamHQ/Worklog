@@ -25,24 +25,35 @@ npm run dev
 
 ### Sign in
 
-| Role | Email | Password |
-| --- | --- | --- |
-| Manager | `manager@company.com` | `Manager@123` |
-| Manager | `manager2@company.com` | `Manager@123` |
-| Team member | `employee1@company.com` | `Employee@123` |
-| Team member | `employee2@company.com` | `Employee@123` |
-| Team member | `employee3@company.com` | `Employee@123` |
+The app ships with **no accounts and no sample content**. Everything you see comes from
+the database, and everything in the database is put there through the app.
 
-Passwords come from `SEED_MANAGER_PASSWORD` / `SEED_EMPLOYEE_PASSWORD` in
-`backend/.env` — change them there and re-seed rather than editing code.
+On an empty database, create the first admin — the one account that cannot be made
+through the UI — by setting these in `backend/.env`:
+
+```
+SEED_ADMIN_EMAIL=you@yourcompany.com
+SEED_ADMIN_PASSWORD=a-strong-password
+SEED_ADMIN_NAME=Your Name
+```
+
+then run:
+
+```bash
+npm run db:seed
+```
+
+That creates one admin and nothing else. Sign in as that admin and add your projects,
+managers and team members from the app. Re-running the seed is safe: it does nothing
+once an admin exists. Change the password from **Profile** after your first sign-in.
 
 ---
 
 ## The database
 
 The app targets **PostgreSQL**. It also ships with an embedded **SQLite** fallback so it
-runs with no database server installed, which is the default and what the demo data above
-uses.
+runs with no database server installed, which is the default when `DATABASE_URL` is
+empty.
 
 Both drivers sit behind one adapter (`backend/src/db/index.js`). Every query is written
 once with `?` placeholders and portable column types — calendar dates as `YYYY-MM-DD`
@@ -329,12 +340,11 @@ node -e "console.log(require('crypto').randomBytes(48).toString('hex'))"
 1. Set `NODE_ENV=production`, a real `JWT_SECRET`, `DATABASE_URL`, `COOKIE_SECURE=true`,
    `CORS_ORIGIN` to your web origin, and the `SMTP_*` / `APP_URL` values so onboarding and
    password-reset emails actually reach people.
-2. `npm run db:migrate` (skip the seed — it is demo data).
-3. Create the real manager account, then remove the demo accounts.
+2. `npm run db:migrate`.
+3. `npm run db:seed` once, with `SEED_ADMIN_*` set, to create the first admin. There is
+   no default account, so nothing well-known is ever live.
 4. `npm run build` and serve `frontend/dist` from your web server or CDN.
 5. `npm start` to run the API behind your reverse proxy.
-
-The login page's demo-account panel is compiled out of production builds automatically.
 
 ---
 
