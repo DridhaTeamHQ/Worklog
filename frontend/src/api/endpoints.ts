@@ -1,7 +1,7 @@
 import { api } from './client';
 import type {
   AnalyticsPayload, AppNotification, DailyReport, EmployeeDashboard, ManagerDashboard,
-  Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
+  Manager, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
   TicketCounts, TicketSeverity, TicketStatus, User,
 } from '../types';
 
@@ -129,6 +129,20 @@ export const teamApi = {
   reports: (id: number, params: ReportFilters = {}, signal?: AbortSignal) =>
     api.get<DailyReport[]>(`/team/${id}/reports`, params as Record<string, string | number | undefined>, signal),
   tasks: (id: number) => api.get<Task[]>(`/team/${id}/tasks`),
+};
+
+/* ------------------------------------------------------------------- admins */
+
+/** Manager accounts. Separate from `teamApi` so granting access is its own action. */
+export const adminApi = {
+  list: (params: { search?: string } = {}, signal?: AbortSignal) =>
+    api.get<Manager[]>('/admins', params, signal),
+  create: (input: NewTeamMemberInput) =>
+    api.post<{
+      admin: User;
+      email: { delivered: boolean; mode: string; error?: string };
+      message: string;
+    }>('/admins', input),
 };
 
 /* ----------------------------------------------------------------- projects */

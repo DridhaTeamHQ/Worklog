@@ -135,10 +135,28 @@ const button = (href, label) => `
  * Welcome email for a newly added team member, carrying the temporary password the
  * manager set. Sent once, at account creation.
  */
-export async function sendWelcomeEmail({ name, email, password, managerName }) {
+export async function sendWelcomeEmail({ name, email, password, managerName, role = 'team_member' }) {
   const loginUrl = `${config.mail.appUrl}/login`;
   const firstName = String(name || '').trim().split(/\s+/)[0] || 'there';
   const addedBy = managerName ? `${managerName} has added you` : 'You have been added';
+  const isManager = role === 'manager';
+
+  const capabilities = isManager
+    ? [
+      'assign tasks to the team and track their progress',
+      'read the daily work reports the whole team submits',
+      'triage the bug tickets your team raises',
+      'add and manage team members',
+    ]
+    : [
+      'see the tasks assigned to you, with deadlines and priority',
+      'update the status of your work as it progresses',
+      'submit your daily task report',
+      'raise a ticket for any bug you hit',
+    ];
+  const accessLine = isManager
+    ? 'You have been given manager access, so you will land on the Manager Dashboard.'
+    : '';
 
   const subject = 'You have been added to Dridha Worklog';
 
@@ -155,10 +173,9 @@ export async function sendWelcomeEmail({ name, email, password, managerName }) {
     'Please change your password after signing in — you can do it from Profile,',
     'or use "Forgot password?" on the sign-in page at any time.',
     '',
+    ...(accessLine ? [accessLine, ''] : []),
     'Once you are in, you can:',
-    '  - see the tasks assigned to you, with deadlines and priority',
-    '  - update the status of your work as it progresses',
-    '  - submit your daily task report',
+    ...capabilities.map((c) => `  - ${c}`),
     '',
     'If you were not expecting this email, please contact your manager.',
     '',
@@ -187,10 +204,11 @@ export async function sendWelcomeEmail({ name, email, password, managerName }) {
         Please change this password once you are in — it is under <strong>Profile</strong>, and
         "Forgot password?" on the sign-in page works at any time.
       </p>
-      <p style="margin:0;font-size:14px;line-height:1.6;color:#334155;">
-        From your dashboard you can see the tasks assigned to you, update their status as you
-        go, and submit your daily task report.
-      </p>`,
+      ${accessLine ? `<p style="margin:0 0 12px;font-size:14px;line-height:1.6;color:#334155;">${escapeHtml(accessLine)}</p>` : ''}
+      <p style="margin:0 0 8px;font-size:14px;line-height:1.6;color:#334155;">Once you are in, you can:</p>
+      <ul style="margin:0;padding-left:20px;font-size:14px;line-height:1.7;color:#334155;">
+        ${capabilities.map((c) => `<li>${escapeHtml(c)}</li>`).join('')}
+      </ul>`,
     footerNote: 'If you were not expecting this email, please contact your manager.',
   });
 

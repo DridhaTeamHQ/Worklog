@@ -1,10 +1,10 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { UserPlus, RefreshCw, Copy, Check, CircleCheck, MailCheck, MailWarning } from 'lucide-react';
-import { teamApi } from '../api/endpoints';
+import { adminApi, teamApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
 import { Modal, Spinner } from './ui';
-import type { User } from '../types';
+import type { Role, User } from '../types';
 
 /**
  * Generates a readable temporary password. Ambiguous characters (O/0, l/1) are left out
@@ -38,13 +38,43 @@ function generatePassword(): string {
 interface Props {
   open: boolean;
   onClose: () => void;
-  onCreated: (employee: User) => void;
+  onCreated: (user: User) => void;
+  /** Which kind of account to create. Drives the endpoint and all of the copy. */
+  role: Role;
   /** Existing departments, offered as suggestions rather than a closed list. */
   departments?: string[];
 }
 
-export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] }: Props) {
+/** Copy differs enough between the two that it is worth stating rather than templating. */
+const COPY = {
+  team_member: {
+    title: 'Add a team member',
+    description: 'Creates their account so they can sign in to the team member portal.',
+    submit: 'Add team member',
+    submitting: 'Adding…',
+    namePlaceholder: 'e.g. Rahul Kumar',
+    titlePlaceholder: 'e.g. Backend Engineer',
+    deptPlaceholder: 'e.g. Development',
+    successTitle: 'Team member added',
+    failMessage: 'Could not add the team member.',
+  },
+  manager: {
+    title: 'Add an admin',
+    description: 'Creates an account with manager access to this portal.',
+    submit: 'Add admin',
+    submitting: 'Adding…',
+    namePlaceholder: 'e.g. Vikram Rao',
+    titlePlaceholder: 'e.g. Delivery Manager',
+    deptPlaceholder: 'e.g. Management',
+    successTitle: 'Admin added',
+    failMessage: 'Could not add the admin.',
+  },
+} as const;
+
+export function AddUserModal({ open, onClose, onCreated, role, departments = [] }: Props) {
   const toast = useToast();
+  const copy = COPY[role];
+  const isManager = role === 'manager';
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -87,25 +117,29 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
 
     setSubmitting(true);
     try {
-      const { data } = await teamApi.create({
+      const payload = {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password,
         department: department.trim() || undefined,
         jobTitle: jobTitle.trim() || undefined,
         phone: phone.trim() || undefined,
-      });
+      };
+      const { data } = isManager
+        ? await adminApi.create(payload)
+        : await teamApi.create(payload);
+      const createdUser = 'admin' in data ? data.admin : data.employee;
       toast.success(data.message);
-      onCreated(data.employee);
+      onCreated(createdUser);
       // Stay open on a success screen: the password is not recoverable later, so the
       // manager needs a chance to copy it before this closes.
-      setCreatedWith({ user: data.employee, password, emailed: data.email?.delivered ?? false });
+      setCreatedWith({ user: createdUser, password, emailed: data.email?.delivered ?? false });
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors);
         toast.error(err.message);
       } else {
-        toast.error('Could not add the team member.');
+        toast.error(copy.failMessage);
       }
     } finally {
       setSubmitting(false);
@@ -130,7 +164,7 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
       <Modal
         open={open}
         onClose={onClose}
-        title="Team member added"
+        title={copy.successTitle}
         description={createdWith.emailed
           ? 'They have been emailed their sign-in details. The password is not shown again.'
           : 'Share these sign-in details with them. The password is not shown again.'}
@@ -145,7 +179,9 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
           <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
             <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
             <div className="min-w-0">
-              <p className="font-semibold text-emerald-900">{createdWith.user.name} can now sign in</p>
+              <p className="font-semibold text-emerald-900">
+                {createdWith.user.name} can now sign in{isManager ? ' as a manager' : ''}
+              </p>
               <p className="mt-0.5 text-sm text-emerald-800">
                 They can change this password from their profile at any time.
               </p>
@@ -200,13 +236,15 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
     <Modal
       open={open}
       onClose={onClose}
-      title="Add a team member"
-      description="Creates their account so they can sign in to the team member portal."
+      title={copy.title}
+      description={copy.description}
       footer={(
         <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
           <button type="button" onClick={onClose} className="btn-secondary">Cancel</button>
           <button type="submit" form="add-member-form" disabled={submitting} className="btn-primary">
-            {submitting ? <><Spinner className="h-4 w-4" /> Adding…</> : <><UserPlus className="h-4 w-4" /> Add team member</>}
+            {submitting
+              ? <><Spinner className="h-4 w-4" /> {copy.submitting}</>
+              : <><UserPlus className="h-4 w-4" /> {copy.submit}</>}
           </button>
         </div>
       )}
@@ -219,7 +257,7 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
             value={name}
             onChange={(e) => setName(e.target.value)}
             maxLength={120}
-            placeholder="e.g. Rahul Kumar"
+            placeholder={copy.namePlaceholder}
             autoFocus
             aria-invalid={!!errors.name}
             className={`input ${errors.name ? 'input-error' : ''}`}
@@ -279,7 +317,7 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
               onChange={(e) => setDepartment(e.target.value)}
               list="department-suggestions"
               maxLength={120}
-              placeholder="e.g. Development"
+              placeholder={copy.deptPlaceholder}
               className="input"
             />
             <datalist id="department-suggestions">
@@ -293,7 +331,7 @@ export function AddTeamMemberModal({ open, onClose, onCreated, departments = [] 
               value={jobTitle}
               onChange={(e) => setJobTitle(e.target.value)}
               maxLength={120}
-              placeholder="e.g. Backend Engineer"
+              placeholder={copy.titlePlaceholder}
               className="input"
             />
           </div>

@@ -13,6 +13,7 @@ import notificationRoutes from './routes/notifications.js';
 import teamRoutes from './routes/team.js';
 import projectRoutes from './routes/projects.js';
 import ticketRoutes from './routes/tickets.js';
+import adminRoutes from './routes/admins.js';
 import dashboardRoutes from './routes/dashboard.js';
 import profileRoutes from './routes/profile.js';
 
@@ -71,6 +72,7 @@ export function createApp() {
   app.use('/api/team', teamRoutes);
   app.use('/api/projects', projectRoutes);
   app.use('/api/tickets', ticketRoutes);
+  app.use('/api/admins', adminRoutes);
   app.use('/api/dashboard', dashboardRoutes);
 
   app.use(notFoundHandler);

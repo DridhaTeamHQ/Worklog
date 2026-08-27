@@ -33,6 +33,12 @@ export interface TeamMember extends User {
   submitted_today: boolean;
 }
 
+/** A user with manager access, plus how much work they have out with the team. */
+export interface Manager extends User {
+  assigned_tasks: number;
+  open_tasks: number;
+}
+
 export interface TeamMemberDetail extends User {
   counts: TaskCounts;
   report_count: number;

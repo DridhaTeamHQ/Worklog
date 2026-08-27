@@ -138,6 +138,43 @@ export async function listTeamMembers({ search, department, status } = {}) {
   });
 }
 
+/**
+ * Everyone with manager access. Managers can add other managers, so this list is how
+ * they see who currently holds that access.
+ */
+export async function listManagers({ search } = {}) {
+  const db = await getDb();
+  const where = ["role = 'manager'"];
+  const params = [];
+  if (search) {
+    where.push("(LOWER(name) LIKE ? OR LOWER(email) LIKE ? OR LOWER(COALESCE(department, '')) LIKE ?)");
+    const like = `%${search.toLowerCase()}%`;
+    params.push(like, like, like);
+  }
+
+  const rows = await db.query(
+    `SELECT ${PUBLIC_COLUMNS} FROM users WHERE ${where.join(' AND ')} ORDER BY name ASC`,
+    params,
+  );
+
+  // How much each manager currently has out with the team, so the list is not just names.
+  const assigned = await db.query(
+    `SELECT manager_id,
+            COUNT(*) AS total,
+            SUM(CASE WHEN status <> 'completed' THEN 1 ELSE 0 END) AS open
+       FROM assigned_tasks GROUP BY manager_id`,
+  );
+  const byManager = new Map(assigned.map((r) => [Number(r.manager_id), {
+    assigned_tasks: Number(r.total),
+    open_tasks: Number(r.open),
+  }]));
+
+  return rows.map((row) => ({
+    ...toPublicUser(row),
+    ...(byManager.get(Number(row.id)) || { assigned_tasks: 0, open_tasks: 0 }),
+  }));
+}
+
 export async function getTeamMember(employeeId) {
   const db = await getDb();
   const row = await db.get(`SELECT ${PUBLIC_COLUMNS} FROM users WHERE id = ? AND role = 'team_member'`, [employeeId]);

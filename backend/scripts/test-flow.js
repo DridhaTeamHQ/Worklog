@@ -172,6 +172,69 @@ async function run() {
   const deptsAfter = await api('/team/departments', { token: managerToken });
   check('their department joins the filter list', deptsAfter.data?.includes('QA'), deptsAfter.data);
 
+  /* -------------------------------------------------------------- admin access */
+  step('3c. Manager grants admin access');
+
+  const adminsBefore = await api('/admins', { token: managerToken });
+  check('manager can list admins', adminsBefore.status === 200 && Array.isArray(adminsBefore.data), adminsBefore.body);
+  check('the seeded manager is listed', adminsBefore.data.some((a) => a.email === MANAGER.email));
+  check('every listed admin holds the manager role', adminsBefore.data.every((a) => a.role === 'manager'), adminsBefore.data?.map((a) => a.role));
+  check('admin rows carry their assignment counts', typeof adminsBefore.data[0]?.assigned_tasks === 'number', adminsBefore.data?.[0]);
+  const adminCountBefore = adminsBefore.data.length;
+
+  const newAdminEmail = `admin.${Date.now()}@company.com`;
+  const newAdminPassword = 'AdminPass@2026';
+
+  const addAdmin = await api('/admins', {
+    method: 'POST',
+    token: managerToken,
+    body: { name: 'Probe Admin', email: newAdminEmail, password: newAdminPassword, department: 'Management', jobTitle: 'Delivery Manager' },
+  });
+  check('manager can add an admin (201)', addAdmin.status === 201, addAdmin.body);
+  check('the new account holds the manager role', addAdmin.data?.admin?.role === 'manager', addAdmin.data?.admin?.role);
+  check('the welcome email outcome is reported', typeof addAdmin.data?.email?.delivered === 'boolean', addAdmin.data?.email);
+  check('no password hash is returned', !JSON.stringify(addAdmin.body).includes('password_hash'));
+  const addedAdminId = addAdmin.data?.admin?.id;
+
+  const adminLogin = await api('/auth/login', { method: 'POST', body: { email: newAdminEmail, password: newAdminPassword } });
+  check('the new admin can sign in', adminLogin.status === 200 && !!adminLogin.data?.token, adminLogin.body);
+  check('they are routed to the manager portal', adminLogin.data?.user?.role === 'manager');
+  const newAdminToken = adminLogin.data?.token;
+
+  const adminDash = await api('/dashboard', { token: newAdminToken });
+  check('the new admin gets the manager dashboard', adminDash.status === 200 && adminDash.data?.role === 'manager', adminDash.data?.role);
+
+  const adminSeesTeam = await api('/team', { token: newAdminToken });
+  check('the new admin can read the team list', adminSeesTeam.status === 200 && adminSeesTeam.data.length >= 3);
+
+  const adminSeesTickets = await api('/tickets', { token: newAdminToken });
+  check('the new admin can read every ticket', adminSeesTickets.status === 200);
+
+  const adminAddsAdmin = await api('/admins', {
+    method: 'POST', token: newAdminToken,
+    body: { name: 'Chained Admin', email: `chained.${Date.now()}@company.com`, password: newAdminPassword },
+  });
+  check('a newly added admin can grant access onward', adminAddsAdmin.status === 201, adminAddsAdmin.body);
+
+  const adminsAfter = await api('/admins', { token: managerToken });
+  check('the admin list grows', adminsAfter.data.length === adminCountBefore + 2, { before: adminCountBefore, after: adminsAfter.data.length });
+
+  const teamListUnchanged = await api('/team', { token: managerToken });
+  check('admins do not appear in the team member list',
+    !teamListUnchanged.data.some((m) => m.id === addedAdminId), teamListUnchanged.data?.map((m) => m.email));
+
+  const dupeAdmin = await api('/admins', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Duplicate', email: newAdminEmail, password: newAdminPassword },
+  });
+  check('a duplicate admin email is rejected (409)', dupeAdmin.status === 409, dupeAdmin.body);
+
+  const weakAdmin = await api('/admins', {
+    method: 'POST', token: managerToken,
+    body: { name: 'Weak', email: `weak.admin.${Date.now()}@company.com`, password: 'short' },
+  });
+  check('a short admin password is rejected (400)', weakAdmin.status === 400);
+
   /* --------------------------------------------------------------------- projects */
   step('3b. Projects');
   const projectList = await api('/projects', { token: managerToken });
@@ -503,6 +566,15 @@ async function run() {
 
   const empAssigns = await api('/tasks', { method: 'POST', token: employeeToken, body: { employeeId: employee.id, projectId: project.id, title: 'self-assigned', description: 'nope', priority: 'low' } });
   check('employee cannot assign tasks (403)', empAssigns.status === 403);
+
+  const empListsAdmins = await api('/admins', { token: employeeToken });
+  check('employee cannot list admins (403)', empListsAdmins.status === 403, empListsAdmins.body);
+
+  const empAddsAdmin = await api('/admins', {
+    method: 'POST', token: employeeToken,
+    body: { name: 'Self Promotion', email: `promote.${Date.now()}@company.com`, password: 'RoguePass@2026' },
+  });
+  check('employee cannot grant admin access (403)', empAddsAdmin.status === 403, empAddsAdmin.body);
 
   const empAddsMember = await api('/team', {
     method: 'POST', token: employeeToken,

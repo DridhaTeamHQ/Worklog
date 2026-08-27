@@ -28,6 +28,18 @@ const MANAGER = {
   phone: '+91 98200 11223',
 };
 
+/** A second admin, so the Admins tab is not empty on a fresh install. */
+const EXTRA_ADMINS = [
+  {
+    name: 'Vikram Rao',
+    email: 'manager2@company.com',
+    role: 'manager',
+    department: 'Management',
+    jobTitle: 'Delivery Manager',
+    phone: '+91 98200 55667',
+  },
+];
+
 const PROJECTS = [
   { name: 'Shortly – Mobile', key: 'SHMOB', description: 'iOS and Android apps for the Shortly news reader.' },
   { name: 'Shortly – Web', key: 'SHWEB', description: 'Marketing site and the web reader.' },
@@ -121,6 +133,11 @@ export async function seed() {
   const { user: manager, isNew: managerIsNew } = await ensureUser(MANAGER, config.seed.managerPassword);
   console.log(`[seed] manager ${manager.email} ${managerIsNew ? 'created' : 'already present'}`);
 
+  for (const spec of EXTRA_ADMINS) {
+    const { user: admin, isNew } = await ensureUser(spec, config.seed.managerPassword);
+    console.log(`[seed] admin ${admin.email} ${isNew ? 'created' : 'already present'}`);
+  }
+
   const existingProjects = await listProjects({ includeArchived: true });
   const projectByKey = new Map(existingProjects.map((p) => [p.project_key, p]));
   for (const spec of PROJECTS) {
@@ -191,6 +208,7 @@ export async function seed() {
   const counts = await db.get(
     `SELECT
        (SELECT COUNT(*) FROM users) AS users,
+       (SELECT COUNT(*) FROM users WHERE role = 'manager') AS admins,
        (SELECT COUNT(*) FROM projects) AS projects,
        (SELECT COUNT(*) FROM assigned_tasks) AS tasks,
        (SELECT COUNT(*) FROM daily_task_reports) AS reports,
@@ -209,6 +227,7 @@ if (isEntry) {
       console.log('');
       console.log('  Sign in with:');
       console.log(`    Manager      ${config.seed.managerEmail} / ${config.seed.managerPassword}`);
+      for (const a of EXTRA_ADMINS) console.log(`    Manager      ${a.email} / ${config.seed.managerPassword}`);
       for (const e of EMPLOYEES) console.log(`    Team member  ${e.email} / ${config.seed.employeePassword}`);
       console.log('');
       await closeDb();
