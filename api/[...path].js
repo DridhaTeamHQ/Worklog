@@ -1,21 +1,26 @@
 /**
  * Vercel serverless entry for the API.
  *
- * `src/server.js` is the long-running entry: it migrates, opens the database, calls
- * `app.listen` and installs signal handlers. None of that belongs in a function that
- * is started and stopped per request, so this file uses `createApp()` — which builds
- * the Express app and nothing else — and lets the platform own the listening socket.
+ * The frontend and the API ship as one project: the built SPA is the static output
+ * and this function serves everything under /api. That is what lets the client keep
+ * calling a relative `/api` path — same origin, so no CORS and no cross-site cookie
+ * problem to solve.
+ *
+ * `backend/src/server.js` is the long-running entry: it migrates, opens the database,
+ * calls `app.listen` and installs signal handlers. None of that belongs in a function
+ * started and stopped per request, so this uses `createApp()` — which builds the
+ * Express app and nothing else — and lets the platform own the listening socket.
  *
  * The filename is a catch-all segment on purpose. Vercel maps `/api/**` to it while
  * leaving `req.url` as the path the browser actually asked for, so Express still sees
  * `/api/auth/login` and its existing `app.use('/api/...')` mounts match unchanged. A
- * plain `api/index.js` with a rewrite would rewrite the path out from under them.
+ * plain `api/index.js` plus a rewrite would replace the path and match nothing.
  *
  * The app is built once at module scope. Vercel reuses a warm instance across
  * invocations, so this keeps the routing table and the database pool alive between
  * requests instead of rebuilding both every time.
  */
-import { createApp } from '../src/app.js';
+import { createApp } from '../backend/src/app.js';
 
 /*
  * Fail loudly rather than quietly wrong.
