@@ -1,13 +1,11 @@
-# Paths are relative to this directory, which is the Vercel project's Root Directory.
-
 # Local SQLite databases. The serverless API runs on PostgreSQL, and uploading a
 # stale .db file would only bloat the deployment.
-data/
+backend/data/
 
 # Test and maintenance scripts. They drive a live API and write real rows; nothing
 # in the deployment should be able to run them.
-scripts/
+backend/scripts/
 
 # Local configuration. Real values come from the Vercel project's environment
 # variables, never from a file in the repo.
-.env
+backend/.env
