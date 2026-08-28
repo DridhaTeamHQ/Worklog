@@ -4,6 +4,7 @@ import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import rateLimit from 'express-rate-limit';
 import config from './config/env.js';
+import { getDb } from './db/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
 
 import authRoutes from './routes/auth.js';
@@ -59,10 +60,31 @@ export function createApp() {
     message: { success: false, error: { message: 'Too many requests. Please slow down.' } },
   }));
 
-  app.get('/api/health', (_req, res) => res.json({
-    success: true,
-    data: { status: 'ok', app: config.appName, db: config.db.client, time: new Date().toISOString() },
-  }));
+  /*
+   * Health actually checks the database rather than reporting which driver was
+   * configured. The difference matters on a deployment: a version that only echoes
+   * config answers 200 while every real request fails, which tells an operator
+   * nothing. One trivial query separates "the function is broken" from "the function
+   * is fine and cannot reach the database", which are unrelated problems.
+   *
+   * Only the error *code* is reported — ETIMEDOUT, ECONNREFUSED, 28P01 and so on.
+   * That is what identifies the fault, and unlike a full message it cannot carry a
+   * host name or a credential.
+   */
+  app.get('/api/health', async (_req, res) => {
+    const base = { app: config.appName, db: config.db.client, time: new Date().toISOString() };
+    try {
+      const db = await getDb();
+      await db.get('SELECT 1 AS ok');
+      return res.json({ success: true, data: { ...base, status: 'ok', database: { ok: true } } });
+    } catch (err) {
+      return res.status(503).json({
+        success: false,
+        data: { ...base, status: 'degraded', database: { ok: false, code: err.code || 'UNKNOWN' } },
+        error: { message: 'The API is running but cannot reach its database.' },
+      });
+    }
+  });
 
   app.use('/api/auth', authRoutes);
   app.use('/api/profile', profileRoutes);

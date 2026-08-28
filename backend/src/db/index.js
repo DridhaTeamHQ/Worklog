@@ -106,7 +106,10 @@ async function createPostgresDriver() {
   const pool = new pg.Pool({
     connectionString: config.db.url,
     ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
-    max: 10,
+    max: config.db.poolMax,
+    // Fail fast rather than holding a serverless invocation open for its whole
+    // timeout while a connection that is never going to arrive is waited on.
+    connectionTimeoutMillis: 10_000,
     // Retire connections before a managed pooler decides to. Supabase closes idle
     // connections on its own schedule, and a client the pool still believes is good
     // is exactly the one that fails on the next request.

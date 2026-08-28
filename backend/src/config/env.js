@@ -44,6 +44,15 @@ export const config = {
     client: process.env.DB_CLIENT || (process.env.DATABASE_URL ? 'postgres' : 'sqlite'),
     url: process.env.DATABASE_URL || '',
     ssl: bool(process.env.DATABASE_SSL, false),
+    /*
+     * How many connections one process may hold.
+     *
+     * A long-running server has exactly one pool, so ten is cheap. Serverless has one
+     * pool per instance and many instances, so the same number multiplies into the
+     * database's connection limit and starts refusing work under ordinary traffic.
+     * Vercel sets VERCEL=1, which is how this tells the two apart.
+     */
+    poolMax: Number(process.env.DB_POOL_MAX) || (process.env.VERCEL ? 2 : 10),
     sqliteFile: process.env.SQLITE_FILE
       ? path.resolve(backendRoot, process.env.SQLITE_FILE)
       : path.join(backendRoot, 'data', 'worklog.db'),
