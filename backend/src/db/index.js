@@ -107,6 +107,25 @@ async function createPostgresDriver() {
     connectionString: config.db.url,
     ssl: config.db.ssl ? { rejectUnauthorized: false } : undefined,
     max: 10,
+    // Retire connections before a managed pooler decides to. Supabase closes idle
+    // connections on its own schedule, and a client the pool still believes is good
+    // is exactly the one that fails on the next request.
+    idleTimeoutMillis: 30_000,
+    keepAlive: true,
+  });
+
+  /*
+   * REQUIRED, not defensive. `pg.Pool` emits 'error' when a client sitting idle in the
+   * pool dies — which a hosted Postgres does routinely, and every laptop does on sleep.
+   * An 'error' event with no listener is fatal in Node, so without this the whole API
+   * process is killed by a dropped background connection and every later request gets
+   * connection refused.
+   *
+   * The pool discards the dead client by itself; the next query opens a fresh one. So
+   * the right response is to record it and carry on, never to exit.
+   */
+  pool.on('error', (err) => {
+    console.error('[db] idle postgres connection dropped:', err.message);
   });
 
   const wrap = (executor) => ({
