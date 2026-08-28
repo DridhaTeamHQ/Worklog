@@ -5,12 +5,16 @@
   "buildCommand": "npm --prefix frontend run build",
   "outputDirectory": "frontend/dist",
   "functions": {
-    "api/[...path].js": {
+    "api/index.js": {
       "maxDuration": 30,
       "memory": 1024
     }
   },
   "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "/api/index?__path=$1"
+    },
     {
       "source": "/((?!api/).*)",
       "destination": "/index.html"

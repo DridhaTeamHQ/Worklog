@@ -11,11 +11,6 @@
  * started and stopped per request, so this uses `createApp()` — which builds the
  * Express app and nothing else — and lets the platform own the listening socket.
  *
- * The filename is a catch-all segment on purpose. Vercel maps `/api/**` to it while
- * leaving `req.url` as the path the browser actually asked for, so Express still sees
- * `/api/auth/login` and its existing `app.use('/api/...')` mounts match unchanged. A
- * plain `api/index.js` plus a rewrite would replace the path and match nothing.
- *
  * The app is built once at module scope. Vercel reuses a warm instance across
  * invocations, so this keeps the routing table and the database pool alive between
  * requests instead of rebuilding both every time.
@@ -41,4 +36,30 @@ if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
 
 const app = createApp();
 
-export default app;
+/**
+ * Rebuilds the path Express should see.
+ *
+ * Every route in this app is mounted under `/api`, but the rewrite that sends traffic
+ * here targets this one file, so the incoming URL can arrive as `/api/index`. The
+ * rewrite therefore carries the real path in `__path`, and this puts it back before
+ * Express looks at it. Anything else in the query string is preserved untouched —
+ * dropping it would silently break every filtered list in the app.
+ *
+ * Exported so the behaviour can be tested directly rather than only through a
+ * deployment.
+ */
+export function restorePath(url) {
+  const parsed = new URL(url || '/', 'http://localhost');
+  const carried = parsed.searchParams.get('__path');
+  if (carried === null) return url;
+
+  parsed.searchParams.delete('__path');
+  const query = parsed.searchParams.toString();
+  const path = carried.replace(/^\/+/, '');
+  return `/api${path ? `/${path}` : ''}${query ? `?${query}` : ''}`;
+}
+
+export default function handler(req, res) {
+  req.url = restorePath(req.url);
+  return app(req, res);
+}
