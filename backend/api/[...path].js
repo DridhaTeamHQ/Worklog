@@ -15,7 +15,7 @@
  * invocations, so this keeps the routing table and the database pool alive between
  * requests instead of rebuilding both every time.
  */
-import { createApp } from '../backend/src/app.js';
+import { createApp } from '../src/app.js';
 
 /*
  * Fail loudly rather than quietly wrong.
