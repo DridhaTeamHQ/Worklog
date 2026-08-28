@@ -3,7 +3,7 @@ import { ClipboardPlus } from 'lucide-react';
 import { projectApi, taskApi, teamApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
-import { Avatar, Modal, Spinner } from './ui';
+import { Avatar, Modal, Spinner, Select } from './ui';
 import { todayIso } from '../lib/format';
 import type { Priority, Project, Task, TeamMember } from '../types';
 
@@ -90,6 +90,8 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
   const selectedMember = members.find((m) => String(m.id) === employeeId);
   const assigneeName = employee?.name ?? selectedMember?.name;
 
+  const selectedProject = projects.find((p) => String(p.id) === String(projectId)) ?? null;
+
   const submit = async (e: FormEvent) => {
     e.preventDefault();
 
@@ -158,20 +160,17 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
             </div>
           ) : (
             <>
-              <select
+              <Select
                 id="t-assignee"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value)}
-                aria-invalid={!!errors.employeeId}
-                className={`input ${errors.employeeId ? 'input-error' : ''}`}
-              >
-                <option value="">Select a team member…</option>
-                {members.map((m) => (
-                  <option key={m.id} value={m.id}>
-                    {m.name}{m.department ? ` · ${m.department}` : ''}
-                  </option>
-                ))}
-              </select>
+                onChange={setEmployeeId}
+                invalid={!!errors.employeeId}
+                placeholder="Select a team member…"
+                options={members.map((m) => ({
+                  value: String(m.id),
+                  label: `${m.name}${m.department ? ` · ${m.department}` : ''}`,
+                }))}
+              />
               {errors.employeeId
                 ? <p className="field-error">{errors.employeeId}</p>
                 : selectedMember && (
@@ -188,21 +187,32 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
 
         <div>
           <label className="label" htmlFor="t-project">Project <span className="text-red-500">*</span></label>
-          <select
+          <Select
             id="t-project"
             value={projectId}
-            onChange={(e) => setProjectId(e.target.value)}
-            aria-invalid={!!errors.projectId}
-            className={`input ${errors.projectId ? 'input-error' : ''}`}
-          >
-            <option value="">Select a project…</option>
-            {projects.map((p) => (
-              <option key={p.id} value={p.id}>{p.project_key} · {p.name}</option>
-            ))}
-          </select>
+            onChange={setProjectId}
+            invalid={!!errors.projectId}
+            placeholder="Select a project…"
+            options={projects.map((p) => ({
+              value: String(p.id),
+              label: p.name,
+              badge: p.project_key,
+            }))}
+          />
           {errors.projectId
             ? <p className="field-error">{errors.projectId}</p>
-            : <p className="hint">The task key is issued from this project, for example SHMOB-12.</p>}
+            : (
+              /*
+                Keyed on the selection so the hint fades between projects instead of
+                the key swapping in place — the one part of this form whose text
+                changes as you choose, so it is the part worth animating.
+              */
+              <p key={projectId || 'none'} className="hint fade-in">
+                {selectedProject
+                  ? `Keys in this project look like ${selectedProject.project_key}-12.`
+                  : 'The task key is issued from this project, for example SHMOB-12.'}
+              </p>
+            )}
         </div>
 
         <div>

@@ -107,7 +107,7 @@ export function TaskTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1080px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-ink-200 bg-ink-50">
+          <tr className="border-b border-brand-100 bg-brand-50">
             {selectable && (
               <th scope="col" className="w-10 px-3 py-2.5">
                 <input
@@ -120,7 +120,7 @@ export function TaskTable({
                 />
               </th>
             )}
-            <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
+            <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-brand-800">
               Work
             </th>
             {showAssignee && <Th>Assignee</Th>}
@@ -144,8 +144,8 @@ export function TaskTable({
               <Fragment key={task.id}>
                 <tr
                   ref={rowRef?.(task.id)}
-                  className={`border-b border-ink-100 transition-colors ${
-                    task.id === highlightId ? 'bg-brand-50' : 'hover:bg-ink-50'
+                  className={`border-b border-ink-100 transition-colors duration-200 ease-out ${
+                    task.id === highlightId ? 'bg-cream-100' : 'hover:bg-brand-50/70'
                   }`}
                 >
                   {selectable && (
@@ -253,7 +253,7 @@ export function TaskTable({
                 </tr>
 
                 {isOpen && (
-                  <tr className="border-b border-ink-100 bg-ink-50/60">
+                  <tr className="border-b border-ink-100 bg-brand-50/50">
                     <td colSpan={columnCount} className="px-3 py-3">
                       <div className="space-y-2.5 pl-8">
                         <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{task.description}</p>
@@ -302,7 +302,7 @@ export function TaskTable({
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-ink-500">
+    <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-brand-800">
       {children}
     </th>
   );

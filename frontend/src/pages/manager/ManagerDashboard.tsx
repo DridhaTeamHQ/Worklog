@@ -52,7 +52,7 @@ export function ManagerDashboard() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Total Team Members" value={summary.total_team_members} accent="brand" icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Assigned Today" value={summary.tasks_assigned_today} accent="ink" icon={<ClipboardCheck className="h-5 w-5" />} />
+        <StatCard label="Assigned Today" value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
         <StatCard label="Completed Today" value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
         <StatCard label="Pending Tasks" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
         <StatCard label="In Progress" value={summary.in_progress_tasks} accent="blue" icon={<Loader2 className="h-5 w-5" />} />
@@ -163,25 +163,25 @@ export function ManagerDashboard() {
             <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gAssigned" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#6366f1" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#6366f1" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#a33e63" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#a33e63" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gCompleted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#059669" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#15794c" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#15794c" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
               <Tooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }}
+                contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }}
                 labelStyle={{ fontWeight: 600, color: '#0f172a' }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="assigned" name="Assigned" stroke="#6366f1" strokeWidth={2} fill="url(#gAssigned)" />
-              <Area type="monotone" dataKey="completed" name="Completed" stroke="#059669" strokeWidth={2} fill="url(#gCompleted)" />
-              <Area type="monotone" dataKey="reports" name="Reports" stroke="#d97706" strokeWidth={2} fillOpacity={0} />
+              <Area type="monotone" dataKey="assigned" name="Assigned" stroke="#a33e63" strokeWidth={2} fill="url(#gAssigned)" />
+              <Area type="monotone" dataKey="completed" name="Completed" stroke="#15794c" strokeWidth={2} fill="url(#gCompleted)" />
+              <Area type="monotone" dataKey="reports" name="Reports" stroke="#94560a" strokeWidth={2} fillOpacity={0} />
             </AreaChart>
           </ResponsiveContainer>
         </div>

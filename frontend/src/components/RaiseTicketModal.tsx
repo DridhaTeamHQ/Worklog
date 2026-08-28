@@ -3,7 +3,7 @@ import { Bug, Info } from 'lucide-react';
 import { taskApi, ticketApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
-import { Modal, Spinner } from './ui';
+import { Modal, Spinner, Select } from './ui';
 import { taskLabel } from '../lib/format';
 import type { Task, Ticket, TicketSeverity } from '../types';
 
@@ -180,41 +180,37 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
         <form id="raise-ticket-form" onSubmit={submit} className="space-y-4" noValidate>
           <div>
             <label className="label" htmlFor="tk-project">Project <span className="text-red-500">*</span></label>
-            <select
+            <Select
               id="tk-project"
               value={projectId}
-              onChange={(e) => changeProject(e.target.value)}
+              onChange={changeProject}
               disabled={loadingTasks}
-              aria-invalid={!!errors.projectId}
-              className={`input ${errors.projectId ? 'input-error' : ''}`}
-            >
-              <option value="">{loadingTasks ? 'Loading your work…' : 'Select a project…'}</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.key} · {p.name} ({p.count} task{p.count === 1 ? '' : 's'})
-                </option>
-              ))}
-            </select>
+              invalid={!!errors.projectId}
+              placeholder={loadingTasks ? 'Loading your work…' : 'Select a project…'}
+              options={projects.map((p) => ({
+                value: String(p.id),
+                label: `${p.name} (${p.count} task${p.count === 1 ? '' : 's'})`,
+                badge: p.key,
+              }))}
+            />
             {errors.projectId && <p className="field-error">{errors.projectId}</p>}
           </div>
 
           <div>
             <label className="label" htmlFor="tk-task">Task <span className="text-red-500">*</span></label>
-            <select
+            <Select
               id="tk-task"
               value={taskId}
-              onChange={(e) => setTaskId(e.target.value)}
+              onChange={setTaskId}
               disabled={!projectId}
-              aria-invalid={!!errors.taskId}
-              className={`input ${errors.taskId ? 'input-error' : ''}`}
-            >
-              <option value="">
-                {projectId ? 'Select the task you were working on…' : 'Choose a project first'}
-              </option>
-              {tasksInProject.map((t) => (
-                <option key={t.id} value={t.id}>{t.task_key} · {taskLabel(t)}</option>
-              ))}
-            </select>
+              invalid={!!errors.taskId}
+              placeholder={projectId ? 'Select the task you were working on…' : 'Choose a project first'}
+              options={tasksInProject.map((t) => ({
+                value: String(t.id),
+                label: taskLabel(t),
+                badge: t.task_key ?? undefined,
+              }))}
+            />
             {errors.taskId
               ? <p className="field-error">{errors.taskId}</p>
               : <p className="hint">Only tasks assigned to you appear here.</p>}

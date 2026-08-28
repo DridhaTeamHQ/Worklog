@@ -7,7 +7,7 @@ import { adminApi, teamApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
-  Avatar, EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner,
+  Avatar, EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner, Select,
 } from '../../components/ui';
 import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
@@ -36,6 +36,8 @@ export function TeamMembersPage() {
 
   /** The member awaiting delete confirmation, or null when nothing is pending. */
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
+  /** The manager-level account awaiting delete confirmation. */
+  const [confirmRemoveAdmin, setConfirmRemoveAdmin] = useState<Manager | null>(null);
   const [removing, setRemoving] = useState(false);
 
   /*
@@ -78,6 +80,9 @@ export function TeamMembersPage() {
   }, [tab, search, department]);
 
   useEffect(() => {
+    // Same reason as the other list pages: the debounce must not leave the previous
+    // tab's rows on screen after the tab has changed.
+    setLoading(true);
     const controller = new AbortController();
     const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -114,6 +119,26 @@ export function TeamMembersPage() {
       loadDepartments();
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not remove that team member.');
+    } finally {
+      setRemoving(false);
+    }
+  };
+
+  /**
+   * Closes a manager-level account. The server moves anything they had assigned to the
+   * signed-in admin, and its message reports how many moved — which is what gets shown,
+   * because "removed" alone would not mention that work changed hands.
+   */
+  const removeAdmin = async () => {
+    if (!confirmRemoveAdmin) return;
+    setRemoving(true);
+    try {
+      const { data } = await adminApi.remove(confirmRemoveAdmin.id);
+      setAdmins((prev) => prev.filter((a) => a.id !== confirmRemoveAdmin.id));
+      toast.success(data.message);
+      setConfirmRemoveAdmin(null);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not remove that account.');
     } finally {
       setRemoving(false);
     }
@@ -161,10 +186,11 @@ export function TeamMembersPage() {
               role="tab"
               aria-selected={tab === t.key}
               onClick={() => { setTab(t.key); setSearch(''); setDepartment(''); }}
-              className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm font-semibold transition-colors ${
+              className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold
+                transition-all duration-200 ease-out active:scale-[0.97] ${
                 tab === t.key
-                  ? 'border-brand-600 bg-brand-600 text-white'
-                  : 'border-ink-300 bg-white text-ink-700 hover:border-ink-400 hover:bg-ink-50'
+                  ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
+                  : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
               }`}
             >
               {t.icon}
@@ -193,15 +219,7 @@ export function TeamMembersPage() {
             to filter by. A manager's roster is already confined to theirs by the server.
           */}
           {isTeam && canAdminister && (
-            <select
-              value={department}
-              onChange={(e) => setDepartment(e.target.value)}
-              aria-label="Filter by department"
-              className="input sm:w-52"
-            >
-              <option value="">All departments</option>
-              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <Select value={department} onChange={(v) => setDepartment(v)} options={[{ value: '', label: `All departments` }, ...departments.map((d) => ({ value: String(d), label: `${d}` }))]} ariaLabel="Filter by department" className="sm:w-52" />
           )}
         </div>
 
@@ -248,7 +266,7 @@ export function TeamMembersPage() {
                 </thead>
                 <tbody>
                   {members.map((m) => (
-                    <tr key={m.id} className="hover:bg-ink-50">
+                    <tr key={m.id}>
                       <td>
                         <Link to={`/manager/team/${m.id}`} className="flex items-center gap-3 group">
                           <Avatar name={m.name} src={m.profile_image} />
@@ -338,11 +356,12 @@ export function TeamMembersPage() {
                     <th scope="col" className="text-right">Tasks assigned</th>
                     <th scope="col" className="text-right">Still open</th>
                     <th scope="col">Added</th>
+                    <th scope="col" className="text-right">Action</th>
                   </tr>
                 </thead>
                 <tbody>
                   {admins.map((a) => (
-                    <tr key={a.id} className="hover:bg-ink-50">
+                    <tr key={a.id}>
                       <td>
                         <span className="flex items-center gap-3">
                           <Avatar name={a.name} src={a.profile_image} />
@@ -374,6 +393,24 @@ export function TeamMembersPage() {
                       <td className="text-right font-semibold tabular-nums text-ink-900">{a.assigned_tasks}</td>
                       <td className="text-right tabular-nums text-ink-600">{a.open_tasks}</td>
                       <td className="whitespace-nowrap text-xs text-ink-500">{formatDate(a.created_at)}</td>
+                      <td className="text-right">
+                        {/*
+                          No delete on your own row: signing yourself out permanently is
+                          not something a confirm dialog should be the first warning of.
+                          The server refuses it independently.
+                        */}
+                        {a.id !== user?.id && (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmRemoveAdmin(a)}
+                            aria-label={`Remove ${a.name}`}
+                            title={`Remove ${a.name}`}
+                            className="rounded-md p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -436,6 +473,66 @@ export function TeamMembersPage() {
                 </p>
               </div>
             </div>
+          </div>
+        )}
+      </Modal>
+
+      <Modal
+        open={!!confirmRemoveAdmin}
+        onClose={() => setConfirmRemoveAdmin(null)}
+        title="Remove this account?"
+        size="sm"
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setConfirmRemoveAdmin(null)} className="btn-secondary">Cancel</button>
+            <button type="button" onClick={() => void removeAdmin()} disabled={removing} className="btn-danger">
+              {removing
+                ? <><Spinner className="h-4 w-4" /> Removing…</>
+                : <><Trash2 className="h-4 w-4" /> Remove permanently</>}
+            </button>
+          </div>
+        )}
+      >
+        {confirmRemoveAdmin && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-xl border border-ink-200 bg-ink-50 p-4">
+              <Avatar name={confirmRemoveAdmin.name} src={confirmRemoveAdmin.profile_image} />
+              <div className="min-w-0">
+                <p className="truncate font-semibold text-ink-900">{confirmRemoveAdmin.name}</p>
+                <p className="truncate text-sm text-ink-500">
+                  {roleLabel(confirmRemoveAdmin.role)} · {confirmRemoveAdmin.email}
+                </p>
+              </div>
+            </div>
+
+            {/*
+              The transfer is stated before the click rather than discovered after it.
+              Without it these tasks would cascade away with the account, taking other
+              people's work with them.
+            */}
+            {confirmRemoveAdmin.assigned_tasks > 0 ? (
+              <div className="flex items-start gap-3 rounded-xl border border-cream-300 bg-cream-50 px-4 py-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-cream-700" aria-hidden />
+                <div className="min-w-0 text-sm">
+                  <p className="font-semibold text-ink-900">
+                    Their {confirmRemoveAdmin.assigned_tasks} assigned task
+                    {confirmRemoveAdmin.assigned_tasks === 1 ? '' : 's'} will move to you
+                  </p>
+                  <p className="mt-0.5 text-ink-700">
+                    Nothing is deleted — the tasks and the employees' progress on them stay
+                    exactly as they are. Only the record of who assigned them changes.
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-sm text-ink-600">
+                They have no assigned tasks, so nothing else is affected.
+              </p>
+            )}
+
+            <p className="text-sm text-ink-600">
+              They lose access to this portal immediately. This cannot be undone.
+            </p>
           </div>
         )}
       </Modal>

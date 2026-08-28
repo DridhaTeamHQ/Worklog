@@ -7,17 +7,17 @@ import { BarChart3, TrendingUp, Users } from 'lucide-react';
 import { dashboardApi, teamApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
-import { EmptyState, ErrorState, PageHeader, PageLoader } from '../../components/ui';
+import { EmptyState, ErrorState, PageHeader, Spinner, Select } from '../../components/ui';
 import { formatDateShort, todayIso, addDaysIso } from '../../lib/format';
 import type { AnalyticsPayload, TeamMember } from '../../types';
 import { isAdmin } from '../../types';
 
 /** One colour per status, matching the badges so the charts read the same way. */
 const STATUS_COLORS = {
-  pending: '#d97706',
-  in_progress: '#2563eb',
-  completed: '#059669',
-  overdue: '#dc2626',
+  pending: '#94560a',
+  in_progress: '#1e4fc4',
+  completed: '#15794c',
+  overdue: '#b32626',
 };
 
 export function AnalyticsPage() {
@@ -62,18 +62,18 @@ export function AnalyticsPage() {
 
   useEffect(() => { void load(); }, [load]);
 
-  if (loading && !data) return <PageLoader />;
   if (error) return <ErrorState message={error} onRetry={load} />;
-  if (!data) return null;
 
-  const { summary, productivity, breakdown, daily, weekly } = data;
+  const { summary, productivity, breakdown, daily, weekly } = data ?? {
+    summary: null, productivity: [], breakdown: null, daily: [], weekly: [],
+  };
 
-  const pieData = [
+  const pieData = breakdown ? [
     { name: 'Pending', value: breakdown.pending, color: STATUS_COLORS.pending },
     { name: 'In Progress', value: breakdown.in_progress, color: STATUS_COLORS.in_progress },
     { name: 'Completed', value: breakdown.completed, color: STATUS_COLORS.completed },
     { name: 'Overdue', value: breakdown.overdue, color: STATUS_COLORS.overdue },
-  ].filter((slice) => slice.value > 0);
+  ].filter((slice) => slice.value > 0) : [];
 
   const trend = view === 'daily'
     ? daily.map((d) => ({ label: formatDateShort(d.day).replace(/,.*/, ''), ...d }))
@@ -94,20 +94,14 @@ export function AnalyticsPage() {
       <div className="card grid gap-4 p-4 sm:grid-cols-2 lg:grid-cols-4">
         <div>
           <label className="label" htmlFor="a-employee">Employee</label>
-          <select id="a-employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="input">
-            <option value="">All employees</option>
-            {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-          </select>
+          <Select id="a-employee" value={employeeId} onChange={(v) => setEmployeeId(v)} options={[{ value: '', label: `All employees` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
         </div>
         {/* A manager spans one department, so there is nothing to choose between;
             the server confines their figures to it regardless. */}
         {canSeeAllDepartments && (
           <div>
             <label className="label" htmlFor="a-dept">Department</label>
-            <select id="a-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
-              <option value="">All departments</option>
-              {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-            </select>
+            <Select id="a-dept" value={department} onChange={(v) => setDepartment(v)} options={[{ value: '', label: `All departments` }, ...departments.map((d) => ({ value: String(d), label: `${d}` }))]} />
           </div>
         )}
         <div>
@@ -152,6 +146,18 @@ export function AnalyticsPage() {
         )}
       </div>
 
+      {/*
+        The filters above stay mounted while this reloads — taking them away and
+        putting them back is what made changing one feel like the page had jumped.
+        The reserved height keeps the card stack from collapsing behind the loader.
+      */}
+      {loading || !summary ? (
+        <div className="card flex min-h-[560px] items-center justify-center" aria-busy="true" aria-live="polite">
+          <Spinner className="h-8 w-8 text-brand-500" />
+          <span className="sr-only">Loading analytics</span>
+        </div>
+      ) : (
+      <div className="fade-in space-y-6">
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         {[
           { label: 'Total tasks', value: summary.total_tasks },
@@ -176,14 +182,14 @@ export function AnalyticsPage() {
             <div className="mt-4 h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
-                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="assigned" name="Assigned" fill="#a5b4fc" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="completed" name="Completed" fill="#059669" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="overdue" name="Overdue" fill="#dc2626" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="assigned" name="Assigned" fill="#bd5579" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill="#15794c" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="overdue" name="Overdue" fill="#b32626" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -202,7 +208,7 @@ export function AnalyticsPage() {
                   <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" paddingAngle={2}>
                     {pieData.map((slice) => <Cell key={slice.name} fill={slice.color} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -219,15 +225,13 @@ export function AnalyticsPage() {
               {view === 'daily' ? 'Last 30 days' : 'Last 8 weeks'} — assignments, completions and reports.
             </p>
           </div>
-          <div className="inline-flex gap-1 self-start rounded-lg bg-ink-100 p-1">
+          <div className="segmented inline-flex self-start">
             {(['daily', 'weekly'] as const).map((v) => (
               <button
                 key={v}
                 type="button"
                 onClick={() => setView(v)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                  view === v ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                }`}
+                className={`segmented-item capitalize ${view === v ? 'segmented-item-active' : ''}`}
               >
                 {v}
               </button>
@@ -237,14 +241,14 @@ export function AnalyticsPage() {
         <div className="mt-4 h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trend} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e2e8f0" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: '#64748b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e2e8f0', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+              <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#6366f1" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="completed" name="Completed" stroke="#059669" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="reports" name="Reports" stroke="#d97706" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#a33e63" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="completed" name="Completed" stroke="#15794c" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="reports" name="Reports" stroke="#94560a" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>
@@ -274,7 +278,7 @@ export function AnalyticsPage() {
               </thead>
               <tbody>
                 {productivity.map((p) => (
-                  <tr key={p.employee_id} className="hover:bg-ink-50">
+                  <tr key={p.employee_id}>
                     <td className="font-medium text-ink-900">{p.employee_name}</td>
                     <td className="text-ink-600">{p.department || '—'}</td>
                     <td className="text-right tabular-nums">{p.assigned}</td>
@@ -297,6 +301,8 @@ export function AnalyticsPage() {
           </div>
         )}
       </section>
+      </div>
+      )}
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { FolderKanban } from 'lucide-react';
 import type { Project } from '../types';
+import { Select } from './ui';
 
 interface Props {
   projects: Project[];
@@ -31,19 +32,19 @@ export function ProjectSwitcher({
       {/* Narrow screens */}
       <div className="sm:hidden">
         <label className="label" htmlFor="project-switcher">Project</label>
-        <select
+        <Select
           id="project-switcher"
-          value={value ?? ''}
-          onChange={(e) => onChange(e.target.value ? Number(e.target.value) : null)}
-          className="input"
-        >
-          <option value="">All projects{showCounts ? ` (${allCount})` : ''}</option>
-          {projects.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.project_key} · {p.name}{showCounts ? ` (${countOf(p)})` : ''}
-            </option>
-          ))}
-        </select>
+          value={value === null ? '' : String(value)}
+          onChange={(v) => onChange(v ? Number(v) : null)}
+          options={[
+            { value: '', label: `All projects${showCounts ? ` (${allCount})` : ''}` },
+            ...projects.map((p) => ({
+              value: String(p.id),
+              label: `${p.name}${showCounts ? ` (${countOf(p)})` : ''}`,
+              badge: p.project_key,
+            })),
+          ]}
+        />
       </div>
 
       {/* Wide screens */}
@@ -90,10 +91,11 @@ function Tab({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-lg border px-3 py-1.5 text-sm font-medium transition-colors ${
+      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium
+        transition-all duration-200 ease-out active:scale-[0.97] ${
         active
-          ? 'border-brand-600 bg-brand-600 text-white'
-          : 'border-ink-300 bg-white text-ink-700 hover:border-ink-400 hover:bg-ink-50'
+          ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
+          : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
       }`}
     >
       {icon}

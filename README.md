@@ -460,6 +460,7 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `POST` | `/team` | **admin** | Add a team member |
 | `GET` | `/admins` | **admin** | List everyone with manager access |
 | `POST` | `/admins` | **admin** | Grant manager access to a new person |
+| `DELETE` | `/admins/:id` | **admin** | Close a manager-level account, moving their assigned work |
 | `GET` | `/team/departments` | manager | Departments for filters |
 | `GET` | `/team/:id` | manager | Employee detail |
 | `DELETE` | `/team/:id` | **admin** | Remove a team member and all their data |
@@ -540,6 +541,14 @@ Title, description, notes, priority and dates are all things a manager may not k
 the moment they hand work over, so none of them is demanded up front and every one of
 them can be filled in later from the edit dialog. An untitled task is listed under its
 key, which is what people call it by anyway.
+
+**Deleting a manager moves their work rather than destroying it.** `assigned_tasks.manager_id`
+is NOT NULL and cascades, so removing a manager outright would take every task they had
+ever assigned — other people's work, not theirs — with them. `DELETE /api/admins/:id`
+re-points those rows to the admin doing the deleting, inside the same transaction as the
+delete, and the confirmation says how many will move before the click. Two accounts are
+refused outright: your own, and the last remaining admin, since nobody else could create
+another one.
 
 **Deleting a team member deletes their history with them.** Every table that references
 `users(id)` cascades, so removing someone takes their assigned tasks, daily reports,

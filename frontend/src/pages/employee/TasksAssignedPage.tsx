@@ -6,7 +6,7 @@ import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { ProjectSwitcher } from '../../components/ProjectSwitcher';
 import { TaskTable } from '../../components/TaskTable';
-import { EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput } from '../../components/ui';
+import { EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput, Select } from '../../components/ui';
 import { STATUS_LABEL } from '../../lib/format';
 import type { Project, Task, TaskStatus } from '../../types';
 
@@ -147,7 +147,7 @@ export function TasksAssignedPage() {
         <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="overflow-x-auto">
             <div
-              className="flex min-w-max gap-1 rounded-lg bg-ink-100 p-1"
+              className="segmented min-w-max"
               role="tablist"
               aria-label="Filter tasks by status"
             >
@@ -158,9 +158,7 @@ export function TasksAssignedPage() {
                   role="tab"
                   aria-selected={status === tab.value}
                   onClick={() => setStatus(tab.value)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    status === tab.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                  }`}
+                  className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
                 >
                   {tab.label}
                 </button>
@@ -170,18 +168,7 @@ export function TasksAssignedPage() {
 
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
             <SearchInput value={search} onChange={setSearch} placeholder="Search work or key" className="sm:w-60" />
-            <select
-              value={sort}
-              onChange={(e) => setSort(e.target.value)}
-              aria-label="Sort tasks"
-              className="input sm:w-44"
-            >
-              <option value="deadline_asc">Deadline (soonest)</option>
-              <option value="deadline_desc">Deadline (latest)</option>
-              <option value="priority_desc">Priority (highest)</option>
-              <option value="created_desc">Newest first</option>
-              <option value="created_asc">Oldest first</option>
-            </select>
+            <Select value={sort} onChange={(v) => setSort(v)} options={[{ value: 'deadline_asc', label: `Deadline (soonest)` }, { value: 'deadline_desc', label: `Deadline (latest)` }, { value: 'priority_desc', label: `Priority (highest)` }, { value: 'created_desc', label: `Newest first` }, { value: 'created_asc', label: `Oldest first` }]} ariaLabel="Sort tasks" className="sm:w-44" />
           </div>
         </div>
 

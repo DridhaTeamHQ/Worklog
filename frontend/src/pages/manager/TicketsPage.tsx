@@ -7,7 +7,7 @@ import { useToast } from '../../components/Toast';
 import { TicketList } from '../../components/TicketList';
 import { TICKET_STATUS_LABEL } from '../../components/Badges';
 import {
-  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, StatCard,
+  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, StatCard, Select,
 } from '../../components/ui';
 import type { Project, TeamMember, Ticket, TicketCounts, TicketStatus } from '../../types';
 
@@ -184,7 +184,7 @@ export function ManagerTicketsPage() {
       <div className="card">
         <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="overflow-x-auto">
-            <div className="flex min-w-max gap-1 rounded-lg bg-ink-100 p-1" role="tablist" aria-label="Filter tickets by status">
+            <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
               {STATUS_TABS.map((tab) => (
                 <button
                   key={tab.value || 'all'}
@@ -192,9 +192,7 @@ export function ManagerTicketsPage() {
                   role="tab"
                   aria-selected={status === tab.value}
                   onClick={() => setStatus(tab.value)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    status === tab.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                  }`}
+                  className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
                 >
                   {tab.label}
                 </button>
@@ -204,39 +202,22 @@ export function ManagerTicketsPage() {
           <SearchInput value={search} onChange={setSearch} placeholder="Search tickets, key or reporter" className="lg:w-72" />
         </div>
 
-        <div className="grid gap-4 border-b border-ink-200 bg-ink-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="label" htmlFor="tf-project">Project</label>
-            <select id="tf-project" value={projectId} onChange={(e) => setProjectId(e.target.value)} className="input">
-              <option value="">All projects</option>
-              {projects.map((p) => <option key={p.id} value={p.id}>{p.project_key} · {p.name}</option>)}
-            </select>
+            <Select id="tf-project" value={projectId} onChange={(v) => setProjectId(v)} options={[{ value: '', label: `All projects` }, ...projects.map((p) => ({ value: String(p.id), label: `${p.project_key} · ${p.name}` }))]} />
           </div>
           <div>
             <label className="label" htmlFor="tf-reporter">Reported by</label>
-            <select id="tf-reporter" value={reporterId} onChange={(e) => setReporterId(e.target.value)} className="input">
-              <option value="">Everyone</option>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <Select id="tf-reporter" value={reporterId} onChange={(v) => setReporterId(v)} options={[{ value: '', label: `Everyone` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
           </div>
           <div>
             <label className="label" htmlFor="tf-severity">Severity</label>
-            <select id="tf-severity" value={severity} onChange={(e) => setSeverity(e.target.value)} className="input">
-              <option value="">Any severity</option>
-              <option value="critical">Critical</option>
-              <option value="high">High</option>
-              <option value="medium">Medium</option>
-              <option value="low">Low</option>
-            </select>
+            <Select id="tf-severity" value={severity} onChange={(v) => setSeverity(v)} options={[{ value: '', label: `Any severity` }, { value: 'critical', label: `Critical` }, { value: 'high', label: `High` }, { value: 'medium', label: `Medium` }, { value: 'low', label: `Low` }]} />
           </div>
           <div>
             <label className="label" htmlFor="tf-sort">Sort</label>
-            <select id="tf-sort" value={sort} onChange={(e) => setSort(e.target.value)} className="input">
-              <option value="severity_desc">Most severe first</option>
-              <option value="status_asc">By status</option>
-              <option value="created_desc">Newest first</option>
-              <option value="created_asc">Oldest first</option>
-            </select>
+            <Select id="tf-sort" value={sort} onChange={(v) => setSort(v)} options={[{ value: 'severity_desc', label: `Most severe first` }, { value: 'status_asc', label: `By status` }, { value: 'created_desc', label: `Newest first` }, { value: 'created_asc', label: `Oldest first` }]} />
           </div>
         </div>
 

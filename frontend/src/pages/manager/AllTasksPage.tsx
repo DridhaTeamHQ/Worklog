@@ -11,7 +11,7 @@ import { CreateProjectModal } from '../../components/CreateProjectModal';
 import { EditProjectModal } from '../../components/EditProjectModal';
 import { EditTaskModal } from '../../components/EditTaskModal';
 import {
-  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner,
+  EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner, Select,
 } from '../../components/ui';
 import { STATUS_LABEL, taskLabel } from '../../lib/format';
 import type { Project, Task, TaskStatus, TeamMember } from '../../types';
@@ -97,6 +97,13 @@ export function AllTasksPage() {
   }, [projectId, search, status, priority, employeeId, assignedFrom, assignedTo, deadlineTo, sort]);
 
   useEffect(() => {
+    /*
+      Loading is flipped here rather than inside `load`, which runs behind a debounce
+      timer. Waiting for the timer left the previous results on screen for the frame
+      after a project tab or filter changed — briefly showing one set of rows under
+      another set's heading, which is what read as a glitch.
+    */
+    setLoading(true);
     const controller = new AbortController();
     const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -279,43 +286,23 @@ export function AllTasksPage() {
                     </span>
                   )}
                 </button>
-                <select value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort tasks" className="input w-44">
-                  <option value="created_desc">Newest first</option>
-                  <option value="created_asc">Oldest first</option>
-                  <option value="deadline_asc">Deadline (soonest)</option>
-                  <option value="priority_desc">Priority (highest)</option>
-                </select>
+                <Select value={sort} onChange={(v) => setSort(v)} options={[{ value: 'created_desc', label: `Newest first` }, { value: 'created_asc', label: `Oldest first` }, { value: 'deadline_asc', label: `Deadline (soonest)` }, { value: 'priority_desc', label: `Priority (highest)` }]} ariaLabel="Sort tasks" className="w-44" />
               </div>
             </div>
 
             {showFilters && (
-              <div className="grid gap-4 border-b border-ink-200 bg-ink-50 p-4 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                 <div>
                   <label className="label" htmlFor="f-employee">Employee</label>
-                  <select id="f-employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="input">
-                    <option value="">All employees</option>
-                    {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-                  </select>
+                  <Select id="f-employee" value={employeeId} onChange={(v) => setEmployeeId(v)} options={[{ value: '', label: `All employees` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
                 </div>
                 <div>
                   <label className="label" htmlFor="f-status">Status</label>
-                  <select id="f-status" value={status} onChange={(e) => setStatus(e.target.value)} className="input">
-                    <option value="">All statuses</option>
-                    <option value="pending">Pending</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="completed">Completed</option>
-                    <option value="overdue">Overdue</option>
-                  </select>
+                  <Select id="f-status" value={status} onChange={(v) => setStatus(v)} options={[{ value: '', label: `All statuses` }, { value: 'pending', label: `Pending` }, { value: 'in_progress', label: `In Progress` }, { value: 'completed', label: `Completed` }, { value: 'overdue', label: `Overdue` }]} />
                 </div>
                 <div>
                   <label className="label" htmlFor="f-priority">Priority</label>
-                  <select id="f-priority" value={priority} onChange={(e) => setPriority(e.target.value)} className="input">
-                    <option value="">All priorities</option>
-                    <option value="low">Low</option>
-                    <option value="medium">Medium</option>
-                    <option value="high">High</option>
-                    <option value="urgent">Urgent</option>
-                  </select>
+                  <Select id="f-priority" value={priority} onChange={(v) => setPriority(v)} options={[{ value: '', label: `All priorities` }, { value: 'low', label: `Low` }, { value: 'medium', label: `Medium` }, { value: 'high', label: `High` }, { value: 'urgent', label: `Urgent` }]} />
                 </div>
                 <div>
                   <label className="label" htmlFor="f-from">Assigned from</label>
@@ -378,8 +365,15 @@ export function AllTasksPage() {
               </div>
             )}
 
+            {/*
+              Every load shows the skeleton, including a project switch or a filter
+              change. Keeping the previous rows on screen while new ones were fetched
+              meant two different lists were briefly readable in the same place.
+              The minimum height matches a populated table, so the card does not
+              resize underneath the pointer.
+            */}
             {loading ? (
-              <LoadingBlock label="Loading tasks" rows={5} />
+              <LoadingBlock label="Loading tasks" rows={5} className="min-h-[420px]" />
             ) : error ? (
               <ErrorState message={error} onRetry={() => void load()} />
             ) : tasks.length === 0 ? (
@@ -402,7 +396,12 @@ export function AllTasksPage() {
                 )}
               />
             ) : (
-              <>
+              /*
+                Keyed on the project so React replays the fade when the tab changes;
+                without the key it would patch the same DOM in place and the switch
+                would be instantaneous rather than animated.
+              */
+              <div key={projectId ?? 'all'} className="fade-in min-h-[420px]">
                 <p className="px-4 py-2 text-xs text-ink-500">
                   {tasks.length} task{tasks.length === 1 ? '' : 's'}
                 </p>
@@ -419,7 +418,7 @@ export function AllTasksPage() {
                   linkAssignee
                   rowRef={(id) => (id === highlightId ? (el) => { highlightRef.current = el; } : undefined)}
                 />
-              </>
+              </div>
             )}
           </div>
         </>

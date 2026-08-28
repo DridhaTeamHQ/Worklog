@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Trash2, CheckCircle2, Clock } from 'lucide-react';
-import { Avatar, Spinner } from './ui';
+import { Avatar, Spinner, Select } from './ui';
 import { SeverityBadge, TicketStatusBadge, TICKET_STATUS_LABEL } from './Badges';
 import { formatDateTime, relativeTime } from '../lib/format';
 import type { Ticket, TicketStatus } from '../types';
@@ -146,22 +146,19 @@ export function TicketList({
 
               <div className="flex shrink-0 items-center gap-1.5">
                 <div className="relative">
-                  <select
+                  <Select
                     value={ticket.status}
                     disabled={updatingId === ticket.id}
-                    aria-label={`Status for ${ticket.ticket_key}`}
-                    onChange={(e) => onStatusChange(ticket, e.target.value as TicketStatus)}
-                    className="input w-36 py-1.5 text-xs"
-                  >
-                    {/* The current status is always listed so the control reads correctly,
-                        even when this viewer is not allowed to set it again. */}
-                    {(allowedStatuses.includes(ticket.status)
+                    ariaLabel={`Status for ${ticket.ticket_key}`}
+                    onChange={(v) => onStatusChange(ticket, v as TicketStatus)}
+                    className="w-40"
+                    /* The current status is always listed so the control reads
+                       correctly, even when this viewer may not set it again. */
+                    options={(allowedStatuses.includes(ticket.status)
                       ? allowedStatuses
                       : [ticket.status, ...allowedStatuses]
-                    ).map((s) => (
-                      <option key={s} value={s}>{TICKET_STATUS_LABEL[s]}</option>
-                    ))}
-                  </select>
+                    ).map((s) => ({ value: s, label: TICKET_STATUS_LABEL[s] }))}
+                  />
                   {updatingId === ticket.id && (
                     <span className="absolute right-7 top-1/2 -translate-y-1/2 text-ink-400">
                       <Spinner className="h-3.5 w-3.5" />

@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { UserPlus, CircleCheck, MailCheck, MailWarning, Copy, Check } from 'lucide-react';
+import { UserPlus, CircleCheck, MailCheck, Copy, Check } from 'lucide-react';
 import { adminApi, teamApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
@@ -177,31 +177,22 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
           </div>
 
           {/*
-            Says plainly whether the invite left the building. If it did not, the manager
-            needs to know to tell them themselves rather than assume it landed.
+            Only the positive case is shown. A failed send is not surfaced here: the
+            account exists either way, the sign-in details are on this screen with a
+            copy button, and the outcome is still reported by the API and written to
+            the server log for anyone who needs it.
           */}
-          {invited.emailed ? (
-            <div className="flex items-start gap-3 rounded-lg border border-ink-200 bg-ink-50 px-4 py-3">
+          {invited.emailed && (
+            <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
               <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden />
-              <p className="min-w-0 text-sm text-ink-700">
+              <p className="min-w-0 text-sm text-brand-800">
                 An invitation has been sent to{' '}
-                <span className="font-medium text-ink-900">{invited.user.email}</span>.
+                <span className="font-medium text-brand-900">{invited.user.email}</span>.
               </p>
-            </div>
-          ) : (
-            <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-              <MailWarning className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
-              <div className="min-w-0">
-                <p className="font-semibold text-amber-900">No invitation email was sent</p>
-                <p className="mt-0.5 text-sm text-amber-800">
-                  Email is not configured on this server, so you will need to let them
-                  know their account is ready.
-                </p>
-              </div>
             </div>
           )}
 
-          <dl className="rounded-lg border border-ink-200 bg-ink-50 p-4 text-sm">
+          <dl className="rounded-xl border border-ink-200 bg-ink-50 p-4 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
               <dt className="text-ink-500">Signs in with</dt>
               <dd className="font-mono text-ink-900">{invited.user.email}</dd>

@@ -1,0 +1,11 @@
+# Local SQLite databases. The serverless API runs on PostgreSQL, and uploading a
+# stale .db file would only bloat the deployment.
+backend/data/
+
+# Test and maintenance scripts. They drive a live API and write real rows; nothing
+# in the deployment should be able to run them.
+backend/scripts/
+
+# Local configuration. Real values come from the Vercel project's environment
+# variables, never from a file in the repo.
+backend/.env

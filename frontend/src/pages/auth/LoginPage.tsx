@@ -98,14 +98,19 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
-      <div className="relative hidden overflow-hidden bg-ink-900 lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
+      <div className="relative hidden overflow-hidden bg-brand-900 lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
+        {/*
+          Rose and blush blooms over the plum — the palette's middle two colours, kept
+          low enough in opacity that the panel never lightens past the surface the text
+          on it was contrast-checked against.
+        */}
         <div
           aria-hidden
-          className="absolute inset-0 opacity-30"
-          style={{ backgroundImage: 'radial-gradient(circle at 20% 20%, #4f46e5 0%, transparent 45%), radial-gradient(circle at 80% 70%, #6366f1 0%, transparent 40%)' }}
+          className="absolute inset-0"
+          style={{ backgroundImage: 'radial-gradient(38rem 30rem at 18% 12%, rgba(189, 85, 121, 0.55), transparent 62%), radial-gradient(34rem 28rem at 88% 78%, rgba(234, 157, 157, 0.32), transparent 60%)' }}
         />
         <div className="relative flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cream-200 text-brand-950 shadow-sm">
             <CheckSquare className="h-6 w-6" />
           </span>
           <span className="text-xl font-bold leading-tight text-white">Taskr</span>
@@ -115,7 +120,7 @@ export function LoginPage() {
           <h2 className="text-3xl font-bold leading-tight text-white">
             Track the work.<br />Not the paperwork.
           </h2>
-          <p className="mt-4 max-w-md text-ink-300">
+          <p className="mt-4 max-w-md text-brand-200">
             One place for daily work reports, assigned tasks and team progress — so nobody has to
             chase a status update again.
           </p>
@@ -125,15 +130,15 @@ export function LoginPage() {
               'See every task assigned to you, with deadlines and priority',
               'Managers get live progress across the whole team',
             ].map((line) => (
-              <li key={line} className="flex items-start gap-3 text-sm text-ink-300">
-                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-brand-400" aria-hidden />
+              <li key={line} className="flex items-start gap-3 text-sm text-brand-200">
+                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-blush-300" aria-hidden />
                 {line}
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-xs text-ink-500">
+        <p className="relative text-xs text-brand-200">
           © {new Date().getFullYear()} Taskr. Internal use only.
         </p>
       </div>

@@ -3,7 +3,7 @@ import { Save } from 'lucide-react';
 import { taskApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
-import { Modal, Spinner } from './ui';
+import { Modal, Spinner, Select } from './ui';
 import type { Priority, Task } from '../types';
 
 const PRIORITIES: { value: Priority; label: string }[] = [
@@ -132,14 +132,7 @@ export function EditTaskModal({ open, onClose, task, onSaved }: Props) {
 
         <div>
           <label className="label" htmlFor="et-priority">Priority</label>
-          <select
-            id="et-priority"
-            value={priority}
-            onChange={(e) => setPriority(e.target.value as Priority)}
-            className="input"
-          >
-            {PRIORITIES.map((p) => <option key={p.value} value={p.value}>{p.label}</option>)}
-          </select>
+          <Select id="et-priority" value={priority} onChange={(v) => setPriority(v as Priority)} options={[...PRIORITIES.map((p) => ({ value: String(p.value), label: `${p.label}` }))]} />
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">

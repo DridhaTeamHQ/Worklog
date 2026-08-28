@@ -193,15 +193,13 @@ export function EmployeeDetailPage() {
           <div>
             <div className="flex flex-col gap-3 border-b border-ink-200 p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="table-wrap sm:overflow-visible">
-                <div className="flex min-w-max gap-1 rounded-lg bg-ink-100 p-1">
+                <div className="segmented min-w-max">
                   {RANGES.map((r) => (
                     <button
                       key={r.value}
                       type="button"
                       onClick={() => setRange(r.value)}
-                      className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                        range === r.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                      }`}
+                      className={`segmented-item ${range === r.value ? 'segmented-item-active' : ''}`}
                     >
                       {r.label}
                     </button>
@@ -212,7 +210,7 @@ export function EmployeeDetailPage() {
             </div>
 
             {range === 'custom' && (
-              <div className="flex flex-wrap items-end gap-3 border-b border-ink-200 bg-ink-50 p-4">
+              <div className="filter-bar flex flex-wrap items-end gap-3">
                 <div>
                   <label className="label" htmlFor="r-from">From</label>
                   <input id="r-from" type="date" value={from} max={to || undefined} onChange={(e) => setFrom(e.target.value)} className="input" />

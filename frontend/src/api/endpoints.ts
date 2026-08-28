@@ -174,6 +174,12 @@ export const adminApi = {
       email: { delivered: boolean; mode: string; error?: string };
       message: string;
     }>('/admins', input),
+  /**
+   * Closes a manager-level account. Work they had assigned moves to the admin making
+   * the request rather than being deleted; `transferred` is how many tasks moved.
+   */
+  remove: (id: number) =>
+    api.delete<{ id: number; transferred: number; message: string }>(`/admins/${id}`),
 };
 
 /* ----------------------------------------------------------------- projects */

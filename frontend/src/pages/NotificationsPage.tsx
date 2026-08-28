@@ -67,7 +67,7 @@ export function NotificationsPage() {
 
       <div className="card">
         <div className="border-b border-ink-200 px-4 py-3">
-          <div className="inline-flex gap-1 rounded-lg bg-ink-100 p-1" role="tablist" aria-label="Filter notifications">
+          <div className="segmented inline-flex" role="tablist" aria-label="Filter notifications">
             {(['all', 'unread'] as const).map((value) => (
               <button
                 key={value}
@@ -75,9 +75,7 @@ export function NotificationsPage() {
                 role="tab"
                 aria-selected={filter === value}
                 onClick={() => setFilter(value)}
-                className={`rounded-md px-3 py-1.5 text-sm font-medium capitalize transition-colors ${
-                  filter === value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                }`}
+                className={`segmented-item capitalize ${filter === value ? 'segmented-item-active' : ''}`}
               >
                 {value}{value === 'unread' && unread > 0 ? ` (${unread})` : ''}
               </button>

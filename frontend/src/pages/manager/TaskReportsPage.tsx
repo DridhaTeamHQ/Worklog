@@ -4,7 +4,7 @@ import { FileText, CheckCircle2, Search } from 'lucide-react';
 import { reportApi, teamApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
-import { Avatar, EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput } from '../../components/ui';
+import { Avatar, EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput, Select } from '../../components/ui';
 import { formatDate, formatTime, reportLines, todayIso } from '../../lib/format';
 import type { DailyReport, TeamMember } from '../../types';
 import { isAdmin } from '../../types';
@@ -65,6 +65,13 @@ export function TaskReportsPage() {
   }, [range, from, to, employeeId, department, search]);
 
   useEffect(() => {
+    /*
+      Loading is flipped here rather than inside `load`, which runs behind a debounce
+      timer. Waiting for the timer left the previous results on screen for the frame
+      after a project tab or filter changed — briefly showing one set of rows under
+      another set's heading, which is what read as a glitch.
+    */
+    setLoading(true);
     const controller = new AbortController();
     const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
@@ -86,15 +93,13 @@ export function TaskReportsPage() {
       <div className="card">
         <div className="flex flex-col gap-3 border-b border-ink-200 p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="table-wrap sm:overflow-visible">
-            <div className="flex min-w-max gap-1 rounded-lg bg-ink-100 p-1">
+            <div className="segmented min-w-max">
               {RANGES.map((r) => (
                 <button
                   key={r.value}
                   type="button"
                   onClick={() => setRange(r.value)}
-                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-                    range === r.value ? 'bg-white text-ink-900 shadow-sm' : 'text-ink-600 hover:text-ink-900'
-                  }`}
+                  className={`segmented-item ${range === r.value ? 'segmented-item-active' : ''}`}
                 >
                   {r.label}
                 </button>
@@ -104,22 +109,16 @@ export function TaskReportsPage() {
           <SearchInput value={search} onChange={setSearch} placeholder="Search report text or employee" className="lg:w-72" />
         </div>
 
-        <div className="grid gap-4 border-b border-ink-200 bg-ink-50 p-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <div>
             <label className="label" htmlFor="rp-employee">Employee</label>
-            <select id="rp-employee" value={employeeId} onChange={(e) => setEmployeeId(e.target.value)} className="input">
-              <option value="">All employees</option>
-              {members.map((m) => <option key={m.id} value={m.id}>{m.name}</option>)}
-            </select>
+            <Select id="rp-employee" value={employeeId} onChange={(v) => setEmployeeId(v)} options={[{ value: '', label: `All employees` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
           </div>
           {/* One department for a manager, so nothing to filter by. */}
           {canSeeAllDepartments && (
             <div>
               <label className="label" htmlFor="rp-dept">Department</label>
-              <select id="rp-dept" value={department} onChange={(e) => setDepartment(e.target.value)} className="input">
-                <option value="">All departments</option>
-                {departments.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
+              <Select id="rp-dept" value={department} onChange={(v) => setDepartment(v)} options={[{ value: '', label: `All departments` }, ...departments.map((d) => ({ value: String(d), label: `${d}` }))]} />
             </div>
           )}
           {range === 'custom' && (
@@ -136,8 +135,10 @@ export function TaskReportsPage() {
           )}
         </div>
 
+        {/* Same reserved height as the populated list, so filtering does not resize
+            the card. */}
         {loading ? (
-          <LoadingBlock label="Loading reports" rows={4} />
+          <LoadingBlock label="Loading reports" rows={4} className="min-h-[380px]" />
         ) : error ? (
           <ErrorState message={error} onRetry={() => void load()} />
         ) : reports.length === 0 ? (
@@ -163,7 +164,7 @@ export function TaskReportsPage() {
           <div className="divide-y divide-ink-200">
             {dates.map((date) => (
               <section key={date}>
-                <h2 className="sticky top-16 z-10 border-b border-ink-200 bg-ink-50/95 px-5 py-2.5 text-sm font-semibold text-ink-800 backdrop-blur">
+                <h2 className="sticky top-16 z-10 border-b border-brand-100 bg-brand-50/95 px-5 py-2.5 text-sm font-semibold text-brand-800 backdrop-blur">
                   {formatDate(date)}
                   <span className="ml-2 font-normal text-ink-500">
                     · {grouped[date].length} report{grouped[date].length === 1 ? '' : 's'}

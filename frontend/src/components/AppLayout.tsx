@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell, User as UserIcon,
-  LogOut, Menu, X, ChevronDown, CheckSquare, Bug,
+  LogOut, Menu, X, ChevronDown, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
@@ -31,11 +31,30 @@ const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee/profile', label: 'Profile', icon: <UserIcon className="h-[18px] w-[18px]" /> },
 ];
 
+/** Remembered so the choice survives a reload rather than resetting every visit. */
+const COLLAPSE_KEY = 'taskr.sidebarCollapsed';
+
+const readCollapsed = () => {
+  try { return localStorage.getItem(COLLAPSE_KEY) === '1'; } catch { return false; }
+};
+
 export function AppLayout() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
+
+  /** Mobile only: the sidebar is an overlay that slides in over the content. */
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  /** Desktop only: the sidebar is permanent, and this hides it to widen the page. */
+  const [collapsed, setCollapsed] = useState(readCollapsed);
+
+  const toggleCollapsed = () => {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try { localStorage.setItem(COLLAPSE_KEY, next ? '1' : '0'); } catch { /* storage unavailable */ }
+      return next;
+    });
+  };
 
   const isManager = isManagerLevel(user?.role);
   const nav = isManager ? MANAGER_NAV : EMPLOYEE_NAV;
@@ -52,9 +71,9 @@ export function AppLayout() {
     <div className="min-h-screen bg-ink-100">
       {/* Sidebar — permanent from lg up, slide-over below it. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-ink-900 transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-brand-900 transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        }`}
+        } ${collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
         aria-label="Main navigation"
       >
         <div className="flex h-16 items-center justify-between px-5">
@@ -63,14 +82,25 @@ export function AppLayout() {
             type="button"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
-            className="rounded-lg p-1.5 text-ink-400 hover:bg-white/10 hover:text-white lg:hidden"
+            className="rounded-lg p-1.5 text-brand-200 hover:bg-white/12 hover:text-white lg:hidden"
           >
             <X className="h-5 w-5" />
+          </button>
+          {/* The same control on desktop, where closing means collapsing rather than
+              dismissing an overlay. */}
+          <button
+            type="button"
+            onClick={toggleCollapsed}
+            aria-label="Collapse sidebar"
+            title="Collapse sidebar"
+            className="hidden rounded-lg p-1.5 text-brand-200 hover:bg-white/12 hover:text-white lg:block"
+          >
+            <PanelLeftClose className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-3 pb-3">
-          <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-ink-500">
+          <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
             {roleLabel(user?.role)}
           </p>
           <nav className="space-y-1">
@@ -88,7 +118,7 @@ export function AppLayout() {
           </nav>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-white/10 p-3">
+        <div className="absolute inset-x-0 bottom-0 border-t border-white/12 p-3">
           <button type="button" onClick={handleLogout} className="nav-link w-full">
             <LogOut className="h-[18px] w-[18px]" />
             <span>Logout</span>
@@ -104,7 +134,7 @@ export function AppLayout() {
         />
       )}
 
-      <div className="lg:pl-64">
+      <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-0' : 'lg:pl-64'}`}>
         <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/95 backdrop-blur">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
@@ -115,6 +145,22 @@ export function AppLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
+
+            {/*
+              Only rendered while the sidebar is collapsed: it is the sole way back, so
+              it must not be possible to hide the navigation with no route to reopen it.
+            */}
+            {collapsed && (
+              <button
+                type="button"
+                onClick={toggleCollapsed}
+                aria-label="Show sidebar"
+                title="Show sidebar"
+                className="hidden rounded-lg p-2 text-ink-600 hover:bg-brand-50 hover:text-brand-700 lg:block"
+              >
+                <PanelLeftOpen className="h-5 w-5" />
+              </button>
+            )}
 
             <div className="min-w-0 flex-1">
               <p className="truncate text-sm font-semibold text-ink-900 sm:text-base">
@@ -142,15 +188,14 @@ export function AppLayout() {
   );
 }
 
-export function BrandMark({ variant = 'dark' }: { variant?: 'dark' | 'light' }) {
+/** The wordmark, always on the deep plum surface, so it is always light text. */
+export function BrandMark() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-brand-600 text-white shadow-sm">
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cream-200 text-brand-950 shadow-sm">
         <CheckSquare className="h-5 w-5" />
       </span>
-      <span className={`text-base font-bold leading-tight ${variant === 'dark' ? 'text-white' : 'text-ink-900'}`}>
-        Taskr
-      </span>
+      <span className="text-base font-bold leading-tight text-white">Taskr</span>
     </span>
   );
 }
