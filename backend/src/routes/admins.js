@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { ROLES } from '../utils/roles.js';
-import { list, create } from '../controllers/admins.js';
+import { list, create, remove } from '../controllers/admins.js';
 
 const router = Router();
 
@@ -29,5 +29,6 @@ const createSchema = z.object({
 
 router.get('/', validate(listQuery, 'query'), list);
 router.post('/', validate(createSchema), create);
+router.delete('/:id', remove);
 
 export default router;

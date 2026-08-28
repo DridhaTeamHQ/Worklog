@@ -292,6 +292,54 @@ export async function deleteTeamMember(employeeId) {
   };
 }
 
+/**
+ * Removes a manager-level account, moving the work they assigned to somebody else.
+ *
+ * The transfer is the whole point. `assigned_tasks.manager_id` is NOT NULL and
+ * cascades, so deleting a manager outright would take every task they had ever
+ * assigned — other people's work, not theirs — with them. Re-pointing those rows first
+ * means the tasks, and the employees' progress on them, survive the account being
+ * closed; only the record of who handed the work out changes.
+ *
+ * Both statements run in one transaction: a crash between them would either orphan the
+ * tasks or leave a deleted manager still owning them.
+ */
+export async function deleteManagerAccount(targetId, transferToId) {
+  const db = await getDb();
+  const roleList = MANAGER_ROLES.map((r) => `'${r}'`).join(', ');
+
+  const target = await db.get(
+    `SELECT id, name, email, role FROM users WHERE id = ? AND role IN (${roleList})`,
+    [targetId],
+  );
+  if (!target) throw notFound('That account could not be found.');
+
+  const assigned = await db.get(
+    'SELECT COUNT(*) AS c FROM assigned_tasks WHERE manager_id = ?',
+    [targetId],
+  );
+  const transferred = Number(assigned?.c || 0);
+
+  await db.transaction(async (tx) => {
+    if (transferred) {
+      await tx.run(
+        'UPDATE assigned_tasks SET manager_id = ?, updated_at = ? WHERE manager_id = ?',
+        [transferToId, nowIso(), targetId],
+      );
+    }
+    await tx.run(`DELETE FROM users WHERE id = ? AND role IN (${roleList})`, [targetId]);
+  });
+
+  return { name: target.name, email: target.email, role: target.role, transferred };
+}
+
+/** How many accounts currently hold the admin role. Guards the last-admin case. */
+export async function countAdmins() {
+  const db = await getDb();
+  const row = await db.get("SELECT COUNT(*) AS c FROM users WHERE role = 'admin'");
+  return Number(row?.c || 0);
+}
+
 export async function getTeamMember(employeeId) {
   const db = await getDb();
   const row = await db.get(

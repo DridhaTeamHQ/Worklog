@@ -1050,6 +1050,65 @@ async function run() {
     if (id) await api(`/team/${id}`, { method: 'DELETE', token: managerToken });
   }
 
+  /* -------------------------------------- deleting a manager-level account */
+  step('12e. An admin removes a manager, and their work survives it');
+
+  const delStamp = Date.now();
+  const doomedMgrEmail = `doomed.mgr.${delStamp}@company.com`;
+  const doomedMgrPassword = 'DoomedMgr@2026';
+
+  const mkDoomed = await api('/admins', {
+    method: 'POST', token: managerToken,
+    body: {
+      name: 'Doomed Manager', email: doomedMgrEmail,
+      department: 'Management', jobTitle: 'Lead', role: 'manager',
+    },
+  });
+  check('an admin can create a manager to remove', mkDoomed.status === 201, mkDoomed.body);
+  const doomedMgrId = mkDoomed.data?.admin?.id;
+  await api('/auth/accept-invite', { method: 'POST', body: { email: doomedMgrEmail, password: doomedMgrPassword } });
+
+  // The admin assigns on their behalf, then re-points the row, so there is real work
+  // hanging off this account when it is deleted.
+  const willTransfer = await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: employee.id, projectId: project.id, title: `Work outliving its manager ${delStamp}` },
+  });
+  check('a task exists to be transferred', willTransfer.status === 201, willTransfer.body);
+  const transferTaskId = willTransfer.data?.task?.id;
+
+  const empDeletesMgr = await api(`/admins/${doomedMgrId}`, { method: 'DELETE', token: employeeToken });
+  check('a team member cannot remove a manager (403)', empDeletesMgr.status === 403, empDeletesMgr.body);
+
+  const selfDelete = await api(`/admins/${mLogin.data.user.id}`, { method: 'DELETE', token: managerToken });
+  check('an admin cannot delete their own account (403)', selfDelete.status === 403, selfDelete.body);
+
+  const meStillThere = await api('/auth/me', { token: managerToken });
+  check('their account survived that attempt', meStillThere.status === 200, meStillThere.body);
+
+  const removedMgr = await api(`/admins/${doomedMgrId}`, { method: 'DELETE', token: managerToken });
+  check('an admin can remove a manager (200)', removedMgr.status === 200, removedMgr.body);
+  check('the response reports how many tasks moved',
+    typeof removedMgr.data?.transferred === 'number', removedMgr.data);
+
+  const adminsNow = await api('/admins', { token: managerToken });
+  check('they are gone from the list', !adminsNow.data?.some((a) => a.id === doomedMgrId));
+
+  const cannotSignIn = await api('/auth/login', {
+    method: 'POST', body: { email: doomedMgrEmail, password: doomedMgrPassword },
+  });
+  check('the removed manager cannot sign in (401)', cannotSignIn.status === 401, cannotSignIn.body);
+
+  // The point of the whole exercise: manager_id cascades, so a plain DELETE would have
+  // taken this task — and the employee's progress on it — with the account.
+  const survivor = await api(`/tasks/${transferTaskId}`, { token: managerToken });
+  check('the work assigned through them still exists', survivor.status === 200, survivor.body);
+
+  const deleteAgainMgr = await api(`/admins/${doomedMgrId}`, { method: 'DELETE', token: managerToken });
+  check('removing them twice returns 404', deleteAgainMgr.status === 404, deleteAgainMgr.body);
+
+  if (transferTaskId) await api(`/tasks/${transferTaskId}`, { method: 'DELETE', token: managerToken });
+
   step('13. Input handling');
   const injection = await api(`/tasks?search=${encodeURIComponent("'; DROP TABLE assigned_tasks; --")}`, { token: managerToken });
   check('SQL injection attempt is treated as literal text', injection.status === 200 && Array.isArray(injection.data), injection.body);
