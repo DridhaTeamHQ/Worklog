@@ -13,6 +13,7 @@
     "dev:backend": "npm --prefix backend run dev",
     "dev:frontend": "npm --prefix frontend run dev",
     "build": "npm --prefix frontend run build",
+    "build:all": "npm --prefix frontend install && npm --prefix frontend run build && npm --prefix backend install",
     "start": "npm --prefix backend start",
     "typecheck": "npm --prefix frontend run typecheck",
     "test": "npm --prefix backend run test:flow",

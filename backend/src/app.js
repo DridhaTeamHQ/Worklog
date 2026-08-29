@@ -1,3 +1,6 @@
+import path from 'node:path';
+import fs from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import express from 'express';
 import helmet from 'helmet';
 import cors from 'cors';
@@ -6,6 +9,8 @@ import rateLimit from 'express-rate-limit';
 import config from './config/env.js';
 import { getDb } from './db/index.js';
 import { notFoundHandler, errorHandler } from './middleware/errorHandler.js';
+
+const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 import authRoutes from './routes/auth.js';
 import taskRoutes from './routes/tasks.js';
@@ -30,12 +35,16 @@ export function createApp() {
     contentSecurityPolicy: {
       useDefaults: true,
       directives: {
-        // The API serves JSON only, so nothing needs to execute or embed.
-        'default-src': ["'none'"],
-        'frame-ancestors': ["'none'"],
+        defaultSrc: ["'self'"],
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        styleSrc: ["'self'", "'unsafe-inline'", 'https://fonts.googleapis.com'],
+        fontSrc: ["'self'", 'https://fonts.gstatic.com', 'data:'],
+        imgSrc: ["'self'", 'data:', 'blob:', 'https:'],
+        connectSrc: ["'self'"],
+        frameAncestors: ["'none'"],
       },
     },
-    crossOriginResourcePolicy: { policy: 'same-site' },
+    crossOriginResourcePolicy: { policy: 'same-origin' },
   }));
 
   app.use(cors({
@@ -96,6 +105,25 @@ export function createApp() {
   app.use('/api/tickets', ticketRoutes);
   app.use('/api/admins', adminRoutes);
   app.use('/api/dashboard', dashboardRoutes);
+
+  // Serve frontend SPA if built files are present (frontend/dist or backend/public)
+  const candidateDirs = [
+    path.resolve(__dirname, '../../frontend/dist'),
+    path.resolve(__dirname, '../public'),
+    path.resolve(__dirname, '../../public'),
+  ];
+  const staticDir = candidateDirs.find((dir) => fs.existsSync(path.join(dir, 'index.html')));
+
+  if (staticDir) {
+    app.use(express.static(staticDir));
+    app.get('*', (req, res, next) => {
+      // Don't intercept API routes with HTML; let them 404 cleanly below
+      if (req.path.startsWith('/api')) {
+        return next();
+      }
+      return res.sendFile(path.join(staticDir, 'index.html'));
+    });
+  }
 
   app.use(notFoundHandler);
   app.use(errorHandler);

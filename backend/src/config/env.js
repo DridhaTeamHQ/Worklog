@@ -91,8 +91,8 @@ export const config = {
    * live on any deployment that forgot to configure this.
    */
   seed: {
-    email: (process.env.SEED_ADMIN_EMAIL || '').trim().toLowerCase(),
-    password: process.env.SEED_ADMIN_PASSWORD || '',
+    email: (process.env.SEED_ADMIN_EMAIL || process.env.SEED_MANAGER_EMAIL || '').trim().toLowerCase(),
+    password: process.env.SEED_ADMIN_PASSWORD || process.env.SEED_MANAGER_PASSWORD || '',
     name: (process.env.SEED_ADMIN_NAME || 'Admin').trim(),
   },
 };
