@@ -49,10 +49,18 @@ export function createApp() {
 
   app.use(cors({
     origin(origin, callback) {
-      // Same-origin/curl requests send no Origin header and are allowed through;
-      // browser origins must be on the configured allow-list.
-      if (!origin || config.corsOrigins.includes(origin)) return callback(null, true);
-      return callback(new Error('Origin not allowed by CORS policy'));
+      if (!origin) return callback(null, true);
+      let isAllowed = config.corsOrigins.includes(origin) || (config.mail.appUrl && config.mail.appUrl === origin);
+      try {
+        const parsed = new URL(origin);
+        if (parsed.hostname.endsWith('.vercel.app') || process.env.VERCEL) {
+          isAllowed = true;
+        }
+      } catch {
+        /* invalid url */
+      }
+      if (isAllowed) return callback(null, true);
+      return callback(new Error(`Origin ${origin} not allowed by CORS policy`));
     },
     credentials: true,
   }));

@@ -17,15 +17,32 @@ import { fileURLToPath } from 'node:url';
 import config from '../config/env.js';
 import { getDb, closeDb } from './index.js';
 import { migrate } from './migrate.js';
-import { createUser, findByEmail } from '../models/user.js';
+import { createUser, findByEmail, hashPassword } from '../models/user.js';
 import { ROLES } from '../utils/roles.js';
 
 export async function seed() {
   await migrate();
   const db = await getDb();
 
-  // Checked before the config, so an already-bootstrapped install is a clean no-op
-  // even when SEED_ADMIN_* was never set — there is genuinely nothing to do.
+  const { email, password, name } = config.seed;
+
+  if (email && password) {
+    if (password.length < 8) {
+      throw new Error('SEED_ADMIN_PASSWORD must be at least 8 characters.');
+    }
+    const existing = await findByEmail(email);
+    if (!existing) {
+      const admin = await createUser({ name: name || 'Admin', email, password, role: ROLES.ADMIN });
+      return { created: true, email: admin.email };
+    }
+    const passwordHash = await hashPassword(password);
+    await db.run(
+      'UPDATE users SET role = ?, password_hash = ?, is_active = 1, updated_at = ? WHERE id = ?',
+      [ROLES.ADMIN, passwordHash, new Date().toISOString(), existing.id],
+    );
+    return { created: false, promoted: true, email: existing.email };
+  }
+
   const existingAdmin = await db.get(
     'SELECT email FROM users WHERE role = ? AND is_active = 1 LIMIT 1',
     [ROLES.ADMIN],
@@ -34,31 +51,10 @@ export async function seed() {
     return { created: false, email: existingAdmin.email, reason: 'an admin already exists' };
   }
 
-  const { email, password, name } = config.seed;
-
-  if (!email || !password) {
-    throw new Error(
-      'Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in backend/.env before seeding.\n'
-      + '       There is no default account — the first admin is yours to choose.',
-    );
-  }
-  if (password.length < 8) {
-    throw new Error('SEED_ADMIN_PASSWORD must be at least 8 characters.');
-  }
-
-  // The address may exist as a manager or team member from earlier use; promoting is
-  // safer than a duplicate-email failure that leaves the install with no way in.
-  const existing = await findByEmail(email);
-  if (existing) {
-    await db.run(
-      'UPDATE users SET role = ?, is_active = 1, updated_at = ? WHERE id = ?',
-      [ROLES.ADMIN, new Date().toISOString(), existing.id],
-    );
-    return { created: false, promoted: true, email: existing.email };
-  }
-
-  const admin = await createUser({ name, email, password, role: ROLES.ADMIN });
-  return { created: true, email: admin.email };
+  throw new Error(
+    'Set SEED_ADMIN_EMAIL and SEED_ADMIN_PASSWORD in backend/.env before seeding.\n'
+    + '       There is no default account — the first admin is yours to choose.',
+  );
 }
 
 const isEntry = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
