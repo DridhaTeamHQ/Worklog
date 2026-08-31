@@ -18,6 +18,10 @@ import { listReports, getReportForDate } from '../models/report.js';
 import { listTickets } from '../models/ticket.js';
 
 export const overview = asyncHandler(async (req, res) => {
+  // Defaults to today, which is what the dashboard showed before it could be asked
+  // for anything else.
+  const range = req.validatedQuery?.range || 'today';
+
   if (isManagerLevel(req.user.role)) {
     // Every figure on the manager dashboard is confined to their department, so the
     // headline counts describe their own team rather than the whole company.
@@ -26,7 +30,7 @@ export const overview = asyncHandler(async (req, res) => {
     if (isEmptyScope(scope)) {
       return ok(res, {
         role: req.user.role,
-        summary: await managerOverview('\u0000no-such-department'),
+        summary: await managerOverview('\u0000no-such-department', range),
         breakdown: { pending: 0, in_progress: 0, completed: 0, overdue: 0 },
         activity: await dailyActivity({ days: 14, department: '\u0000no-such-department' }),
         recent_tasks: [],
@@ -36,7 +40,7 @@ export const overview = asyncHandler(async (req, res) => {
     }
 
     const [summary, recentTasks, recentReports, breakdown, activity, openTickets] = await Promise.all([
-      managerOverview(department),
+      managerOverview(department, range),
       listTasks({ sort: 'created_desc', limit: 8, department }),
       listReports({ limit: 6, department }),
       statusBreakdown({ department }),

@@ -209,6 +209,9 @@ export interface AppNotification {
   created_at: string;
 }
 
+/** The periods the dashboard's headline counts can be narrowed to. */
+export type DashboardRange = 'today' | 'week' | 'month' | 'all';
+
 export interface ManagerSummary {
   open_tickets: number;
   critical_tickets: number;

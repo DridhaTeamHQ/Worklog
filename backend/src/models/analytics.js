@@ -1,5 +1,5 @@
 import { getDb } from '../db/index.js';
-import { today, addDays, startOfWeek } from '../utils/dates.js';
+import { today, addDays, startOfWeek, resolveRange } from '../utils/dates.js';
 import { ticketCounts } from './ticket.js';
 
 /**
@@ -24,9 +24,23 @@ function taskFilters({ employeeId, department, from, to }) {
  * dashboard reports on their own team rather than the whole company. Left undefined —
  * an admin — nothing is narrowed.
  */
-export async function managerOverview(department) {
+export async function managerOverview(department, range = 'today') {
   const db = await getDb();
   const t = today();
+
+  /*
+    The headline counts answer "how much in this period", so everything that is a
+    happening rather than a standing state is bounded by it: work assigned, work
+    completed, and the pending work left behind by what was assigned. A null `from`
+    means all time, which is what the Overall option asks for.
+
+    Headcount and overdue are deliberately outside it. Both describe how things stand
+    right now — how many people there are, how much is late — and neither is a thing
+    that occurred within a window, so narrowing them to one would only ever mislead.
+  */
+  const { from } = resolveRange(range);
+  const since = from ? ' AND substr(a.created_at, 1, 10) >= ?' : '';
+  const sinceParam = from ? [from] : [];
 
   // Applied to each count separately: the tables reach `users` by different columns,
   // so there is no single join to hang this off.
@@ -37,19 +51,29 @@ export async function managerOverview(department) {
     `SELECT COUNT(*) AS c FROM users e WHERE e.role = 'team_member' AND e.is_active = 1${dept}`,
     deptParam,
   );
+  /*
+    Completion is dated by when it happened, not by when the task was raised, so a
+    task assigned last month and finished today counts toward today. Assignment and
+    the pending remainder are dated by when the task was raised. The two therefore
+    need separate bounds, which is why `since` is not simply added to the WHERE.
+  */
+  const assignedIn = from ? 'substr(a.created_at, 1, 10) >= ?' : '1 = 1';
+  const completedIn = from
+    ? 'substr(COALESCE(a.completed_at, a.updated_at), 1, 10) >= ?'
+    : '1 = 1';
   const tasks = await db.get(
     `SELECT
        COUNT(*) AS total,
-       SUM(CASE WHEN substr(a.created_at, 1, 10) = ? THEN 1 ELSE 0 END) AS assigned_today,
-       SUM(CASE WHEN a.status = 'completed' AND substr(COALESCE(a.completed_at, a.updated_at), 1, 10) = ? THEN 1 ELSE 0 END) AS completed_today,
-       SUM(CASE WHEN a.status = 'pending' THEN 1 ELSE 0 END) AS pending,
+       SUM(CASE WHEN ${assignedIn} THEN 1 ELSE 0 END) AS assigned_in_range,
+       SUM(CASE WHEN a.status = 'completed' AND ${completedIn} THEN 1 ELSE 0 END) AS completed_in_range,
+       SUM(CASE WHEN a.status = 'pending' AND ${assignedIn} THEN 1 ELSE 0 END) AS pending,
        SUM(CASE WHEN a.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
        SUM(CASE WHEN a.status = 'completed' THEN 1 ELSE 0 END) AS completed,
        SUM(CASE WHEN a.status <> 'completed' AND a.deadline IS NOT NULL AND a.deadline < ? THEN 1 ELSE 0 END) AS overdue
      FROM assigned_tasks a
      JOIN users e ON e.id = a.employee_id
      WHERE 1 = 1${dept}`,
-    [t, t, t, ...deptParam],
+    [...sinceParam, ...sinceParam, ...sinceParam, t, ...deptParam],
   );
   const reports = await db.get(
     `SELECT COUNT(*) AS c FROM daily_task_reports d
@@ -58,15 +82,17 @@ export async function managerOverview(department) {
     [t, ...deptParam],
   );
 
-  const tickets = await ticketCounts({ department });
+  const tickets = await ticketCounts({ department, from });
 
   const n = (v) => Number(v || 0);
   return {
     open_tickets: tickets.unresolved,
     critical_tickets: tickets.critical_open,
     total_team_members: n(team?.c),
-    tasks_assigned_today: n(tasks?.assigned_today),
-    tasks_completed_today: n(tasks?.completed_today),
+    // Kept under their old names so nothing downstream has to change; what they
+    // count is now the selected period rather than always today.
+    tasks_assigned_today: n(tasks?.assigned_in_range),
+    tasks_completed_today: n(tasks?.completed_in_range),
     pending_tasks: n(tasks?.pending),
     in_progress_tasks: n(tasks?.in_progress),
     completed_tasks: n(tasks?.completed),

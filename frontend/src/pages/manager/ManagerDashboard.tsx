@@ -14,7 +14,9 @@ import { TaskBoard } from '../../components/TaskBoard';
 import { TimelineStrip } from '../../components/TimelineStrip';
 import { formatDate, formatDateShort, reportLines } from '../../lib/format';
 import { CHART, STATUS_COLORS, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
-import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from '../../types';
+import type {
+  DashboardRange, ManagerDashboard as ManagerDashboardData, Task, TaskStatus,
+} from '../../types';
 
 /*
   Drawn at rest, for the same reason as the analytics charts: the library only paints
@@ -24,6 +26,18 @@ import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from 
 */
 const STILL = { isAnimationActive: false } as const;
 
+/*
+  The periods the headline counts can be read over, and how each names itself on a
+  card. The label is a suffix rather than a whole title so the cards keep their
+  subject — "Assigned" stays the first word, which is what you scan for.
+*/
+const RANGES: { key: DashboardRange; label: string; suffix: string }[] = [
+  { key: 'today', label: 'Today', suffix: 'today' },
+  { key: 'week', label: 'This week', suffix: 'this week' },
+  { key: 'month', label: 'This month', suffix: 'this month' },
+  { key: 'all', label: 'Overall', suffix: 'overall' },
+];
+
 export function ManagerDashboard() {
   const navigate = useNavigate();
   const toast = useToast();
@@ -32,12 +46,13 @@ export function ManagerDashboard() {
   const [loading, setLoading] = useState(true);
   /** The card waiting on a status change, so the board can show it as busy. */
   const [movingId, setMovingId] = useState<number | null>(null);
+  const [range, setRange] = useState<DashboardRange>('today');
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (forRange: DashboardRange) => {
     setLoading(true);
     setError('');
     try {
-      const res = await dashboardApi.load();
+      const res = await dashboardApi.load({ range: forRange });
       setData(res.data as ManagerDashboardData);
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not load the dashboard.');
@@ -46,7 +61,7 @@ export function ManagerDashboard() {
     }
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => { void load(range); }, [load, range]);
 
   /**
    * A card dropped in another column. The board is updated straight away and the
@@ -61,7 +76,7 @@ export function ManagerDashboard() {
         ...prev,
         recent_tasks: prev.recent_tasks.map((t) => (t.id === task.id ? updated : t)),
       } : prev));
-      void load();
+      void load(range);
     } catch (err) {
       toast.error(err instanceof ApiError ? err.message : 'Could not move the task.');
     } finally {
@@ -70,9 +85,10 @@ export function ManagerDashboard() {
   };
 
   if (loading) return <PageLoader />;
-  if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
+  if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={() => void load(range)} />;
 
   const { summary, activity, recent_tasks: tasks, recent_reports: reports } = data;
+  const suffix = RANGES.find((r) => r.key === range)?.suffix ?? 'today';
 
   const chartData = activity.map((point) => ({
     ...point,
@@ -81,23 +97,51 @@ export function ManagerDashboard() {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="display-title text-2xl text-foreground sm:text-4xl">Dashboard overview</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{formatDate(new Date().toISOString())}</p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <h1 className="display-title text-2xl text-foreground sm:text-4xl">Dashboard overview</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{formatDate(new Date().toISOString())}</p>
+        </div>
+        {/*
+          Which period the counts below are read over. A row of buttons rather than a
+          select: there are four, they are short, and the one in force should be
+          readable without opening anything.
+        */}
+        <div
+          className="flex items-center gap-1 rounded-xl border border-border bg-card p-1"
+          role="group"
+          aria-label="Period for the headline figures"
+        >
+          {RANGES.map((r) => (
+            <button
+              key={r.key}
+              type="button"
+              onClick={() => setRange(r.key)}
+              aria-pressed={range === r.key}
+              className={`rounded-lg px-3 py-1.5 text-sm font-semibold transition-colors ${
+                range === r.key
+                  ? 'bg-primary text-primary-foreground'
+                  : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+              }`}
+            >
+              {r.label}
+            </button>
+          ))}
+        </div>
       </div>
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Total Team Members" value={summary.total_team_members} accent="brand" icon={<Users className="h-5 w-5" />} />
-        <StatCard label="Assigned Today" value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
-        <StatCard label="Completed Today" value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
-        <StatCard label="Pending Tasks" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
+        <StatCard label={`Assigned ${suffix}`} value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
+        <StatCard label={`Completed ${suffix}`} value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
+        <StatCard label={`Pending ${suffix === 'today' ? 'from today' : suffix}`} value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
         {/*
           Tickets take the fifth slot, and the card is the whole of their presence on
           this page now — so it is a button through to the list, and it says how many
           are critical, which is the part that decides whether the number is urgent.
         */}
         <StatCard
-          label="Open Tickets"
+          label={`Tickets ${suffix === 'today' ? 'raised today' : `raised ${suffix}`}`}
           value={summary.open_tickets}
           accent="red"
           icon={<Bug className="h-5 w-5" />}

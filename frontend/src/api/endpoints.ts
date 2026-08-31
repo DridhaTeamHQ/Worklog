@@ -1,6 +1,6 @@
 import { api } from './client';
 import type {
-  AnalyticsPayload, AppNotification, DailyReport, EmployeeDashboard, ManagerDashboard,
+  AnalyticsPayload, AppNotification, DailyReport, DashboardRange, EmployeeDashboard, ManagerDashboard,
   Manager, PersonalTodo, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
   TicketCounts, TicketSeverity, TicketStatus, User,
 } from '../types';
@@ -35,7 +35,9 @@ export const authApi = {
 /* ---------------------------------------------------------------- dashboard */
 
 export const dashboardApi = {
-  load: () => api.get<ManagerDashboard | EmployeeDashboard>('/dashboard'),
+  /** `range` narrows the headline counts; the server defaults to today. */
+  load: (params: { range?: DashboardRange } = {}) =>
+    api.get<ManagerDashboard | EmployeeDashboard>('/dashboard', params),
   analytics: (params: { employeeId?: number; department?: string; from?: string; to?: string; days?: number }) =>
     api.get<AnalyticsPayload>('/dashboard/analytics', params),
 };

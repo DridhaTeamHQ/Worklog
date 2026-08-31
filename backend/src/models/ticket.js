@@ -256,10 +256,13 @@ export async function deleteTicket({ ticketId, actor }) {
 }
 
 /** Counts for the dashboards. `reporterId` scopes it to one person. */
-export async function ticketCounts({ reporterId, department } = {}) {
+export async function ticketCounts({ reporterId, department, from } = {}) {
   const db = await getDb();
   const where = [];
   const params = [];
+  // Raised on or after this date. The dashboard's period filter reaches tickets the
+  // same way it reaches tasks — by when they were reported.
+  if (from) { where.push('substr(t.created_at, 1, 10) >= ?'); params.push(from); }
   if (reporterId) { where.push('t.reporter_id = ?'); params.push(reporterId); }
   // Same rule as listTickets: a ticket belongs to the department of whoever raised it.
   if (department) { where.push('r.department = ?'); params.push(department); }

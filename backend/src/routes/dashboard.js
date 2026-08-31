@@ -16,7 +16,11 @@ const analyticsQuery = z.object({
   weeks: z.coerce.number().int().min(2).max(26).default(8),
 });
 
-router.get('/', overview);
+const overviewQuery = z.object({
+  range: z.enum(['today', 'week', 'month', 'all']).optional(),
+});
+
+router.get('/', validate(overviewQuery, 'query'), overview);
 router.get('/analytics', requireManager, validate(analyticsQuery, 'query'), analytics);
 
 export default router;
