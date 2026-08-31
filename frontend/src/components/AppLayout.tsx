@@ -1,7 +1,7 @@
 import { useEffect, useState, type ReactNode } from 'react';
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell, User as UserIcon,
+  LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell,
   LogOut, Menu, X, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen, Pencil,
   ChartGantt, NotebookPen,
 } from 'lucide-react';
@@ -22,7 +22,6 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/manager/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/manager/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
-  { to: '/manager/profile', label: 'Profile', icon: <UserIcon className="h-[18px] w-[18px]" /> },
 ];
 
 const EMPLOYEE_NAV: NavItem[] = [
@@ -33,7 +32,6 @@ const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
   { to: '/employee/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/employee/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
-  { to: '/employee/profile', label: 'Profile', icon: <UserIcon className="h-[18px] w-[18px]" /> },
 ];
 
 /** Remembered so the choice survives a reload rather than resetting every visit. */
@@ -64,6 +62,9 @@ export function AppLayout() {
   const isManager = isManagerLevel(user?.role);
   const nav = isManager ? MANAGER_NAV : EMPLOYEE_NAV;
   const profilePath = isManager ? '/manager/profile' : '/employee/profile';
+  /* The name is the only way to the profile page now, so it also has to be what
+     shows you are on it — otherwise that route highlights nothing at all. */
+  const onProfile = location.pathname === profilePath;
 
   // On mobile the sidebar is an overlay; navigating should dismiss it.
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
@@ -86,20 +87,6 @@ export function AppLayout() {
         } lg:translate-x-0 ${collapsed ? 'w-64 lg:w-[4.75rem]' : 'w-64'}`}
         aria-label="Main navigation"
       >
-        {/* Collapse handle, on the panel's edge as a round control so it is reachable
-            in both states — the header has no room for it once collapsed. */}
-        <button
-          type="button"
-          onClick={toggleCollapsed}
-          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
-          className="absolute -right-3 top-20 z-10 hidden h-6 w-6 items-center justify-center rounded-full border border-border bg-popover text-muted-foreground shadow-md transition-colors hover:text-foreground lg:flex"
-        >
-          {collapsed
-            ? <PanelLeftOpen className="h-3.5 w-3.5" />
-            : <PanelLeftClose className="h-3.5 w-3.5" />}
-        </button>
-
         {/* ------------------------------------------------------------ header */}
         <div className="flex h-16 shrink-0 items-center justify-between px-5">
           {collapsed ? (
@@ -115,7 +102,39 @@ export function AppLayout() {
           >
             <X className="h-5 w-5" />
           </button>
+          {/*
+            Expanded, the collapse control sits in the header beside the wordmark.
+            Collapsed there is no room for it there — the rail is barely wider than
+            the logo — so it moves to its own centred row below, which is why this
+            one is hidden rather than restyled.
+          */}
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Collapse sidebar"
+              title="Collapse sidebar"
+              className="hidden rounded-lg p-1.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:block"
+            >
+              <PanelLeftClose className="h-5 w-5" />
+            </button>
+          )}
         </div>
+
+        {/* The same control once the panel is a rail, on a row of its own. */}
+        {collapsed && (
+          <div className="hidden shrink-0 justify-center pb-2 lg:flex">
+            <button
+              type="button"
+              onClick={toggleCollapsed}
+              aria-label="Expand sidebar"
+              title="Expand sidebar"
+              className="rounded-lg p-1.5 text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+            >
+              <PanelLeftOpen className="h-5 w-5" />
+            </button>
+          </div>
+        )}
 
         {/*
           Who is signed in, and the way to their own details. A link rather than a
@@ -126,9 +145,10 @@ export function AppLayout() {
             to={profilePath}
             title={collapsed ? `${user?.name} — edit your details` : undefined}
             aria-label={`${user?.name}. Edit your profile details.`}
-            className={`group flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-sidebar-accent ${
-              collapsed ? 'justify-center' : ''
-            }`}
+            aria-current={onProfile ? 'page' : undefined}
+            className={`group flex items-center gap-3 rounded-md p-2 transition-colors ${
+              onProfile ? 'bg-sidebar-accent' : 'hover:bg-sidebar-accent'
+            } ${collapsed ? 'justify-center' : ''}`}
           >
             <Avatar name={user?.name ?? '?'} src={user?.profile_image} size="md" />
             {!collapsed && (
