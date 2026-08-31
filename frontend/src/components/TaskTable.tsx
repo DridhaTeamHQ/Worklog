@@ -101,6 +101,12 @@ export function TaskTable({
   };
 
   const hasActions = Boolean(onDelete || onEdit);
+  /*
+    Code, Work, Reporter, Priority, Status, Created and Updated are always drawn; the
+    checkbox, Assignee and Actions are conditional. Only the expanded detail row reads
+    this, to span the table — it was one too high before Code existed, which browsers
+    forgive but which made the number wrong about the thing it describes.
+  */
   const columnCount = 7 + (selectable ? 1 : 0) + (showAssignee ? 1 : 0) + (hasActions ? 1 : 0);
 
   return (
@@ -120,6 +126,9 @@ export function TaskTable({
                 />
               </th>
             )}
+            <th scope="col" className="w-28 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              Code
+            </th>
             <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Work
             </th>
@@ -159,6 +168,24 @@ export function TaskTable({
                     </td>
                   )}
 
+                  {/*
+                    The key gets its own column. It was reading as part of the title —
+                    "PLAT-2 check" looks like a four-word name rather than a reference
+                    and a name — and in a column it also lines up down the page, which
+                    is what makes it scannable when you are looking for one task.
+                  */}
+                  <td className="px-3 py-2.5">
+                    {task.task_key && (
+                      <span
+                        className={`font-mono text-xs font-semibold whitespace-nowrap ${
+                          isDone ? 'text-muted-foreground line-through' : 'text-foreground'
+                        }`}
+                      >
+                        {task.task_key}
+                      </span>
+                    )}
+                  </td>
+
                   <td className="px-3 py-2.5">
                     <div className="flex items-start gap-1.5">
                       <button
@@ -172,16 +199,6 @@ export function TaskTable({
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
                       </button>
-
-                      {task.task_key && (
-                        <span
-                          className={`shrink-0 font-mono text-xs font-semibold ${
-                            isDone ? 'text-muted-foreground line-through' : 'text-foreground'
-                          }`}
-                        >
-                          {task.task_key}
-                        </span>
-                      )}
 
                       <span className="min-w-0 flex-1 truncate text-foreground" title={task.title}>
                         {taskLabel(task)}
