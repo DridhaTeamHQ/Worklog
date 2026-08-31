@@ -127,7 +127,7 @@ export function TaskTable({
               </th>
             )}
             <th scope="col" className="w-28 px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
-              Code
+              Project
             </th>
             <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Work
