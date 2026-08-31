@@ -555,7 +555,14 @@ export function AnalyticsPage() {
           ) : (
             <div className="mt-4 h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%">
+                {/*
+                  `maxBarSize` caps how wide a bar may be drawn. Without it recharts
+                  divides the plot between however many people there are, so a team of
+                  two gets bars a couple of hundred pixels across — which reads as a
+                  block of colour rather than as a measurement, and makes two people
+                  look like a fuller chart than twenty.
+                */}
+                <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%" maxBarSize={26}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
