@@ -1,6 +1,8 @@
 import {
-  useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
+  useCallback, useEffect, useLayoutEffect, useRef, useState,
+  type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2, Search, X, AlertCircle, RefreshCw, ChevronDown, Check } from 'lucide-react';
 import { initials } from '../lib/format';
 import errorIllustration from '../assets/error-illustration.gif';
@@ -387,6 +389,17 @@ export function Select({
   const rootRef = useRef<HTMLDivElement | null>(null);
   const listRef = useRef<HTMLUListElement | null>(null);
   const triggerRef = useRef<HTMLButtonElement | null>(null);
+  /*
+    Where to draw the menu, in viewport coordinates.
+
+    The menu is rendered into the body rather than next to the trigger. Absolutely
+    positioned, it was being clipped by whichever ancestor happened to have an
+    overflow — a card, a filter bar, a table's own scroll container — and no z-index
+    fixes that, because clipping happens before stacking is considered. Out in the
+    body it has no ancestor that can cut it off, at the cost of having to be
+    positioned by hand and kept in place as things scroll.
+  */
+  const [rect, setRect] = useState<DOMRect | null>(null);
   const typed = useRef({ text: '', at: 0 });
   /*
     Enter and Space on a focused button fire a click as well as a keydown. Without
@@ -400,9 +413,15 @@ export function Select({
 
   // Opening lands the highlight on the current value, so arrowing starts from what is
   // selected rather than from the top of the list.
+  const measure = useCallback(() => {
+    const el = triggerRef.current;
+    if (el) setRect(el.getBoundingClientRect());
+  }, []);
+
   const openMenu = () => {
     if (disabled) return;
     setActive(selectedIndex >= 0 ? selectedIndex : 0);
+    measure();
     setOpen(true);
   };
 
@@ -422,11 +441,58 @@ export function Select({
   useEffect(() => {
     if (!open) return undefined;
     const onPointerDown = (e: MouseEvent) => {
-      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+      const target = e.target as Node;
+      // The menu is no longer inside the root, so it has to be asked separately —
+      // without this, clicking an option would be read as clicking outside.
+      if (rootRef.current?.contains(target) || listRef.current?.contains(target)) return;
+      setOpen(false);
     };
     document.addEventListener('mousedown', onPointerDown);
     return () => document.removeEventListener('mousedown', onPointerDown);
   }, [open]);
+
+  /*
+    Fixed coordinates go stale the moment anything moves, so while the menu is open the
+    trigger is watched on every frame and the menu follows it.
+  
+    A frame loop rather than scroll and resize listeners. Those need to be bound to
+    whichever ancestor actually scrolls — the page here, a dialog body elsewhere — and
+    they miss anything that shifts the trigger without scrolling at all: a panel
+    expanding above it, a row being removed, a font finishing loading. Watching the one
+    rectangle that matters catches every case for the price of a comparison per frame,
+    and only while the menu is open.
+  */
+  useLayoutEffect(() => {
+    if (!open) return undefined;
+    let frame = 0;
+    let last = '';
+    const follow = () => {
+      const el = triggerRef.current;
+      if (el) {
+        const r = el.getBoundingClientRect();
+        const key = `${r.top}|${r.left}|${r.width}|${r.bottom}`;
+        if (key !== last) { last = key; setRect(r); }
+      }
+      frame = requestAnimationFrame(follow);
+    };
+    frame = requestAnimationFrame(follow);
+
+    /*
+      The frame loop is paused by the browser whenever the page is not being
+      presented, so scroll and resize are listened for as well: on coming back to a
+      backgrounded tab the first of those repositions the menu without waiting for a
+      frame that may not be scheduled yet. Scroll is on capture so it also hears a
+      container scrolling rather than only the page.
+    */
+    const onMove = () => measure();
+    window.addEventListener('scroll', onMove, true);
+    window.addEventListener('resize', onMove);
+    return () => {
+      cancelAnimationFrame(frame);
+      window.removeEventListener('scroll', onMove, true);
+      window.removeEventListener('resize', onMove);
+    };
+  }, [open, measure]);
 
   // Keeps the highlighted row in view when arrowing through a long list.
   useEffect(() => {
@@ -473,6 +539,33 @@ export function Select({
 
   const listId = id ? id + '-listbox' : undefined;
 
+  /*
+    Four rows at 2.25rem each, plus the list's own 0.5rem of padding.
+  */
+  const MENU_MAX = 152;
+
+  /*
+    Where the menu goes, in viewport coordinates.
+
+    `documentElement.clientHeight` rather than `innerHeight`: the latter can report 0
+    while the page is not being presented, and a flip decision made against a zero
+    height puts the menu somewhere off-screen. When no usable height can be read at
+    all, the menu simply opens downwards — that is the ordinary case, and it is better
+    to be occasionally clipped than reliably invisible.
+
+    It opens upwards only when the space below genuinely cannot hold it and the space
+    above is roomier. Near the foot of a long page that is the difference between a
+    usable list and a row and a half.
+  */
+  const viewportH = typeof document === 'undefined'
+    ? 0
+    : document.documentElement.clientHeight || window.innerHeight || 0;
+  const spaceBelow = rect ? viewportH - rect.bottom : 0;
+  const dropUp = !!rect
+    && viewportH > 0
+    && spaceBelow < MENU_MAX + 8
+    && rect.top > spaceBelow;
+
   return (
     <div ref={rootRef} className={`relative ${className}`}>
       <button
@@ -510,13 +603,27 @@ export function Select({
         />
       </button>
 
-      {open && (
+      {open && rect && createPortal((
         <ul
           ref={listRef}
           id={listId}
           role="listbox"
           tabIndex={-1}
-          className="fade-in absolute z-50 mt-1.5 max-h-64 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          /*
+            Four rows and no more: each is 2.25rem, and the list's own padding adds
+            0.5rem. A fifth row is then half in view, which is what says the list
+            scrolls — a clean cut at the boundary reads as the end of the options.
+          */
+          style={{
+            position: 'fixed',
+            left: rect.left,
+            width: rect.width,
+            maxHeight: '9.5rem',
+            ...(dropUp
+              ? { bottom: Math.max(viewportH - rect.top + 6, 0) }
+              : { top: rect.bottom + 6 }),
+          }}
+          className="fade-in z-50 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           {options.length === 0 && (
             <li className="px-3 py-2 text-sm text-muted-foreground">No options</li>
@@ -550,7 +657,7 @@ export function Select({
             );
           })}
         </ul>
-      )}
+      ), document.body)}
     </div>
   );
 }
