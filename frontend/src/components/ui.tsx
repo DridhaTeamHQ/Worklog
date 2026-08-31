@@ -3,6 +3,7 @@ import {
 } from 'react';
 import { Loader2, Search, X, AlertCircle, RefreshCw, ChevronDown, Check } from 'lucide-react';
 import { initials } from '../lib/format';
+import errorIllustration from '../assets/error-illustration.gif';
 
 /* ------------------------------------------------------------------ avatar */
 
@@ -107,6 +108,22 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center" role="alert">
+      {/*
+        Decorative, so it carries no alt text and removes itself if it will not load —
+        an error screen is the last place to show a second thing that is broken.
+
+        It sits above the message rather than replacing the icon: the artwork is warm
+        and does not say "this failed" on its own, so the red mark, the wording and the
+        retry still do the explaining. Kept small because this renders inside a card as
+        often as it fills a page.
+      */}
+      <img
+        src={errorIllustration}
+        alt=""
+        aria-hidden
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        className="mb-5 w-32 rounded-2xl border border-border"
+      />
       <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
         <AlertCircle className="h-6 w-6" />
       </span>

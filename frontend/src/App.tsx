@@ -26,6 +26,7 @@ import { TaskReportsPage } from './pages/manager/TaskReportsPage';
 import { AnalyticsPage } from './pages/manager/AnalyticsPage';
 import { ManagerTicketsPage } from './pages/manager/TicketsPage';
 import { MANAGER_ROLES } from './types';
+import errorIllustration from './assets/error-illustration.gif';
 
 export default function App() {
   return (
@@ -92,6 +93,14 @@ function NotFoundPage() {
   const { user } = useAuth();
   return (
     <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-6 text-center">
+      {/* Decorative, and removes itself if it will not load. */}
+      <img
+        src={errorIllustration}
+        alt=""
+        aria-hidden
+        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+        className="mb-8 w-56 rounded-3xl border border-border shadow-sm"
+      />
       <p className="text-5xl font-bold text-muted-foreground">404</p>
       <h1 className="display-title mt-4 text-2xl text-foreground">This page doesn't exist</h1>
       <p className="mt-2 max-w-sm text-sm text-muted-foreground">
