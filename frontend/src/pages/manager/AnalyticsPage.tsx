@@ -324,7 +324,7 @@ export function AnalyticsPage() {
             </div>
           )}
           <div>
-            <label className="label" htmlFor="a-from">Assigned from</label>
+            <label className="label" htmlFor="a-from">From</label>
             <input
               id="a-from"
               type="date"
@@ -335,7 +335,7 @@ export function AnalyticsPage() {
             />
           </div>
           <div>
-            <label className="label" htmlFor="a-to">Assigned to</label>
+            <label className="label" htmlFor="a-to">To</label>
             <input
               id="a-to"
               type="date"

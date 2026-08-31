@@ -305,11 +305,11 @@ export function AllTasksPage() {
                   <Select id="f-priority" value={priority} onChange={(v) => setPriority(v)} options={[{ value: '', label: `All priorities` }, { value: 'low', label: `Low` }, { value: 'medium', label: `Medium` }, { value: 'high', label: `High` }, { value: 'urgent', label: `Urgent` }]} />
                 </div>
                 <div>
-                  <label className="label" htmlFor="f-from">Assigned from</label>
+                  <label className="label" htmlFor="f-from">From</label>
                   <input id="f-from" type="date" value={assignedFrom} max={assignedTo || undefined} onChange={(e) => setAssignedFrom(e.target.value)} className="input" />
                 </div>
                 <div>
-                  <label className="label" htmlFor="f-to">Assigned to</label>
+                  <label className="label" htmlFor="f-to">To</label>
                   <input id="f-to" type="date" value={assignedTo} min={assignedFrom || undefined} onChange={(e) => setAssignedTo(e.target.value)} className="input" />
                 </div>
                 <div>
