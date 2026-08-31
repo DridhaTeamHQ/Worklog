@@ -166,41 +166,36 @@ export function LoginPage() {
 
           {/*
             Decorative only, so it is hidden from assistive tech and carries no alt
-            text. It removes itself if neither file is there — the panel reads fine
-            without it, and a broken-image icon on the sign-in screen would not.
+            text. It removes itself if the file is not there — the panel reads fine
+            without it, and a broken player on the sign-in screen would not.
 
             Full width and never cropped: the negative side margins cancel the panel's
             p-12 so it runs to both edges, the width is widened by the same 6rem
-            (a negative margin moves a box without resizing it), and `h-auto` lets the
-            height follow the aspect ratio instead of being forced into a box. That is
-            the combination that leaves the artwork whole — `object-cover` would fill
-            the space but trim the top and bottom off to do it.
+            (a negative margin moves a box without resizing it), and the height is
+            left to follow the aspect ratio rather than being forced into a box. That
+            is what leaves the artwork whole — `object-cover` would fill the space but
+            trim the top and bottom off to do it.
 
             Its own height therefore decides how much room it needs, and the panel does
             not scroll — so the copy above it is kept short and small deliberately, to
             leave that height free. `mt-auto` holds it against the bottom edge.
 
-            This upscales a 538px-wide file to roughly 720px, so it is softer than
-            drawing it at native size. A wider source (~1500px, or an SVG) would give
-            full width and sharpness together.
+            `muted` is what lets it start on its own: a browser will not autoplay a
+            clip that can make noise. `playsInline` stops iOS taking it fullscreen,
+            and `preload="auto"` matters more here than elsewhere — this is the first
+            screen anyone sees, and a clip that stutters into life reads as a fault.
           */}
-          <img
-            src="/login-illustration.png"
-            alt=""
+          <video
+            src="/login-illustration.mp4"
+            autoPlay
+            loop
+            muted
+            playsInline
+            preload="auto"
             aria-hidden
-            onError={(e) => {
-              // The artwork gets replaced from time to time and the format changes
-              // with it, so a missing .png tries .jpg once before giving up. The flag
-              // is what stops a missing pair from looping.
-              const el = e.currentTarget;
-              if (!el.dataset.triedJpg) {
-                el.dataset.triedJpg = '1';
-                el.src = '/login-illustration.jpg';
-                return;
-              }
-              el.style.display = 'none';
-            }}
-            className="-mx-12 mt-auto block w-[calc(100%+6rem)] max-w-none pt-6"
+            tabIndex={-1}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            className="-mx-12 mt-auto block h-auto w-[calc(100%+6rem)] max-w-none pt-6"
           />
         </div>
       </div>
