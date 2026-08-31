@@ -10,7 +10,6 @@ import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
 import { SetPasswordPage } from './pages/auth/SetPasswordPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { TimelinePage } from './pages/TimelinePage';
 import { MyDayPage } from './pages/MyDayPage';
 
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
@@ -49,7 +48,6 @@ export default function App() {
                     <Route path="/manager/team" element={<TeamMembersPage />} />
                     <Route path="/manager/team/:id" element={<EmployeeDetailPage />} />
                     <Route path="/manager/tasks" element={<AllTasksPage />} />
-                    <Route path="/manager/timeline" element={<TimelinePage />} />
                     <Route path="/manager/my-day" element={<MyDayPage />} />
                     <Route path="/manager/reports" element={<TaskReportsPage />} />
                     <Route path="/manager/tickets" element={<ManagerTicketsPage />} />
@@ -63,7 +61,6 @@ export default function App() {
                     <Route path="/employee" element={<EmployeeDashboard />} />
                     <Route path="/employee/tasks-assigned" element={<TasksAssignedPage />} />
                     <Route path="/employee/tasks-done" element={<TasksDonePage />} />
-                    <Route path="/employee/timeline" element={<TimelinePage />} />
                     <Route path="/employee/my-day" element={<MyDayPage />} />
                     <Route path="/employee/tickets" element={<TicketsPage />} />
                     <Route path="/employee/notifications" element={<NotificationsPage />} />

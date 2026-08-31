@@ -10,7 +10,6 @@ import {
   Avatar, EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner, Select,
   Toggle,
 } from '../../components/ui';
-import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
 import { EditTeamMemberModal } from '../../components/EditTeamMemberModal';
 import { useToast } from '../../components/Toast';
@@ -298,7 +297,7 @@ export function TeamMembersPage() {
                 <thead>
                   <tr>
                     <th scope="col">Employee</th>
-                    <th scope="col">Current status</th>
+                    <th scope="col" className="text-right">Assigned</th>
                     <th scope="col" className="text-right">Pending</th>
                     <th scope="col" className="text-right">Completed</th>
                     <th scope="col">Today's report</th>
@@ -335,7 +334,7 @@ export function TeamMembersPage() {
                           </span>
                         </Link>
                       </td>
-                      <td><StatusBadge status={m.current_status} /></td>
+                      <td className="text-right font-semibold tabular-nums text-foreground">{m.counts.total}</td>
                       <td className="text-right font-semibold tabular-nums text-foreground">{m.counts.pending}</td>
                       <td className="text-right font-semibold tabular-nums text-foreground">{m.counts.completed}</td>
                       <td>

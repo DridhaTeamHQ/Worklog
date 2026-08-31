@@ -190,10 +190,17 @@ export function ManagerTicketsPage() {
           <StatCard label="Open" value={counts.open} accent="red" icon={<Bug className="h-5 w-5" />} />
           <StatCard label="In Progress" value={counts.in_progress} accent="blue" icon={<Bug className="h-5 w-5" />} />
           <StatCard label="Resolved" value={counts.resolved} accent="emerald" icon={<Bug className="h-5 w-5" />} />
+          {/*
+            The share of everything reported that is no longer outstanding. `unresolved`
+            is what the server counts as still needing work, so the rate is what is left
+            over — which keeps this card agreeing with the three beside it rather than
+            re-deriving the same thing from a different sum.
+          */}
           <StatCard
-            label="Critical open"
-            value={counts.critical_open}
-            accent={counts.critical_open > 0 ? 'red' : 'ink'}
+            label="Resolving rate"
+            value={`${Math.round(((counts.total - counts.unresolved) / counts.total) * 100)}%`}
+            accent={counts.unresolved === 0 ? 'emerald' : 'blue'}
+            hint={`${counts.total - counts.unresolved} of ${counts.total} closed out`}
             icon={<AlertOctagon className="h-5 w-5" />}
           />
         </div>
