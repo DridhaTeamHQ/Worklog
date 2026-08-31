@@ -8,7 +8,8 @@ import { ok, created } from '../utils/http.js';
 import { asyncHandler, forbidden, badRequest } from '../utils/errors.js';
 import { ROLES, grantableRoles, roleLabel, isAdmin } from '../utils/roles.js';
 import {
-  listManagers, createUser, deleteManagerAccount, countAdmins,
+  listManagers, createUser, deleteManagerAccount, countAdmins, countActiveAdmins,
+  setManagerAccess,
 } from '../models/user.js';
 import { sendInviteEmail } from '../services/mail.js';
 
@@ -96,5 +97,40 @@ export const remove = asyncHandler(async (req, res) => {
       ? `${name} was removed. Their ${transferred} assigned task${transferred === 1 ? '' : 's'} moved to you.`
       : `${name} was removed.`,
     role,
+  });
+});
+
+/**
+ * PATCH /api/admins/:id — block or restore a manager-level account's portal access.
+ *
+ * Blocking is the reversible half of DELETE: the account and its work stay exactly
+ * where they are and only the sign-in stops, which is what you want for someone on
+ * leave or between roles. It refuses the same two cases for the same reasons — you
+ * cannot block yourself, and the last admin who can still sign in cannot be blocked,
+ * because a blocked admin cannot lift their own block and nobody else could.
+ */
+export const setAccess = asyncHandler(async (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) throw badRequest('Invalid account id.');
+
+  const { isActive } = req.body;
+
+  if (targetId === req.user.id) {
+    throw forbidden('You cannot block your own access.');
+  }
+
+  if (!isActive) {
+    const target = (await listManagers()).find((m) => m.id === targetId);
+    // Counted before the change, or the answer would always be "enough".
+    if (target && isAdmin(target.role) && target.is_active && await countActiveAdmins() <= 1) {
+      throw forbidden('This is the only admin who can sign in. Grant admin access to someone else first.');
+    }
+  }
+
+  const account = await setManagerAccess(targetId, isActive);
+  return ok(res, account, {
+    message: isActive
+      ? `${account.name} can sign in again.`
+      : `${account.name}'s access has been blocked.`,
   });
 });

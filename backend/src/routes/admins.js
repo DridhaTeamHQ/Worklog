@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { ROLES } from '../utils/roles.js';
-import { list, create, remove } from '../controllers/admins.js';
+import { list, create, remove, setAccess } from '../controllers/admins.js';
 
 const router = Router();
 
@@ -27,8 +27,13 @@ const createSchema = z.object({
   role: z.enum([ROLES.ADMIN, ROLES.MANAGER]).optional(),
 });
 
+const accessSchema = z.object({ isActive: z.boolean() });
+
 router.get('/', validate(listQuery, 'query'), list);
 router.post('/', validate(createSchema), create);
+// Blocking is separate from DELETE on purpose: it is reversible and touches nothing
+// but the sign-in, where delete closes the account and moves its work elsewhere.
+router.patch('/:id', validate(accessSchema), setAccess);
 router.delete('/:id', remove);
 
 export default router;

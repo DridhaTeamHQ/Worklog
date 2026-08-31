@@ -380,6 +380,41 @@ export async function countAdmins() {
   return Number(row?.c || 0);
 }
 
+/**
+ * Admins who can still sign in. Distinct from `countAdmins`, which counts the accounts
+ * that exist: blocking the last admin who can actually get in locks the company out of
+ * account administration just as surely as deleting them would, and a blocked admin
+ * cannot unblock themselves.
+ */
+export async function countActiveAdmins() {
+  const db = await getDb();
+  const row = await db.get("SELECT COUNT(*) AS c FROM users WHERE role = 'admin' AND is_active = 1");
+  return Number(row?.c || 0);
+}
+
+/**
+ * Turn a manager-level account's portal access on or off.
+ *
+ * Deliberately narrow: it sets one column and refuses anything that is not a manager
+ * or an admin, so it can never be pointed at a team member — those go through
+ * `updateTeamMember`, which is scoped the same way in the other direction.
+ */
+export async function setManagerAccess(accountId, isActive) {
+  const db = await getDb();
+  const roleList = MANAGER_ROLES.map((r) => `'${r}'`).join(', ');
+  const existing = await db.get(
+    `SELECT id FROM users WHERE id = ? AND role IN (${roleList})`,
+    [accountId],
+  );
+  if (!existing) throw notFound('That account could not be found.');
+
+  await db.run(
+    'UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?',
+    [isActive ? 1 : 0, nowIso(), accountId],
+  );
+  return findById(accountId);
+}
+
 export async function getTeamMember(employeeId) {
   const db = await getDb();
   const row = await db.get(

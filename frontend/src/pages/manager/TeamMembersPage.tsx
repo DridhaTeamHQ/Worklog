@@ -8,6 +8,7 @@ import { ApiError } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import {
   Avatar, EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, Spinner, Select,
+  Toggle,
 } from '../../components/ui';
 import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
@@ -54,6 +55,42 @@ export function TeamMembersPage() {
    * the department filter and the department column have nothing left to say.
    */
   const canAdminister = isAdmin(user?.role);
+
+  /**
+   * Portal access, toggled straight from the roster.
+   *
+   * Blocking is not deleting: the account, its tasks and its history all stay, and the
+   * only thing that stops is signing in. That makes it the right control for someone
+   * on leave or between roles, and it is why it sits inline rather than behind the
+   * same confirm dialog as removal.
+   *
+   * The row is not updated optimistically. The server refuses some of these — you
+   * cannot block yourself, and it will not let the last admin who can still sign in be
+   * blocked — so showing the switch move before the answer arrives would mean showing
+   * a state that is about to be taken back. `savingAccess` holds the id in flight so
+   * only that one switch is disabled rather than the whole table.
+   */
+  const [savingAccess, setSavingAccess] = useState<number | null>(null);
+
+  const setAccess = async (
+    person: { id: number; name: string; is_active: boolean },
+    kind: 'member' | 'admin',
+  ) => {
+    const next = !person.is_active;
+    setSavingAccess(person.id);
+    try {
+      if (kind === 'member') await teamApi.update(person.id, { isActive: next });
+      else await adminApi.setAccess(person.id, next);
+      toast.success(next
+        ? `${person.name} can sign in again.`
+        : `${person.name}'s access has been blocked.`);
+      reloadBoth();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not change that access.');
+    } finally {
+      setSavingAccess(null);
+    }
+  };
 
   const loadDepartments = useCallback(() => {
     teamApi.departments().then(({ data }) => setDepartments(data)).catch(() => setDepartments([]));
@@ -265,6 +302,9 @@ export function TeamMembersPage() {
                     <th scope="col" className="text-right">Pending</th>
                     <th scope="col" className="text-right">Completed</th>
                     <th scope="col">Today's report</th>
+                    {/* Administration, so it is not shown to a manager at all — the
+                        server refuses them the endpoint either way. */}
+                    {canAdminister && <th scope="col">Access</th>}
                     <th scope="col" className="text-right">Action</th>
                   </tr>
                 </thead>
@@ -310,6 +350,18 @@ export function TeamMembersPage() {
                           </span>
                         )}
                       </td>
+                      {canAdminister && (
+                        <td>
+                          <Toggle
+                            checked={m.is_active}
+                            disabled={savingAccess === m.id}
+                            onChange={() => void setAccess(m, 'member')}
+                            label={m.is_active
+                              ? `Block ${m.name}'s access to the portal`
+                              : `Restore ${m.name}'s access to the portal`}
+                          />
+                        </td>
+                      )}
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
                           <Link to={`/manager/team/${m.id}`} className="btn-secondary btn-sm">
@@ -372,6 +424,7 @@ export function TeamMembersPage() {
                     <th scope="col" className="text-right">Tasks assigned</th>
                     <th scope="col" className="text-right">Still open</th>
                     <th scope="col">Added</th>
+                    <th scope="col">Access</th>
                     <th scope="col" className="text-right">Action</th>
                   </tr>
                 </thead>
@@ -409,6 +462,24 @@ export function TeamMembersPage() {
                       <td className="text-right font-semibold tabular-nums text-foreground">{a.assigned_tasks}</td>
                       <td className="text-right tabular-nums text-muted-foreground">{a.open_tasks}</td>
                       <td className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(a.created_at)}</td>
+                      <td>
+                        {/*
+                          No switch on your own row, for the same reason there is no
+                          delete on it: blocking yourself signs you out with no way
+                          back in, and a blocked admin cannot lift their own block.
+                          The server refuses it independently.
+                        */}
+                        {a.id !== user?.id && (
+                          <Toggle
+                            checked={a.is_active}
+                            disabled={savingAccess === a.id}
+                            onChange={() => void setAccess(a, 'admin')}
+                            label={a.is_active
+                              ? `Block ${a.name}'s access to the portal`
+                              : `Restore ${a.name}'s access to the portal`}
+                          />
+                        )}
+                      </td>
                       <td className="text-right">
                         {/*
                           No delete on your own row: signing yourself out permanently is

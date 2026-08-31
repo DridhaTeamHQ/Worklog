@@ -86,6 +86,49 @@ export function StatCard({
   );
 }
 
+/* ---------------------------------------------------------------- toggle */
+
+/**
+ * A switch for a setting that takes effect immediately — no form, no save button.
+ *
+ * `role="switch"` with `aria-checked` rather than a checkbox: a screen reader then
+ * announces it as on or off rather than as ticked, which is what it is. `label` is
+ * what it is announced as, so it has to name the person or thing being switched, not
+ * just the setting.
+ *
+ * It disables itself while a change is in flight. The state it shows comes from the
+ * server, so letting it be clicked again before the answer lands would show a
+ * position that may not survive the round trip.
+ */
+export function Toggle({
+  checked, onChange, label, disabled = false,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  label: string;
+  disabled?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      aria-label={label}
+      title={label}
+      disabled={disabled}
+      onClick={() => onChange(!checked)}
+      className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors
+        disabled:cursor-not-allowed disabled:opacity-50 ${checked ? 'bg-success' : 'bg-muted-foreground/35'}`}
+    >
+      <span
+        aria-hidden
+        className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform
+          ${checked ? 'translate-x-[1.125rem]' : 'translate-x-[0.1875rem]'}`}
+      />
+    </button>
+  );
+}
+
 /* ------------------------------------------------------------ empty states */
 
 export function EmptyState({

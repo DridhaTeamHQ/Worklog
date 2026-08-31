@@ -192,6 +192,12 @@ export const adminApi = {
    */
   remove: (id: number) =>
     api.delete<{ id: number; transferred: number; message: string }>(`/admins/${id}`),
+  /**
+   * Blocks or restores a manager-level account's sign-in. Reversible, and it touches
+   * nothing but access — `remove` is the one that closes the account.
+   */
+  setAccess: (id: number, isActive: boolean) =>
+    api.patch<User>(`/admins/${id}`, { isActive }),
 };
 
 /* ----------------------------------------------------------------- projects */
