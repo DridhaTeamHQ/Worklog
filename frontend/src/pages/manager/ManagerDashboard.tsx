@@ -36,7 +36,6 @@ const STILL = { isAnimationActive: false } as const;
 const RANGES: { key: DashboardRange; label: string }[] = [
   { key: 'today', label: 'Today' },
   { key: 'week', label: 'This week' },
-  { key: 'month', label: 'This month' },
   { key: 'all', label: 'Overall' },
 ];
 
