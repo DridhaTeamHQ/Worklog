@@ -563,11 +563,13 @@ export function AnalyticsPage() {
                   block of colour rather than as a measurement, and makes two people
                   look like a fuller chart than twenty.
 
-                  `barGap` is the space between one person's three bars, halved from
-                  the default so they read as a group belonging to that person; the
-                  space between people is left alone, and is what separates the groups.
+                  `barGap` is the space between one person's three bars, and it is
+                  zero: they touch, so each person reads as a single block split by
+                  colour rather than as three readings that happen to share a label.
+                  The colours are distinct enough to divide them without a gap, and the
+                  space between people is left alone to do the separating.
                 */}
-                <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%" barGap={2} maxBarSize={26}>
+                <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }} barCategoryGap="24%" barGap={0} maxBarSize={26}>
                   <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
