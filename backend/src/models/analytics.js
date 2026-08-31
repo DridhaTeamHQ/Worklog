@@ -162,13 +162,25 @@ export async function productivityByEmployee(filters = {}) {
   if (from) { joinConds.push('substr(t.created_at, 1, 10) >= ?'); joinParams.push(from); }
   if (to) { joinConds.push('substr(t.created_at, 1, 10) <= ?'); joinParams.push(to); }
 
-  const whereConds = ["e.role = 'team_member'"];
+  /*
+    Managers and admins are included, not just team members. Nothing stops work being
+    assigned to one — `assign` checks the department, not the role — so leaving them
+    out meant a manager carrying tasks simply did not appear in the figures for their
+    own team.
+
+    They appear only when they are actually holding work, though. A team member with
+    nothing assigned is still a row of zeros, because the point of the table is who
+    has capacity; a manager with nothing assigned is not idle, they are doing a
+    different job, and listing every one of them at zero would say otherwise. That is
+    the HAVING clause: team members unconditionally, everyone else on evidence.
+  */
+  const whereConds = ["e.role IN ('team_member', 'manager', 'admin')"];
   const whereParams = [];
   if (employeeId) { whereConds.push('e.id = ?'); whereParams.push(employeeId); }
   if (department) { whereConds.push('e.department = ?'); whereParams.push(department); }
 
   const rows = await db.query(
-    `SELECT e.id AS employee_id, e.name AS employee_name, e.department,
+    `SELECT e.id AS employee_id, e.name AS employee_name, e.department, e.role,
             COUNT(t.id) AS assigned,
             SUM(CASE WHEN t.status = 'pending' THEN 1 ELSE 0 END) AS pending,
             SUM(CASE WHEN t.status = 'in_progress' THEN 1 ELSE 0 END) AS in_progress,
@@ -177,7 +189,8 @@ export async function productivityByEmployee(filters = {}) {
        FROM users e
        LEFT JOIN assigned_tasks t ON ${joinConds.join(' AND ')}
       WHERE ${whereConds.join(' AND ')}
-      GROUP BY e.id, e.name, e.department
+      GROUP BY e.id, e.name, e.department, e.role
+      HAVING e.role = 'team_member' OR COUNT(t.id) > 0
       ORDER BY completed DESC, e.name ASC`,
     [t, ...joinParams, ...whereParams],
   );
@@ -186,6 +199,7 @@ export async function productivityByEmployee(filters = {}) {
     employee_id: Number(r.employee_id),
     employee_name: r.employee_name,
     department: r.department,
+    role: r.role,
     assigned: Number(r.assigned || 0),
     pending: Number(r.pending || 0),
     in_progress: Number(r.in_progress || 0),

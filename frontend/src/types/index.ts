@@ -267,6 +267,8 @@ export interface ProductivityRow {
   employee_id: number;
   employee_name: string;
   department: string | null;
+  /** Managers and admins appear here too, but only when they are holding work. */
+  role: Role;
   assigned: number;
   pending: number;
   in_progress: number;
