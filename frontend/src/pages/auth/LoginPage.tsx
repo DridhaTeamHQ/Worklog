@@ -6,6 +6,14 @@ import { ApiError } from '../../api/client';
 import { authApi } from '../../api/endpoints';
 import { homeFor } from '../../components/RouteGuards';
 import { Spinner } from '../../components/ui';
+/*
+  Imported rather than referenced from `public/`, so the build fingerprints both
+  files. They are replaced from time to time under the same name, and at a fixed
+  URL a browser that has seen an older cut will keep serving it — which looks
+  exactly like the change never landed.
+*/
+import illustrationClip from '../../assets/login-illustration.webm';
+import illustrationStill from '../../assets/login-illustration.png';
 
 /** Long enough that typing an address is one request, short enough to feel immediate. */
 const INVITE_CHECK_DELAY_MS = 450;
@@ -192,8 +200,8 @@ export function LoginPage() {
             standing still rather than nothing at all.
           */}
           <video
-            src="/login-illustration.webm"
-            poster="/login-illustration.png"
+            src={illustrationClip}
+            poster={illustrationStill}
             autoPlay
             loop
             muted
