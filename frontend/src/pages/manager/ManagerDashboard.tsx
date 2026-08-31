@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import {
-  Users, ClipboardCheck, CheckCircle2, Clock, Loader2, AlertTriangle, FileText, ArrowRight, Bug,
+  Users, ClipboardCheck, CheckCircle2, Clock, AlertTriangle, FileText, ArrowRight, Bug,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -10,7 +10,6 @@ import { dashboardApi, taskApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { SeverityBadge } from '../../components/Badges';
 import { TaskBoard } from '../../components/TaskBoard';
 import { TimelineStrip } from '../../components/TimelineStrip';
 import { formatDate, formatDateShort, reportLines } from '../../lib/format';
@@ -26,6 +25,7 @@ import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from 
 const STILL = { isAnimationActive: false } as const;
 
 export function ManagerDashboard() {
+  const navigate = useNavigate();
   const toast = useToast();
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [error, setError] = useState('');
@@ -72,7 +72,7 @@ export function ManagerDashboard() {
   if (loading) return <PageLoader />;
   if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
 
-  const { summary, activity, recent_tasks: tasks, recent_reports: reports, open_tickets: tickets } = data;
+  const { summary, activity, recent_tasks: tasks, recent_reports: reports } = data;
 
   const chartData = activity.map((point) => ({
     ...point,
@@ -91,7 +91,21 @@ export function ManagerDashboard() {
         <StatCard label="Assigned Today" value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
         <StatCard label="Completed Today" value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
         <StatCard label="Pending Tasks" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
-        <StatCard label="In Progress" value={summary.in_progress_tasks} accent="blue" icon={<Loader2 className="h-5 w-5" />} />
+        {/*
+          Tickets take the fifth slot, and the card is the whole of their presence on
+          this page now — so it is a button through to the list, and it says how many
+          are critical, which is the part that decides whether the number is urgent.
+        */}
+        <StatCard
+          label="Open Tickets"
+          value={summary.open_tickets}
+          accent="red"
+          icon={<Bug className="h-5 w-5" />}
+          hint={summary.critical_tickets > 0
+            ? `${summary.critical_tickets} critical`
+            : undefined}
+          onClick={() => navigate('/manager/tickets')}
+        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
@@ -152,44 +166,6 @@ export function ManagerDashboard() {
         </div>
       </div>
 
-      {summary.open_tickets > 0 && (
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <div className="flex items-center gap-2.5">
-              <Bug className="h-5 w-5 text-destructive" aria-hidden />
-              <h2 className="font-semibold text-foreground">
-                {summary.open_tickets} open ticket{summary.open_tickets === 1 ? '' : 's'}
-                {summary.critical_tickets > 0 && (
-                  <span className="ml-2 font-normal text-destructive">
-                    · {summary.critical_tickets} critical
-                  </span>
-                )}
-              </h2>
-            </div>
-            <Link to="/manager/tickets" className="text-sm font-medium text-primary-strong hover:underline">
-              View all
-            </Link>
-          </header>
-          <ul className="divide-y divide-border">
-            {tickets.map((ticket) => (
-              <li key={ticket.id} className="flex items-start gap-3 px-5 py-3.5">
-                <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-foreground">
-                    <span className="mr-1.5 font-mono text-xs text-muted-foreground">{ticket.ticket_key}</span>
-                    {ticket.title}
-                  </p>
-                  <p className="truncate text-xs text-muted-foreground">
-                    {ticket.reporter_name} · {ticket.project_name}
-                    {ticket.task_key && ` · on ${ticket.task_key}`}
-                  </p>
-                </div>
-                <SeverityBadge severity={ticket.severity} />
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
 
       <section className="card p-5">
         <h2 className="font-semibold text-foreground">Activity — last 14 days</h2>
