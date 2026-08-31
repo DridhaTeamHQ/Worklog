@@ -14,7 +14,7 @@ import { SeverityBadge } from '../../components/Badges';
 import { TaskBoard } from '../../components/TaskBoard';
 import { TimelineStrip } from '../../components/TimelineStrip';
 import { formatDate, formatDateShort, reportLines } from '../../lib/format';
-import { CHART, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
+import { CHART, STATUS_COLORS, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
 import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from '../../types';
 
 /*
@@ -203,8 +203,8 @@ export function ManagerDashboard() {
                   <stop offset="95%" stopColor={CHART.primary} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gCompleted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor={CHART.neutral} stopOpacity={0.35} />
-                  <stop offset="95%" stopColor={CHART.neutral} stopOpacity={0} />
+                  <stop offset="5%" stopColor={STATUS_COLORS.completed} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={STATUS_COLORS.completed} stopOpacity={0} />
                 </linearGradient>
               </defs>
               <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
@@ -218,7 +218,7 @@ export function ManagerDashboard() {
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
               <Area type="monotone" dataKey="assigned" name="Assigned" stroke={CHART.primary} strokeWidth={2} fill="url(#gAssigned)" {...STILL} />
-              <Area type="monotone" dataKey="completed" name="Completed" stroke={CHART.neutral} strokeWidth={2} fill="url(#gCompleted)" {...STILL} />
+              <Area type="monotone" dataKey="completed" name="Completed" stroke={STATUS_COLORS.completed} strokeWidth={2} fill="url(#gCompleted)" {...STILL} />
               <Area type="monotone" dataKey="reports" name="Reports" stroke={CHART.neutralSoft} strokeWidth={2} fillOpacity={0} {...STILL} />
             </AreaChart>
           </ResponsiveContainer>

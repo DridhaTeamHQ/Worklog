@@ -492,7 +492,7 @@ export function AnalyticsPage() {
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                   {/* Assignments are what the chart is about; the other two are context. */}
                   <Line type="monotone" dataKey="assigned" name="Assigned" stroke={CHART.primary} strokeWidth={2} dot={false} {...STILL} />
-                  <Line type="monotone" dataKey="completed" name="Completed" stroke={CHART.neutral} strokeWidth={2} dot={false} {...STILL} />
+                  <Line type="monotone" dataKey="completed" name="Completed" stroke={STATUS_COLORS.completed} strokeWidth={2} dot={false} {...STILL} />
                   <Line type="monotone" dataKey="reports" name="Reports" stroke={CHART.neutralSoft} strokeWidth={2} dot={false} {...STILL} />
                 </LineChart>
               </ResponsiveContainer>
@@ -566,10 +566,12 @@ export function AnalyticsPage() {
                     cursor={{ fill: 'rgba(9,9,11,0.04)' }}
                   />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  {/* Assigned is the baseline and completed is the answer to it, so both
-                      stay neutral; overdue is the exception, and takes its state colour. */}
+                  {/* Completed and overdue are task states, so they carry the same
+                      colours here as in the breakdown's legend, the badges and the
+                      table. Assigned is not a state — it is the baseline the other two
+                      are read against — so it stays neutral. */}
                   <Bar dataKey="assigned" name="Assigned" fill={CHART.neutralFaint} radius={[6, 6, 0, 0]} {...STILL} />
-                  <Bar dataKey="completed" name="Completed" fill={CHART.neutral} radius={[6, 6, 0, 0]} {...STILL} />
+                  <Bar dataKey="completed" name="Completed" fill={STATUS_COLORS.completed} radius={[6, 6, 0, 0]} {...STILL} />
                   <Bar dataKey="overdue" name="Overdue" fill={STATUS_COLORS.overdue} radius={[6, 6, 0, 0]} {...STILL} />
                 </BarChart>
               </ResponsiveContainer>
