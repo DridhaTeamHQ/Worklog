@@ -101,7 +101,18 @@ export function ManagerDashboard() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
         <div>
           <h1 className="display-title text-2xl text-foreground sm:text-4xl">Dashboard overview</h1>
-          <p className="mt-1 text-sm text-muted-foreground">{formatDate(new Date().toISOString())}</p>
+          {/*
+            The date, and which period the figures below are counting. The cards no
+            longer say it themselves, so it is said once here — otherwise a number
+            like "Assigned 1" gives no way to tell a quiet day from a quiet year.
+          */}
+          <p className="mt-1 text-sm text-muted-foreground">
+            {formatDate(new Date().toISOString())}
+            <span aria-hidden> · </span>
+            <span className="font-medium text-foreground">
+              {RANGES.find((r) => r.key === range)?.label}
+            </span>
+          </p>
         </div>
         {/*
           Which period the counts below are read over. A row of buttons rather than a
