@@ -197,7 +197,7 @@ export function ManagerTicketsPage() {
             re-deriving the same thing from a different sum.
           */}
           <StatCard
-            label="Resolving rate"
+            label="Resolved rate"
             value={`${Math.round(((counts.total - counts.unresolved) / counts.total) * 100)}%`}
             accent={counts.unresolved === 0 ? 'emerald' : 'blue'}
             hint={`${counts.total - counts.unresolved} of ${counts.total} closed out`}

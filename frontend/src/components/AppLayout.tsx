@@ -16,9 +16,9 @@ interface NavItem { to: string; label: string; icon: ReactNode; end?: boolean }
 const MANAGER_NAV: NavItem[] = [
   { to: '/manager', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
   { to: '/manager/team', label: 'Team Members', icon: <Users className="h-[18px] w-[18px]" /> },
-  { to: '/manager/tasks', label: 'Assigned Task', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
+  { to: '/manager/tasks', label: 'Tasks', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { to: '/manager/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
-  { to: '/manager/reports', label: 'Task Reports', icon: <FileText className="h-[18px] w-[18px]" /> },
+  { to: '/manager/reports', label: 'Daily Reports', icon: <FileText className="h-[18px] w-[18px]" /> },
   { to: '/manager/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/manager/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
