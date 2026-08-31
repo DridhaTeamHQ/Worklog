@@ -1,8 +1,8 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom';
 import {
   LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell, User as UserIcon,
-  LogOut, Menu, X, ChevronDown, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen,
+  LogOut, Menu, X, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen, Pencil,
   ChartGantt, NotebookPen,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
@@ -63,6 +63,7 @@ export function AppLayout() {
 
   const isManager = isManagerLevel(user?.role);
   const nav = isManager ? MANAGER_NAV : EMPLOYEE_NAV;
+  const profilePath = isManager ? '/manager/profile' : '/employee/profile';
 
   // On mobile the sidebar is an overlay; navigating should dismiss it.
   useEffect(() => { setSidebarOpen(false); }, [location.pathname]);
@@ -74,15 +75,38 @@ export function AppLayout() {
 
   return (
     <div className="min-h-screen bg-muted">
-      {/* Sidebar — permanent from lg up, slide-over below it. */}
+      {/*
+        Sidebar — permanent from lg up, slide-over below it. Collapsing narrows it to
+        a rail rather than hiding it: the rail is always the way back, so navigation
+        can never be dismissed with no route left to reopen it.
+      */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-foreground lg:border-r lg:border-border transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex transform flex-col bg-foreground lg:border-r lg:border-border transition-[transform,width] duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
-        } ${collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
+        } lg:translate-x-0 ${collapsed ? 'w-64 lg:w-[4.75rem]' : 'w-64'}`}
         aria-label="Main navigation"
       >
-        <div className="flex h-16 items-center justify-between px-5">
-          <BrandMark />
+        {/* Collapse handle, on the panel's edge as a round control so it is reachable
+            in both states — the header has no room for it once collapsed. */}
+        <button
+          type="button"
+          onClick={toggleCollapsed}
+          aria-label={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+          className="absolute -right-3 top-20 z-10 hidden h-6 w-6 items-center justify-center rounded-full border border-border bg-popover text-muted-foreground shadow-md transition-colors hover:text-foreground lg:flex"
+        >
+          {collapsed
+            ? <PanelLeftOpen className="h-3.5 w-3.5" />
+            : <PanelLeftClose className="h-3.5 w-3.5" />}
+        </button>
+
+        {/* ------------------------------------------------------------ header */}
+        <div className="flex h-16 shrink-0 items-center justify-between px-5">
+          {collapsed ? (
+            <span className="mx-auto inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+              <CheckSquare className="h-5 w-5" />
+            </span>
+          ) : <BrandMark />}
           <button
             type="button"
             onClick={() => setSidebarOpen(false)}
@@ -91,42 +115,81 @@ export function AppLayout() {
           >
             <X className="h-5 w-5" />
           </button>
-          {/* The same control on desktop, where closing means collapsing rather than
-              dismissing an overlay. */}
-          <button
-            type="button"
-            onClick={toggleCollapsed}
-            aria-label="Collapse sidebar"
-            title="Collapse sidebar"
-            className="hidden rounded-lg p-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:block"
-          >
-            <PanelLeftClose className="h-5 w-5" />
-          </button>
         </div>
 
-        <div className="px-3 pb-3">
-          <p className="px-3 pb-2 pt-4 eyebrow text-sidebar-foreground/70">
-            {roleLabel(user?.role)}
-          </p>
+        {/*
+          Who is signed in, and the way to their own details. A link rather than a
+          label, and it says so on hover and to a screen reader.
+        */}
+        <div className={`shrink-0 border-b border-sidebar-border pb-4 ${collapsed ? 'px-2' : 'px-3'}`}>
+          <Link
+            to={profilePath}
+            title={collapsed ? `${user?.name} — edit your details` : undefined}
+            aria-label={`${user?.name}. Edit your profile details.`}
+            className={`group flex items-center gap-3 rounded-md p-2 transition-colors hover:bg-sidebar-accent ${
+              collapsed ? 'justify-center' : ''
+            }`}
+          >
+            <Avatar name={user?.name ?? '?'} src={user?.profile_image} size="md" />
+            {!collapsed && (
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">
+                  {roleLabel(user?.role)}
+                </span>
+                <span className="block truncate text-sm font-bold text-background">{user?.name}</span>
+              </span>
+            )}
+            {!collapsed && (
+              <Pencil className="h-3.5 w-3.5 shrink-0 text-sidebar-foreground opacity-0 transition-opacity group-hover:opacity-100" aria-hidden />
+            )}
+          </Link>
+        </div>
+
+        {/* -------------------------------------------------------------- nav */}
+        {/*
+          Collapsed, the flyout labels sit outside the rail's own width, and a scroll
+          container would clip them on that axis — `overflow-y-auto` cannot pair with
+          a visible x. The rail is short enough not to need scrolling, so it drops the
+          clipping entirely and only the expanded panel scrolls.
+        */}
+        <div className={`flex-1 px-3 py-4 ${collapsed ? 'lg:overflow-visible' : 'overflow-y-auto'}`}>
           <nav className="space-y-1">
             {nav.map((item) => (
               <NavLink
                 key={item.to}
                 to={item.to}
                 end={item.end}
-                className={({ isActive }) => `nav-link ${isActive ? 'nav-link-active' : ''}`}
+                className={({ isActive }) => `group relative nav-link ${
+                  collapsed ? 'lg:justify-center lg:px-0' : ''
+                } ${isActive ? 'nav-link-active' : ''}`}
               >
                 {item.icon}
-                <span>{item.label}</span>
+                <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                {/* Collapsed, the label arrives as a flyout — the rail must still say
+                    what each icon is, without depending on a native tooltip's delay. */}
+                {collapsed && (
+                  <span className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md border border-border bg-popover px-3 py-1.5 text-sm font-medium text-popover-foreground opacity-0 shadow-xl transition-opacity group-hover:opacity-100 lg:block">
+                    {item.label}
+                  </span>
+                )}
               </NavLink>
             ))}
           </nav>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-sidebar-border p-3">
-          <button type="button" onClick={handleLogout} className="nav-link w-full">
+        <div className="shrink-0 border-t border-sidebar-border p-3">
+          <button
+            type="button"
+            onClick={handleLogout}
+            className={`group relative nav-link w-full ${collapsed ? 'lg:justify-center lg:px-0' : ''}`}
+          >
             <LogOut className="h-[18px] w-[18px]" />
-            <span>Logout</span>
+            <span className={collapsed ? 'lg:hidden' : ''}>Logout</span>
+            {collapsed && (
+              <span className="pointer-events-none absolute left-full z-50 ml-3 hidden whitespace-nowrap rounded-md border border-border bg-popover px-3 py-1.5 text-sm font-medium text-popover-foreground opacity-0 shadow-xl transition-opacity group-hover:opacity-100 lg:block">
+                Logout
+              </span>
+            )}
           </button>
         </div>
       </aside>
@@ -139,7 +202,7 @@ export function AppLayout() {
         />
       )}
 
-      <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-0' : 'lg:pl-64'}`}>
+      <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-[4.75rem]' : 'lg:pl-64'}`}>
         <header className="sticky top-0 z-30 border-b border-border bg-muted/90 backdrop-blur">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
@@ -150,22 +213,6 @@ export function AppLayout() {
             >
               <Menu className="h-5 w-5" />
             </button>
-
-            {/*
-              Only rendered while the sidebar is collapsed: it is the sole way back, so
-              it must not be possible to hide the navigation with no route to reopen it.
-            */}
-            {collapsed && (
-              <button
-                type="button"
-                onClick={toggleCollapsed}
-                aria-label="Show sidebar"
-                title="Show sidebar"
-                className="hidden rounded-full p-2 text-foreground hover:bg-accent hover:text-foreground lg:block"
-              >
-                <PanelLeftOpen className="h-5 w-5" />
-              </button>
-            )}
 
             <div className="min-w-0 flex-1">
               <p className="display-title truncate text-sm text-foreground sm:text-base">
@@ -181,7 +228,6 @@ export function AppLayout() {
             </div>
 
             <NotificationBell />
-            <ProfileMenu onLogout={handleLogout} />
           </div>
         </header>
 
@@ -202,76 +248,5 @@ export function BrandMark() {
       </span>
       <span className="display-title text-lg leading-tight text-background">Taskr</span>
     </span>
-  );
-}
-
-function ProfileMenu({ onLogout }: { onLogout: () => void }) {
-  const { user } = useAuth();
-  const navigate = useNavigate();
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const onClick = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false); };
-    document.addEventListener('mousedown', onClick);
-    document.addEventListener('keydown', onKey);
-    return () => {
-      document.removeEventListener('mousedown', onClick);
-      document.removeEventListener('keydown', onKey);
-    };
-  }, [open]);
-
-  if (!user) return null;
-  const profilePath = isManagerLevel(user.role) ? '/manager/profile' : '/employee/profile';
-
-  return (
-    <div className="relative" ref={ref}>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-expanded={open}
-        aria-label="Account menu"
-        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-accent"
-      >
-        <Avatar name={user.name} src={user.profile_image} size="sm" />
-        <span className="hidden text-left sm:block">
-          <span className="block max-w-[10rem] truncate text-sm font-semibold text-foreground">{user.name}</span>
-          <span className="block text-xs text-muted-foreground">{roleLabel(user.role)}</span>
-        </span>
-        <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
-      </button>
-
-      {open && (
-        <div className="animate-in-up absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg">
-          <div className="border-b border-border px-4 py-3">
-            <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
-            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
-            {user.department && (
-              <p className="mt-1.5 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                {user.department}
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); navigate(profilePath); }}
-            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted"
-          >
-            <UserIcon className="h-4 w-4 text-muted-foreground" /> My profile
-          </button>
-          <button
-            type="button"
-            onClick={() => { setOpen(false); onLogout(); }}
-            className="flex w-full items-center gap-2.5 border-t border-border px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10"
-          >
-            <LogOut className="h-4 w-4" /> Logout
-          </button>
-        </div>
-      )}
-    </div>
   );
 }
