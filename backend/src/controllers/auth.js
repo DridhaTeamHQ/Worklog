@@ -6,7 +6,7 @@
 import config from '../config/env.js';
 import { signToken } from '../middleware/auth.js';
 import { ok } from '../utils/http.js';
-import { asyncHandler, unauthorized, badRequest } from '../utils/errors.js';
+import { asyncHandler, unauthorized, badRequest, forbidden } from '../utils/errors.js';
 import {
   findByEmail, findById, verifyPassword, toPublicUser, changePassword,
   findInvitedByEmail, setInitialPassword,
@@ -29,13 +29,36 @@ export const login = asyncHandler(async (req, res) => {
   const { email, password } = req.body;
   const user = await findByEmail(email);
 
-  // Same message and comparable timing for "no such user" and "wrong password" so the
-  // endpoint cannot be used to discover which emails exist. An invited account that
-  // has not been claimed has a NULL hash, so it lands on the same placeholder and is
-  // refused here exactly like an unknown address — claiming it is the only way in.
-  const hash = user?.password_hash || '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidi';
+  /*
+    Two refusals are named rather than hidden behind the generic message: an address
+    nobody has added, and an account whose access has been blocked. Both are dead ends
+    that no amount of retyping fixes, and telling someone to check their password when
+    the password was never the problem sends them round a loop the portal cannot let
+    them out of. The answer names who can fix it instead.
+
+    This is a deliberate trade. It means the endpoint can be used to discover which
+    addresses exist, which the generic message existed to prevent. It is accepted here
+    because this is an internal portal whose roster is not secret to the people using
+    it — the same names are on the team page — and because the alternative is a locked
+    -out colleague with no way to find out why. `invite-status` already makes the same
+    trade for the same reason; see the security note in the README.
+
+    Wrong passwords are still answered generically, so a correct address with a wrong
+    password reveals nothing beyond what the two cases above already do.
+  */
+  if (!user) {
+    throw forbidden('Access denied. This email has not been added to the portal — ask an admin to add you.');
+  }
+  if (!user.is_active) {
+    throw forbidden('Access denied. Your access to this portal has been blocked — contact an admin.');
+  }
+
+  // An invited account that has not been claimed has a NULL hash, so it lands on the
+  // placeholder and is refused exactly like a wrong password — the sign-in page offers
+  // it the "set your password" route separately, from `invite-status`.
+  const hash = user.password_hash || '$2a$10$invalidinvalidinvalidinvalidinvalidinvalidinvalidinvalidi';
   const passwordOk = await verifyPassword(password, hash);
-  if (!user || !passwordOk || !user.is_active) {
+  if (!passwordOk) {
     throw unauthorized('Incorrect email or password.');
   }
 

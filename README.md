@@ -228,12 +228,15 @@ data access lives in services, so authorization rules are stated once each.
   can only read values that passed — unknown fields are dropped, which is why a team
   member cannot promote themselves by adding `role` to a profile update.
 - **Rate limiting** on sign-in and password reset, plus a global API limit.
-- **Account enumeration** is blocked on sign-in and password reset: wrong-password and
-  no-such-user return the same message, and forgot-password always answers identically.
-  **The one deliberate exception is `POST /api/auth/invite-status`**, which is what puts
-  the "Invited" button on the sign-in page — it necessarily confirms that a given address
-  is an account somebody added and nobody has claimed. See **Invitations** for what that
-  costs and how it is bounded.
+- **Account enumeration** is blocked on password reset, which always answers
+  identically. Sign-in is a **deliberate exception**: an address nobody has added and an
+  account whose access has been blocked are each named, because both are dead ends that
+  no amount of retyping fixes and the person needs to know to go and ask an admin. A
+  wrong password on a live account is still answered generically. The trade is accepted
+  because this is an internal portal whose roster is not secret to the people using it.
+  `POST /api/auth/invite-status` makes the same trade for the same reason — it is what
+  puts the "Invited" button on the sign-in page, and it necessarily confirms that a given
+  address is an account somebody added and nobody has claimed.
 - **Errors** never leak internals — 5xx responses return a generic message and log the
   detail server-side.
 
