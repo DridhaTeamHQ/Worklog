@@ -7,13 +7,12 @@ import { authApi } from '../../api/endpoints';
 import { homeFor } from '../../components/RouteGuards';
 import { Spinner } from '../../components/ui';
 /*
-  Imported rather than referenced from `public/`, so the build fingerprints both
-  files. They are replaced from time to time under the same name, and at a fixed
-  URL a browser that has seen an older cut will keep serving it — which looks
-  exactly like the change never landed.
+  Imported rather than referenced from `public/`, so the build fingerprints it.
+  The artwork has been replaced several times under the same name, and at a fixed
+  URL a browser that has seen an older one keeps serving it — which looks exactly
+  like the change never landed.
 */
-import illustrationClip from '../../assets/login-illustration.webm';
-import illustrationStill from '../../assets/login-illustration.png';
+import illustration from '../../assets/login-illustration.gif';
 
 /** Long enough that typing an address is one request, short enough to feel immediate. */
 const INVITE_CHECK_DELAY_MS = 450;
@@ -174,42 +173,26 @@ export function LoginPage() {
 
           {/*
             Decorative only, so it is hidden from assistive tech and carries no alt
-            text. It removes itself if the file is not there — the panel reads fine
-            without it, and a broken player on the sign-in screen would not.
+            text. It removes itself if the file is missing — the panel reads fine
+            without it, and a broken-image icon on the sign-in screen would not.
 
-            Full width and never cropped: the negative side margins cancel the panel's
-            p-12 so it runs to both edges, the width is widened by the same 6rem
-            (a negative margin moves a box without resizing it), and the height is
-            left to follow the aspect ratio rather than being forced into a box. That
-            is what leaves the artwork whole — `object-cover` would fill the space but
-            trim the top and bottom off to do it.
+            A gif rather than a video: this one already carries its own transparency,
+            so it needs no keying to sit on the dark panel, it animates in every
+            browser including Safari, and at 130KB it is a twentieth of the clip it
+            replaces. An <img> also cannot be paused, muted or autoplay-blocked, which
+            is three fewer things to get wrong for something purely decorative.
 
-            Its own height therefore decides how much room it needs, and the panel does
-            not scroll — so the copy above it is kept short and small deliberately, to
-            leave that height free. `mt-auto` holds it against the bottom edge.
-
-            `muted` is what lets it start on its own: a browser will not autoplay a
-            clip that can make noise. `playsInline` stops iOS taking it fullscreen,
-            and `preload="auto"` matters more here than elsewhere — this is the first
-            screen anyone sees, and a clip that stutters into life reads as a fault.
-
-            WebM because the clip carries an alpha channel, which is what lets it sit
-            on the dark panel rather than in a white box of its own. Safari does not
-            decode alpha in WebM; it falls back to the poster, which is the opening
-            frame with the same transparency, so that browser gets the artwork
-            standing still rather than nothing at all.
+            Square, so it is held to a width the panel's remaining height can take
+            rather than run edge to edge: at full width it would be as tall as it is
+            wide and the copy above it would have nowhere to go. `mt-auto` keeps it
+            against the bottom edge.
           */}
-          <video
-            src={illustrationClip}
-            poster={illustrationStill}
-            autoPlay
-            loop
-            muted
-            playsInline
-            preload="auto"
+          <img
+            src={illustration}
+            alt=""
             aria-hidden
-            tabIndex={-1}
-            className="-mx-12 mt-auto block h-auto w-[calc(100%+6rem)] max-w-none pt-6"
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            className="mx-auto mt-auto block w-full max-w-[24rem] pt-6"
           />
         </div>
       </div>
