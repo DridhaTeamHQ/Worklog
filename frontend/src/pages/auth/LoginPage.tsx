@@ -184,9 +184,16 @@ export function LoginPage() {
             clip that can make noise. `playsInline` stops iOS taking it fullscreen,
             and `preload="auto"` matters more here than elsewhere — this is the first
             screen anyone sees, and a clip that stutters into life reads as a fault.
+
+            WebM because the clip carries an alpha channel, which is what lets it sit
+            on the dark panel rather than in a white box of its own. Safari does not
+            decode alpha in WebM; it falls back to the poster, which is the opening
+            frame with the same transparency, so that browser gets the artwork
+            standing still rather than nothing at all.
           */}
           <video
-            src="/login-illustration.mp4"
+            src="/login-illustration.webm"
+            poster="/login-illustration.png"
             autoPlay
             loop
             muted
@@ -194,7 +201,6 @@ export function LoginPage() {
             preload="auto"
             aria-hidden
             tabIndex={-1}
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
             className="-mx-12 mt-auto block h-auto w-[calc(100%+6rem)] max-w-none pt-6"
           />
         </div>
