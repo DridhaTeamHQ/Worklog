@@ -27,15 +27,17 @@ import type {
 const STILL = { isAnimationActive: false } as const;
 
 /*
-  The periods the headline counts can be read over, and how each names itself on a
-  card. The label is a suffix rather than a whole title so the cards keep their
-  subject — "Assigned" stays the first word, which is what you scan for.
+  The periods the headline counts can be read over.
+
+  The cards do not name the period. It is stated once, on the control above them, and
+  repeating it five times made every title longer than the figure it belonged to —
+  "Tickets raised this month" wrapping onto two lines above a single digit.
 */
-const RANGES: { key: DashboardRange; label: string; suffix: string }[] = [
-  { key: 'today', label: 'Today', suffix: 'today' },
-  { key: 'week', label: 'This week', suffix: 'this week' },
-  { key: 'month', label: 'This month', suffix: 'this month' },
-  { key: 'all', label: 'Overall', suffix: 'overall' },
+const RANGES: { key: DashboardRange; label: string }[] = [
+  { key: 'today', label: 'Today' },
+  { key: 'week', label: 'This week' },
+  { key: 'month', label: 'This month' },
+  { key: 'all', label: 'Overall' },
 ];
 
 export function ManagerDashboard() {
@@ -88,7 +90,6 @@ export function ManagerDashboard() {
   if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={() => void load(range)} />;
 
   const { summary, activity, recent_tasks: tasks, recent_reports: reports } = data;
-  const suffix = RANGES.find((r) => r.key === range)?.suffix ?? 'today';
 
   const chartData = activity.map((point) => ({
     ...point,
@@ -132,16 +133,16 @@ export function ManagerDashboard() {
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
         <StatCard label="Total Team Members" value={summary.total_team_members} accent="brand" icon={<Users className="h-5 w-5" />} />
-        <StatCard label={`Assigned ${suffix}`} value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
-        <StatCard label={`Completed ${suffix}`} value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
-        <StatCard label={`Pending ${suffix === 'today' ? 'from today' : suffix}`} value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
+        <StatCard label="Assigned" value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
+        <StatCard label="Completed" value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
+        <StatCard label="Pending" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
         {/*
           Tickets take the fifth slot, and the card is the whole of their presence on
           this page now — so it is a button through to the list, and it says how many
           are critical, which is the part that decides whether the number is urgent.
         */}
         <StatCard
-          label={`Tickets ${suffix === 'today' ? 'raised today' : `raised ${suffix}`}`}
+          label="Tickets raised"
           value={summary.open_tickets}
           accent="red"
           icon={<Bug className="h-5 w-5" />}
