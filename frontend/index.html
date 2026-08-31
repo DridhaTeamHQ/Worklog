@@ -5,6 +5,15 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="description" content="Internal employee task management and daily work reporting portal." />
     <title>Taskr</title>
+    <!--
+      The only web font in the app. Everything else uses the system stack, so this is
+      loaded on its own rather than pulling in a whole family: it dresses one headline
+      on the sign-in screen, and falls back to the system sans if the network is not
+      there.
+    -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet" />
   </head>
   <body>
     <div id="root"></div>

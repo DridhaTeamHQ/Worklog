@@ -8,7 +8,16 @@ import { EmptyState, Spinner } from './ui';
 import type { AppNotification } from '../types';
 import { isManagerLevel } from '../types';
 
-export function NotificationBell() {
+interface Props {
+  /**
+   * Rendered as a round floating control clear of the page rather than docked in a
+   * bar. Only changes the button's shape — it sits at the top of the viewport, so the
+   * panel still opens downwards.
+   */
+  floating?: boolean;
+}
+
+export function NotificationBell({ floating = false }: Props) {
   const { items, unread, loading, markRead, markAllRead, reload } = useNotifications();
   const { user } = useAuth();
   const navigate = useNavigate();
@@ -56,7 +65,11 @@ export function NotificationBell() {
         onClick={() => { setOpen((o) => !o); if (!open) void reload(); }}
         aria-label={unread > 0 ? `Notifications, ${unread} unread` : 'Notifications'}
         aria-expanded={open}
-        className="relative rounded-lg p-2 text-ink-500 transition-colors hover:bg-ink-100 hover:text-ink-800"
+        className={`relative text-ink-900 transition-colors ${
+          floating
+            ? 'flex h-12 w-12 items-center justify-center rounded-full bg-petal-300 shadow-lg hover:bg-petal-400'
+            : 'rounded-lg bg-petal-300 p-2 hover:bg-petal-400'
+        }`}
       >
         <Bell className="h-5 w-5" />
         {unread > 0 && (
@@ -67,7 +80,10 @@ export function NotificationBell() {
       </button>
 
       {open && (
-        <div className="animate-in-up absolute right-0 z-50 mt-2 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl">
+        <div className={`animate-in-up absolute right-0 z-50 w-[min(22rem,calc(100vw-2rem))] overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl ${
+          floating ? 'mt-3' : 'mt-2'
+        }`}
+        >
           <div className="flex items-center justify-between border-b border-ink-200 px-4 py-3">
             <h3 className="text-sm font-semibold text-ink-900">
               Notifications {unread > 0 && <span className="text-ink-500">({unread} unread)</span>}

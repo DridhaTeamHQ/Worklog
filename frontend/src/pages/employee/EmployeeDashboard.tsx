@@ -8,8 +8,8 @@ import { dashboardApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { StatusBadge, PriorityBadge } from '../../components/Badges';
-import { deadlineLabel, formatDate, formatTime, reportLines, taskLabel } from '../../lib/format';
+import { TimelineStrip } from '../../components/TimelineStrip';
+import { formatDate, formatTime, reportLines } from '../../lib/format';
 import type { EmployeeDashboard as EmployeeDashboardData } from '../../types';
 
 export function EmployeeDashboard() {
@@ -18,7 +18,6 @@ export function EmployeeDashboard() {
   const [data, setData] = useState<EmployeeDashboardData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
-
   const load = useCallback(async () => {
     setLoading(true);
     setError('');
@@ -42,10 +41,10 @@ export function EmployeeDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink-900 sm:text-2xl">
+        <h1 className="text-xl font-bold text-white drop-shadow-sm sm:text-2xl">
           Welcome, {user?.name.split(' ')[0]}
         </h1>
-        <p className="mt-1 text-sm text-ink-500">
+        <p className="mt-1 text-sm text-white/85">
           {formatDate(new Date().toISOString())} · Here's where your work stands today.
         </p>
       </div>
@@ -155,104 +154,55 @@ export function EmployeeDashboard() {
         </div>
       )}
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Upcoming tasks</h2>
-            <Link to="/employee/tasks-assigned" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
-              View all
-            </Link>
-          </header>
-          {tasks.length === 0 ? (
-            <EmptyState
-              icon={<ClipboardList className="h-6 w-6" />}
-              title="No tasks have been assigned to you yet."
-              description="When your manager assigns work, it will appear here."
-            />
-          ) : (
-            <ul className="divide-y divide-ink-100">
-              {tasks.map((task) => {
-                const due = deadlineLabel(task.deadline, task.status);
-                return (
-                  <li key={task.id}>
-                    <Link
-                      to={`/employee/tasks-assigned?highlight=${task.id}`}
-                      className="block px-5 py-4 transition-colors hover:bg-ink-50"
-                    >
-                      <div className="flex items-start justify-between gap-3">
-                        <p className="min-w-0 flex-1 truncate font-medium text-ink-900">
-                          {task.task_key && (
-                            <span className={`mr-1.5 font-mono text-xs ${
-                              task.status === 'completed' ? 'text-ink-400 line-through' : 'text-brand-700'
-                            }`}
-                            >
-                              {task.task_key}
-                            </span>
-                          )}
-                          {taskLabel(task)}
-                        </p>
-                        <PriorityBadge priority={task.priority} />
-                      </div>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <StatusBadge status={task.effective_status} />
-                        <span className={`text-xs font-medium ${
-                          due.tone === 'danger' ? 'text-red-600' : due.tone === 'warn' ? 'text-amber-600' : 'text-ink-500'
-                        }`}
-                        >
-                          {due.text}
-                        </span>
-                      </div>
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </section>
+      <TimelineStrip
+        tasks={tasks}
+        taskHref={(task) => `/employee/tasks-assigned?highlight=${task.id}`}
+      />
 
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Recent task reports</h2>
-            <Link to="/employee/tasks-done" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
-              View all
-            </Link>
-          </header>
-          {reports.length === 0 ? (
-            <EmptyState
-              icon={<FileText className="h-6 w-6" />}
-              title="No reports yet"
-              description="Your daily task reports will be listed here once you submit one."
-            />
-          ) : (
-            <ul className="divide-y divide-ink-100">
-              {reports.map((report) => (
-                <li key={report.id} className="px-5 py-4">
-                  <div className="flex items-baseline justify-between gap-3">
-                    <p className="font-medium text-ink-900">{formatDate(report.report_date)}</p>
-                    <p className="shrink-0 text-xs text-ink-400">{formatTime(report.created_at)}</p>
-                  </div>
-                  <ul className="mt-2 space-y-1">
-                    {reportLines(report.task_description).slice(0, 3).map((line, i) => (
-                      <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
-                        <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-300" aria-hidden />
-                        <span className="min-w-0">{line}</span>
-                      </li>
-                    ))}
-                    {reportLines(report.task_description).length > 3 && (
-                      <li className="pl-3.5 text-xs text-ink-400">
-                        +{reportLines(report.task_description).length - 3} more
-                      </li>
-                    )}
-                  </ul>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+
+      <section className="card">
+        <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
+          <h2 className="font-semibold text-ink-900">Recent task reports</h2>
+          <Link to="/employee/tasks-done" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+            View all
+          </Link>
+        </header>
+        {reports.length === 0 ? (
+          <EmptyState
+            icon={<FileText className="h-6 w-6" />}
+            title="No reports yet"
+            description="Your daily task reports will be listed here once you submit one."
+          />
+        ) : (
+          <ul className="divide-y divide-ink-100">
+            {reports.map((report) => (
+              <li key={report.id} className="px-5 py-4">
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="font-medium text-ink-900">{formatDate(report.report_date)}</p>
+                  <p className="shrink-0 text-xs text-ink-400">{formatTime(report.created_at)}</p>
+                </div>
+                <ul className="mt-2 space-y-1">
+                  {reportLines(report.task_description).slice(0, 3).map((line, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-ink-600">
+                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink-300" aria-hidden />
+                      <span className="min-w-0">{line}</span>
+                    </li>
+                  ))}
+                  {reportLines(report.task_description).length > 3 && (
+                    <li className="pl-3.5 text-xs text-ink-400">
+                      +{reportLines(report.task_description).length - 3} more
+                    </li>
+                  )}
+                </ul>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
 
       {todayReport && (
-        <p className="text-center text-xs text-ink-400">
+        <p className="text-center text-xs text-white/75">
           Today's report last updated {formatTime(todayReport.updated_at)}
         </p>
       )}

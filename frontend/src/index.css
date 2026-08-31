@@ -3,72 +3,87 @@
 /*
   Design tokens.
 
-  The brand ramp runs rose to plum: #BD5579 sits at 500 and #601D49 at 900, both taken
-  from the palette, with the steps between and either side interpolated along the same
-  hue so the ramp reads as one colour rather than two.
+  Two colours carry the whole product: #5B6CF9 (indigo) and #EA98DA (orchid). The
+  brand ramp is anchored on the indigo at 500 and the accent ramp on the orchid at
+  300, with the steps either side interpolated along each hue so both read as one
+  colour rather than a set of guesses. Together they are the gradient the palette is
+  named for, and it is used literally — sidebar, logo tile, login panel.
 
-  #601D49 is dark, so the sidebar and the login panel are back to white text on a deep
-  surface — 11.9:1, with plenty of headroom. The active nav item is a cream pill, which
-  is the one place the warmest colour in the palette carries weight instead of being
-  decoration.
+  Indigo carries every action and the active state, because it is the darker of the
+  two and holds white text (#4450E6 on white is 5.9:1). Orchid is pale and is used as
+  a surface, a highlight and a chart fill; wherever it carries text, the text is one
+  of its own dark steps, never white.
 
-  Blush (#EA9D9D) and cream (#FFEBB8) are the accents. Both are pale, so they are used
-  as surfaces and chart fills; wherever they carry text it is one of their own dark
-  steps, never white.
-
-  The neutrals are warmed slightly towards mauve so they sit with the plum instead of
-  fighting it. The status palette stays as it is: those four colours mean something,
-  and are tuned for legibility rather than to match a theme.
+  Neutrals are tinted very slightly towards indigo so greys sit with the brand rather
+  than fighting it. The status palette stays as it is: those four colours mean
+  something, and are tuned for legibility rather than to match a theme.
 
   Every pairing here was checked against WCAG AA (4.5:1, or 3:1 for chart fills and
   block accents) before being committed.
 */
 @theme {
-  /* Rose to plum. 500 and 900 are the palette's own colours. */
-  --color-brand-50: #fcf2f7;
-  --color-brand-100: #f8e4ee;
-  --color-brand-200: #f1c6d9;
-  --color-brand-300: #e29fb8;
-  --color-brand-400: #d0789a;
-  --color-brand-500: #bd5579;
-  --color-brand-600: #a33e63;
-  --color-brand-700: #86304f;
-  --color-brand-800: #6e2540;
-  --color-brand-900: #601d49;
-  --color-brand-950: #3f1230;
+  /* Indigo. 500 is #5B6CF9, the palette's own colour. */
+  --color-brand-50: #eef0fe;
+  --color-brand-100: #dfe3fd;
+  --color-brand-200: #c5cbfc;
+  --color-brand-300: #a4adfb;
+  --color-brand-400: #808cfa;
+  --color-brand-500: #5b6cf9;
+  --color-brand-600: #4450e6;
+  --color-brand-700: #363fc0;
+  --color-brand-800: #2d3499;
+  --color-brand-900: #282d78;
+  --color-brand-950: #191b48;
 
-  /* Blush accent, from #EA9D9D at 300. */
-  --color-blush-50: #fdf4f4;
-  --color-blush-100: #fae8e8;
-  --color-blush-200: #f5d2d2;
-  --color-blush-300: #ea9d9d;
-  --color-blush-400: #db7a7a;
-  --color-blush-500: #c45a5a;
-  --color-blush-600: #a34444;
-  --color-blush-700: #833737;
+  /* Orchid accent, from #EA98DA at 300 — the other half of the gradient. */
+  --color-blush-50: #fdf4fb;
+  --color-blush-100: #fbe9f7;
+  --color-blush-200: #f6d2ef;
+  --color-blush-300: #ea98da;
+  --color-blush-400: #dc7bc9;
+  --color-blush-500: #c65cb0;
+  --color-blush-600: #a54591;
+  --color-blush-700: #863a76;
 
-  /* Cream accent, from #FFEBB8 at 200. */
-  --color-cream-50: #fffcf2;
-  --color-cream-100: #fff7e1;
-  --color-cream-200: #ffebb8;
-  --color-cream-300: #fbd98a;
-  --color-cream-400: #eebf56;
-  --color-cream-500: #d4a12c;
-  --color-cream-600: #a87c1b;
-  --color-cream-700: #845f16;
+  /* Periwinkle, the midpoint of the two. Where a third, softer step is wanted. */
+  --color-cream-50: #f6f4fe;
+  --color-cream-100: #eeeafd;
+  --color-cream-200: #ded6fb;
+  --color-cream-300: #c4b6f6;
+  --color-cream-400: #a591ee;
+  --color-cream-500: #8a6fe2;
+  --color-cream-600: #7154c9;
+  --color-cream-700: #5b43a2;
 
-  /* Neutrals warmed towards mauve so they sit with the plum. */
-  --color-ink-50: #fbf8fa;
-  --color-ink-100: #f5f0f3;
-  --color-ink-200: #e8dfe5;
-  --color-ink-300: #d2c4cd;
-  --color-ink-400: #9e8b97;
-  --color-ink-500: #71606b;
-  --color-ink-600: #574853;
-  --color-ink-700: #42353e;
-  --color-ink-800: #2c222a;
-  --color-ink-900: #1c151a;
-  --color-ink-950: #100b0e;
+  /* Neutrals tinted towards indigo so they sit with the brand. */
+  --color-ink-50: #f9f9fd;
+  --color-ink-100: #f2f2f9;
+  --color-ink-200: #e4e4f0;
+  --color-ink-300: #cbcbdf;
+  --color-ink-400: #9494b0;
+  --color-ink-500: #6a6a88;
+  --color-ink-600: #52526c;
+  --color-ink-700: #3e3e55;
+  --color-ink-800: #292939;
+  --color-ink-900: #191924;
+  --color-ink-950: #0e0e15;
+
+  /*
+    Lavender Smoke — #6D51A5 into #E4A7C5. This is the content surface's own gradient,
+    and it is the one place a full-strength gradient sits behind whole pages.
+
+    The two ends want opposite text colours: white clears the lavender end at 6.2:1 but
+    only manages 2.0:1 on the petal end, and dark text is the reverse. Nothing is asked
+    to span both — page headings sit on the lavender end and are white, everything else
+    is inside a card on its own white surface. #E4A7C5 also serves as a button fill in
+    the top bar, where it carries ink-900 at 8.7:1.
+  */
+  --color-lavender-400: #8a71bb;
+  --color-lavender-500: #6d51a5;
+  --color-lavender-600: #5a4189;
+  --color-petal-200: #f0cadd;
+  --color-petal-300: #e4a7c5;
+  --color-petal-400: #d488ae;
 
   --color-status-pending: #94560a;
   --color-status-progress: #1e4fc4;
@@ -76,6 +91,8 @@
   --color-status-overdue: #b32626;
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  /* Display face for the sign-in headline. Nothing else uses it. */
+  --font-display: 'Audiowide', ui-sans-serif, system-ui, sans-serif;
 }
 
 @layer base {
@@ -91,8 +108,8 @@
     */
     background-color: var(--color-ink-100);
     background-image:
-      radial-gradient(60rem 40rem at 12% -8%, rgba(234, 157, 157, 0.28), transparent 60%),
-      radial-gradient(50rem 34rem at 92% 4%, rgba(255, 235, 184, 0.5), transparent 62%);
+      radial-gradient(60rem 40rem at 12% -8%, rgba(234, 152, 218, 0.26), transparent 60%),
+      radial-gradient(50rem 34rem at 92% 4%, rgba(91, 108, 249, 0.16), transparent 62%);
     background-attachment: fixed;
   }
 
@@ -152,16 +169,54 @@
     Tailwind v4 cannot @apply one component class inside another, so each variant
     repeats the shared base rather than extending `.btn`.
   */
-  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
+  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger,
+  .btn-tint-1, .btn-tint-2, .btn-tint-3 {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
            transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed
            disabled:active:scale-100 whitespace-nowrap;
   }
-  .btn-primary { @apply bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700; }
+
+  /*
+    Buttons wear the stat cards' three surfaces rather than solid indigo, so an
+    action and a card read as the same family. The order is the cards' own —
+    indigo, pink, periwinkle — and `.btn-primary` is the first of them, which is
+    what every standalone action gets. `.btn-tint-*` expose all three for rows of
+    buttons that should step through the palette the way a row of cards does.
+
+    Each surface carries its own dark step as text, never white: brand-800 on
+    brand-100 is 7.5:1, blush-700 on petal-200 6.0:1, cream-700 on cream-200 6.9:1.
+  */
+  .btn-primary, .btn-tint-1 {
+    @apply border border-brand-200 bg-brand-100 text-brand-800 shadow-sm shadow-brand-600/10
+           hover:border-brand-300 hover:bg-brand-200;
+  }
+  .btn-tint-2 {
+    @apply border border-petal-300 bg-petal-200 text-blush-700 shadow-sm shadow-blush-600/10
+           hover:border-petal-400 hover:bg-petal-300;
+  }
+  .btn-tint-3 {
+    @apply border border-cream-300 bg-cream-200 text-cream-700 shadow-sm shadow-cream-600/10
+           hover:border-cream-400 hover:bg-cream-300;
+  }
   .btn-secondary { @apply bg-white text-ink-700 border border-ink-300 hover:bg-ink-50; }
-  .btn-ghost { @apply text-ink-600 hover:bg-ink-100; }
-  .btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-ghost { @apply border border-transparent text-ink-600 hover:bg-ink-100; }
+  .btn-danger { @apply border border-red-600 bg-red-600 text-white hover:border-red-700 hover:bg-red-700; }
   .btn-sm { @apply px-3 py-1.5 text-xs; }
+
+  /*
+    Chips for a row of tabs or filters. Every chip takes the next tint in the card
+    cycle, so the strip is a tinted set rather than one indigo item among white
+    ones; the selected one keeps its own tint and gains a solid outline in that
+    tint's text colour, which is what marks it now that colour no longer can.
+  */
+  .chip-tint-1 { @apply border-brand-200 bg-brand-100 text-brand-800 hover:bg-brand-200; }
+  .chip-tint-1.is-active { @apply border-brand-800 bg-brand-200 shadow-sm shadow-brand-600/20; }
+
+  .chip-tint-2 { @apply border-petal-300 bg-petal-200 text-blush-700 hover:bg-petal-300; }
+  .chip-tint-2.is-active { @apply border-blush-700 bg-petal-300 shadow-sm shadow-blush-600/20; }
+
+  .chip-tint-3 { @apply border-cream-300 bg-cream-200 text-cream-700 hover:bg-cream-300; }
+  .chip-tint-3.is-active { @apply border-cream-700 bg-cream-300 shadow-sm shadow-cream-600/20; }
 
   /*
     `transition-all` rather than `transition-colors`: the focus state changes the
@@ -260,16 +315,16 @@
   */
   .nav-link {
     @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
-           text-brand-200 transition-colors hover:bg-white/12 hover:text-white;
+           text-ink-600 transition-colors hover:bg-ink-100 hover:text-ink-900;
   }
   /*
-    Cream, not a darker plum. On a deep surface the active item has to be lighter than
-    everything around it to read as selected — this clears the sidebar at 10:1 and
-    carries plum text at 13.3:1.
+    Flat #E4A7C5. On a white rail this is the only filled element, which is what makes
+    the selected item obvious. The label is ink, not white: white on this pink reads at
+    2.0:1 and fails outright, where ink-900 clears it at 8.7:1.
   */
   .nav-link-active {
-    @apply bg-cream-200 text-brand-950 shadow-sm shadow-brand-950/30
-           hover:bg-cream-200 hover:text-brand-950;
+    @apply bg-petal-300 text-ink-900 shadow-sm shadow-lavender-600/20
+           hover:bg-petal-300 hover:text-ink-900;
   }
 
   .skeleton { @apply animate-pulse rounded bg-ink-200; }
@@ -284,6 +339,35 @@
 }
 
 @layer utilities {
+  /*
+    A band of light crossing the sign-in card. It rests off-screen for most of the
+    cycle and sweeps once, so it reads as a highlight catching the surface rather than
+    as something blinking for attention. The global prefers-reduced-motion block above
+    stops it for anyone who has asked for less movement.
+  */
+  /*
+    The drifting decorations on the sign-in page. One keyframe, and each element sets
+    its own duration and delay inline so they never move in lockstep — four things
+    rocking in time would read as a glitch rather than as float. The global
+    prefers-reduced-motion block above stops all of it.
+  */
+  .animate-float-tilt {
+    animation-name: float-tilt;
+    animation-timing-function: ease-in-out;
+    animation-iteration-count: infinite;
+    will-change: transform;
+  }
+  @keyframes float-tilt {
+    0%, 100% { transform: translateY(0) rotate(-7deg); }
+    50% { transform: translateY(-16px) rotate(7deg); }
+  }
+
+  .animate-sheen { animation: sheen 6s ease-in-out infinite; }
+  @keyframes sheen {
+    0%, 55% { transform: translateX(0) skewX(-14deg); }
+    100% { transform: translateX(460%) skewX(-14deg); }
+  }
+
   .animate-in-up { animation: in-up 0.25s ease-out both; }
   @keyframes in-up {
     from { opacity: 0; transform: translateY(6px); }

@@ -1,4 +1,5 @@
 import { FolderKanban } from 'lucide-react';
+import { chipTint } from '../lib/tints';
 import type { Project } from '../types';
 import { Select } from './ui';
 
@@ -54,15 +55,17 @@ export function ProjectSwitcher({
         aria-label="Filter tasks by project"
       >
         <Tab
+          index={0}
           active={value === null}
           onClick={() => onChange(null)}
           label="All projects"
           count={showCounts ? allCount : undefined}
           icon={<FolderKanban className="h-3.5 w-3.5" aria-hidden />}
         />
-        {projects.map((p) => (
+        {projects.map((p, i) => (
           <Tab
             key={p.id}
+            index={i + 1}
             active={value === p.id}
             onClick={() => onChange(p.id)}
             label={p.name}
@@ -76,8 +79,10 @@ export function ProjectSwitcher({
 }
 
 function Tab({
-  active, onClick, label, badge, count, icon,
+  index, active, onClick, label, badge, count, icon,
 }: {
+  /** Position in the strip. Decides which of the card tints the chip wears. */
+  index: number;
   active: boolean;
   onClick: () => void;
   label: string;
@@ -91,24 +96,21 @@ function Tab({
       role="tab"
       aria-selected={active}
       onClick={onClick}
-      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium
-        transition-all duration-200 ease-out active:scale-[0.97] ${
-        active
-          ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-          : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
-      }`}
+      className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm
+        transition-all duration-200 ease-out active:scale-[0.97]
+        ${active ? 'font-semibold' : 'font-medium'} ${chipTint(index, active)}`}
     >
       {icon}
       {badge && (
-        <span className={`font-mono text-[11px] font-bold ${active ? 'text-brand-100' : 'text-brand-700'}`}>
+        <span className="font-mono text-[11px] font-bold opacity-65">
           {badge}
         </span>
       )}
       <span>{label}</span>
       {count !== undefined && (
         <span
-          className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
-            active ? 'bg-white/20 text-white' : 'bg-ink-100 text-ink-600'
+          className={`rounded-full bg-white/70 px-1.5 text-[11px] font-semibold tabular-nums ${
+            active ? '' : 'opacity-80'
           }`}
         >
           {count}

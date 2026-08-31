@@ -101,7 +101,7 @@ export function TaskTable({
   };
 
   const hasActions = Boolean(onDelete || onEdit);
-  const columnCount = 8 + (selectable ? 1 : 0) + (showAssignee ? 1 : 0) + (hasActions ? 1 : 0);
+  const columnCount = 7 + (selectable ? 1 : 0) + (showAssignee ? 1 : 0) + (hasActions ? 1 : 0);
 
   return (
     <div className="overflow-x-auto">
@@ -127,7 +127,6 @@ export function TaskTable({
             <Th>Reporter</Th>
             <Th>Priority</Th>
             <Th>Status</Th>
-            <Th>Resolution</Th>
             <Th>Created</Th>
             <Th>Updated</Th>
             {hasActions && <th scope="col" className="w-20 px-3 py-2.5"><span className="sr-only">Actions</span></th>}
@@ -218,8 +217,6 @@ export function TaskTable({
                     />
                   </td>
 
-                  {/* Jira's Resolution: set once the work is actually finished. */}
-                  <td className="px-3 py-2.5 text-ink-600">{isDone ? 'Done' : <span className="text-ink-300">—</span>}</td>
 
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs text-ink-500">{formatDateTime(task.created_at)}</td>
                   <td className="whitespace-nowrap px-3 py-2.5 text-xs text-ink-500">{formatDateTime(task.updated_at)}</td>

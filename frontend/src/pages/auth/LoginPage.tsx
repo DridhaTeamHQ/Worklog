@@ -12,6 +12,23 @@ const INVITE_CHECK_DELAY_MS = 450;
 
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
+/**
+ * The drifting decorations on the sign-in page.
+ *
+ * Positions are chosen around what is already on screen — the headline sits top-left,
+ * the artwork fills the bottom-left, and the card is centred in the right half — so
+ * these fill the corners those leave empty rather than landing on top of them.
+ *
+ * Each carries its own duration and delay: identical timing would have four objects
+ * rocking in unison, which reads as a glitch rather than as drift.
+ */
+const DECORATIONS = [
+  // Moved clear of the card's top-left corner, which the astronaut now occupies.
+  { src: '/deco-bug.png', className: 'left-[45%] top-[6%] w-14', duration: '7s', delay: '0s' },
+  // Clear of the card's bottom-right corner, which was clipping it.
+  { src: '/deco-calendar.png', className: 'right-[3%] bottom-[7%] w-24', duration: '8s', delay: '0.6s' },
+];
+
 export function LoginPage() {
   const { login } = useAuth();
   const navigate = useNavigate();
@@ -96,56 +113,117 @@ export function LoginPage() {
   };
 
   return (
-    <div className="flex min-h-screen flex-col lg:flex-row">
+    <div className="relative flex min-h-screen flex-col bg-lavender-500 lg:h-screen lg:flex-row lg:overflow-hidden">
+      {/*
+        Purely decorative: aria-hidden and pointer-events-none, so they are invisible
+        to assistive tech and can never intercept a click meant for the form. They sit
+        behind everything, and each removes itself if its file is missing rather than
+        leaving a broken-image icon on the sign-in screen.
+      */}
+      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden lg:block">
+        {DECORATIONS.map((d) => (
+          <img
+            key={d.src}
+            src={d.src}
+            alt=""
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ animationDuration: d.duration, animationDelay: d.delay }}
+            className={`animate-float-tilt absolute opacity-90 drop-shadow-lg ${d.className}`}
+          />
+        ))}
+      </div>
+
       {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
-      <div className="relative hidden overflow-hidden bg-brand-900 lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
-        {/*
-          Rose and blush blooms over the plum — the palette's middle two colours, kept
-          low enough in opacity that the panel never lightens past the surface the text
-          on it was contrast-checked against.
-        */}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: 'radial-gradient(38rem 30rem at 18% 12%, rgba(189, 85, 121, 0.55), transparent 62%), radial-gradient(34rem 28rem at 88% 78%, rgba(234, 157, 157, 0.32), transparent 60%)' }}
-        />
-        <div className="relative flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cream-200 text-brand-950 shadow-sm">
+      <div className="relative z-10 hidden overflow-hidden lg:flex lg:h-screen lg:w-[45%] lg:flex-col lg:p-12 lg:pb-0">
+        <div className="relative flex shrink-0 items-center gap-3">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blush-300 to-brand-500 text-white shadow-sm">
             <CheckSquare className="h-6 w-6" />
           </span>
           <span className="text-xl font-bold leading-tight text-white">Taskr</span>
         </div>
 
-        <div className="relative">
-          <h2 className="text-3xl font-bold leading-tight text-white">
+        <div className="relative flex flex-1 flex-col pt-6">
+          <h2 className="font-display text-2xl leading-snug text-white">
             Track the work.<br />Not the paperwork.
           </h2>
-          <p className="mt-4 max-w-md text-brand-200">
-            One place for daily work reports, assigned tasks and team progress — so nobody has to
-            chase a status update again.
+          <p className="mt-5 text-xs text-brand-200">
+            © {new Date().getFullYear()} Taskr. Internal use only.
           </p>
-          <ul className="mt-8 space-y-3">
-            {[
-              'Submit and edit your daily task report in seconds',
-              'See every task assigned to you, with deadlines and priority',
-              'Managers get live progress across the whole team',
-            ].map((line) => (
-              <li key={line} className="flex items-start gap-3 text-sm text-brand-200">
-                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-blush-300" aria-hidden />
-                {line}
-              </li>
-            ))}
-          </ul>
-        </div>
 
-        <p className="relative text-xs text-brand-200">
-          © {new Date().getFullYear()} Taskr. Internal use only.
-        </p>
+          {/*
+            Decorative only, so it is hidden from assistive tech and carries no alt
+            text. It removes itself if neither file is there — the panel reads fine
+            without it, and a broken-image icon on the sign-in screen would not.
+
+            Full width and never cropped: the negative side margins cancel the panel's
+            p-12 so it runs to both edges, the width is widened by the same 6rem
+            (a negative margin moves a box without resizing it), and `h-auto` lets the
+            height follow the aspect ratio instead of being forced into a box. That is
+            the combination that leaves the artwork whole — `object-cover` would fill
+            the space but trim the top and bottom off to do it.
+
+            Its own height therefore decides how much room it needs, and the panel does
+            not scroll — so the copy above it is kept short and small deliberately, to
+            leave that height free. `mt-auto` holds it against the bottom edge.
+
+            This upscales a 538px-wide file to roughly 720px, so it is softer than
+            drawing it at native size. A wider source (~1500px, or an SVG) would give
+            full width and sharpness together.
+          */}
+          <img
+            src="/login-illustration.png"
+            alt=""
+            aria-hidden
+            onError={(e) => {
+              // The artwork gets replaced from time to time and the format changes
+              // with it, so a missing .png tries .jpg once before giving up. The flag
+              // is what stops a missing pair from looping.
+              const el = e.currentTarget;
+              if (!el.dataset.triedJpg) {
+                el.dataset.triedJpg = '1';
+                el.src = '/login-illustration.jpg';
+                return;
+              }
+              el.style.display = 'none';
+            }}
+            className="-mx-12 mt-auto block w-[calc(100%+6rem)] max-w-none pt-6"
+          />
+        </div>
       </div>
 
       {/* Form panel */}
-      <div className="flex flex-1 items-center justify-center bg-white px-5 py-10 sm:px-8">
-        <div className="w-full max-w-sm">
+      <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
+        {/*
+          The card is the only white surface on the page, which is what makes it the
+          thing to look at. #E4A7C5 does the shining rather than sitting as a stripe:
+          a blurred halo bleeding out behind the card, a hairline ring on its edge, and
+          a band of light that sweeps across it. None of it touches the interior, so
+          every label, field and error stays on plain white.
+        */}
+        <div className="relative w-full max-w-md">
+          <span
+            aria-hidden
+            className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-petal-300/45 blur-3xl"
+          />
+          {/*
+            Positioned against the card rather than the viewport, so it holds the
+            top-right corner at any window size instead of drifting under the card when
+            the layout reflows. Above the card, since it is meant to sit on the corner.
+          */}
+          <img
+            src="/deco-astronaut.png"
+            alt=""
+            aria-hidden
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            style={{ animationDuration: '9s', animationDelay: '1.2s' }}
+            className="animate-float-tilt pointer-events-none absolute -right-14 -top-12 z-20 hidden w-28 drop-shadow-lg lg:block"
+          />
+          <div className="relative overflow-hidden rounded-3xl bg-white shadow-2xl shadow-lavender-950/40 ring-1 ring-petal-300/70">
+            <span
+              aria-hidden
+              className="animate-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-petal-300/40 to-transparent"
+            />
+          <div className="relative px-8 py-14 sm:px-10 sm:py-20">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
             <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
               <CheckSquare className="h-6 w-6" />
@@ -154,7 +232,6 @@ export function LoginPage() {
           </div>
 
           <h1 className="text-2xl font-bold text-ink-900">Sign in</h1>
-          <p className="mt-1.5 text-sm text-ink-500">Use your company account to continue.</p>
 
           {error && (
             <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3" role="alert">
@@ -163,7 +240,7 @@ export function LoginPage() {
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-6 space-y-4" noValidate>
+          <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
             <div>
               <label className="label" htmlFor="email">Email address</label>
               <input
@@ -238,10 +315,16 @@ export function LoginPage() {
               {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
             </div>
 
-            <button type="submit" disabled={submitting} className="btn-primary w-full">
+            <button
+              type="submit"
+              disabled={submitting}
+              className="btn-primary mt-2 w-full py-3 bg-petal-300 text-ink-900 shadow-petal-400/40 hover:bg-petal-400 disabled:hover:bg-petal-300"
+            >
               {submitting ? <><Spinner className="h-4 w-4" /> Signing in…</> : <><LogIn className="h-4 w-4" /> Login</>}
             </button>
           </form>
+          </div>
+          </div>
         </div>
       </div>
     </div>

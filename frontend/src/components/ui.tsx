@@ -41,34 +41,46 @@ export function StatCard({
   onClick?: () => void;
 }) {
   /*
-    Each accent is a pair: a soft wash for the icon tile and a matching hairline down
-    the left edge, so a row of stat cards reads as a set of colours rather than five
-    identical white boxes. The washes are backgrounds only — every number and label on
-    top of them stays on white, which is what keeps the text contrast honest.
+    Three surfaces, not eight. Each is one of the palette's colours already mixed well
+    down towards white, so a row of stat cards reads as a tinted set rather than as
+    five unrelated blocks of poster paint.
+
+    The `accent` prop keeps its old vocabulary — callers all over the app pass
+    'emerald' or 'amber' — but those names now only choose which of the three tints a
+    card wears. They are mapped so that the rows which actually exist alternate rather
+    than repeat: the manager dashboard comes out indigo, pink, periwinkle, indigo,
+    pink, and both ticket pages indigo, pink, periwinkle, indigo.
+
+    The icon tile is white on every one of them, which is what keeps it reading as
+    raised now that the card itself is no longer white.
   */
-  const accents = {
-    brand: { tile: 'bg-brand-100 text-brand-700', edge: 'bg-brand-400' },
-    blush: { tile: 'bg-blush-100 text-blush-700', edge: 'bg-blush-300' },
-    cream: { tile: 'bg-cream-100 text-cream-700', edge: 'bg-cream-300' },
-    amber: { tile: 'bg-amber-100 text-amber-700', edge: 'bg-amber-300' },
-    blue: { tile: 'bg-blue-100 text-blue-700', edge: 'bg-blue-300' },
-    emerald: { tile: 'bg-emerald-100 text-emerald-700', edge: 'bg-emerald-300' },
-    red: { tile: 'bg-red-100 text-red-700', edge: 'bg-red-300' },
-    ink: { tile: 'bg-ink-100 text-ink-600', edge: 'bg-ink-300' },
+  const surfaces = {
+    indigo: { surface: 'bg-brand-100', tile: 'bg-white text-brand-700' },
+    pink: { surface: 'bg-petal-200', tile: 'bg-white text-blush-700' },
+    periwinkle: { surface: 'bg-cream-200', tile: 'bg-white text-cream-700' },
+  } as const;
+
+  const accentSurface: Record<string, keyof typeof surfaces> = {
+    brand: 'indigo', amber: 'indigo', red: 'indigo', ink: 'indigo',
+    blush: 'pink', blue: 'pink',
+    emerald: 'periwinkle', cream: 'periwinkle',
   };
-  const a = accents[accent];
+
+  const a = surfaces[accentSurface[accent]];
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag
       onClick={onClick}
-      className={`card relative overflow-hidden p-4 sm:p-5 text-left w-full ${onClick ? 'card-hover cursor-pointer' : ''}`}
+      className={`card relative overflow-hidden p-4 sm:p-5 text-left w-full ${a.surface} ${onClick ? 'card-hover cursor-pointer' : ''}`}
     >
-      <span className={`absolute inset-y-0 left-0 w-1.5 ${a.edge}`} aria-hidden />
-      <div className="flex items-start justify-between gap-3 pl-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-ink-500 truncate">{label}</p>
+          {/* Wraps rather than truncates: a label like "Total Team Members" is the
+              only thing saying what the number is, so cutting it off costs more than
+              a second line does. `balance` keeps the wrap from leaving one orphan. */}
+          <p className="text-sm font-medium text-ink-700 [text-wrap:balance]">{label}</p>
           <p className="mt-1.5 text-2xl sm:text-3xl font-bold text-ink-900 tabular-nums">{value}</p>
-          {hint && <p className="mt-1 text-xs text-ink-500 truncate">{hint}</p>}
+          {hint && <p className="mt-1 text-xs text-ink-600">{hint}</p>}
         </div>
         <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.tile}`}>
           {icon}
@@ -270,8 +282,10 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-ink-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
+        {/* On the content gradient, not on a card: white, because ink-900 reads at
+            2.75:1 against the lavender end and white reads at 6.2:1. */}
+        <h1 className="text-xl sm:text-2xl font-bold text-white drop-shadow-sm">{title}</h1>
+        {subtitle && <p className="mt-1 text-sm text-white/85">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>

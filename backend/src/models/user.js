@@ -141,6 +141,46 @@ export async function updateProfile(userId, patch) {
   return findById(userId);
 }
 
+/**
+ * Admin edit of a team member's account details.
+ *
+ * Separate from `updateProfile`, which is a user editing their own record: this one
+ * can also move the email address and switch the account off, so it re-checks that
+ * the new email is not already taken. The role guard in the WHERE clause means this
+ * can never be pointed at a manager or an admin, whatever id is passed.
+ */
+export async function updateTeamMember(employeeId, patch) {
+  const db = await getDb();
+  const existing = await db.get(
+    `SELECT id, email FROM users WHERE id = ? AND role = 'team_member'`,
+    [employeeId],
+  );
+  if (!existing) throw notFound('That team member could not be found.');
+
+  if (patch.email && patch.email.toLowerCase() !== String(existing.email).toLowerCase()) {
+    if (await findByEmail(patch.email)) throw conflict('An account with that email already exists.');
+  }
+
+  const columns = {
+    name: patch.name,
+    email: patch.email ? patch.email.toLowerCase() : undefined,
+    department: patch.department,
+    job_title: patch.jobTitle,
+    phone: patch.phone,
+    is_active: patch.isActive === undefined ? undefined : (patch.isActive ? 1 : 0),
+  };
+  const sets = [];
+  const params = [];
+  for (const [col, val] of Object.entries(columns)) {
+    if (val !== undefined) { sets.push(`${col} = ?`); params.push(val); }
+  }
+  if (!sets.length) return findById(employeeId);
+  sets.push('updated_at = ?');
+  params.push(nowIso(), employeeId);
+  await db.run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params);
+  return findById(employeeId);
+}
+
 export async function changePassword(userId, newPassword) {
   const db = await getDb();
   const res = await db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [

@@ -116,7 +116,7 @@ export function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/manager/team" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900">
+      <Link to="/manager/team" className="inline-flex items-center gap-1.5 text-sm font-medium text-white/85 hover:text-white">
         <ArrowLeft className="h-4 w-4" /> Back to Team Members
       </Link>
 

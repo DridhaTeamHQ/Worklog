@@ -1,10 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bug, AlertOctagon, Trash2 } from 'lucide-react';
+import { Bug, AlertOctagon, Trash2, LayoutGrid, List } from 'lucide-react';
 import { projectApi, teamApi, ticketApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { TicketList } from '../../components/TicketList';
+import { TicketBoard } from '../../components/TicketBoard';
 import { TICKET_STATUS_LABEL } from '../../components/Badges';
 import {
   EmptyState, ErrorState, LoadingBlock, Modal, PageHeader, SearchInput, StatCard, Select,
@@ -22,6 +23,8 @@ const STATUS_TABS: { value: string; label: string }[] = [
 
 const MANAGER_STATUSES: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
 
+type View = 'board' | 'list';
+
 export function ManagerTicketsPage() {
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -32,6 +35,7 @@ export function ManagerTicketsPage() {
   const [projects, setProjects] = useState<Project[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
 
+  const [view, setView] = useState<View>('board');
   const [status, setStatus] = useState(params.get('status') ?? 'unresolved');
   const [projectId, setProjectId] = useState('');
   const [reporterId, setReporterId] = useState('');
@@ -86,10 +90,13 @@ export function ManagerTicketsPage() {
   }, [load, search]);
 
   // A ticket reached from a notification may not match the default filter, so widen
-  // to "All" rather than showing an empty list the person cannot explain.
+  // to "All" rather than showing an empty list the person cannot explain. It also
+  // drops to the list, which is the view that can scroll one row into sight.
   useEffect(() => {
-    if (highlightId && status === 'unresolved') setStatus('');
-  }, [highlightId, status]);
+    if (!highlightId) return;
+    setView('list');
+    setStatus((prev) => (prev === 'unresolved' ? '' : prev));
+  }, [highlightId]);
 
   useEffect(() => {
     if (!highlightId || loading || scrolledTo.current === highlightId) return;
@@ -161,7 +168,18 @@ export function ManagerTicketsPage() {
     }
   };
 
-  const hasFilters = Boolean(search || projectId || reporterId || severity || status !== 'unresolved');
+  /**
+   * On the board the columns are the status filter, so a status filter on top of them
+   * would silently empty three of the four columns. Switching to the board widens to
+   * every status; switching back restores the list's default.
+   */
+  const changeView = (next: View) => {
+    setView(next);
+    setStatus(next === 'board' ? '' : 'unresolved');
+  };
+
+  const hasFilters = Boolean(search || projectId || reporterId || severity
+    || (view === 'list' && status !== 'unresolved'));
 
   return (
     <div className="space-y-5">
@@ -183,21 +201,47 @@ export function ManagerTicketsPage() {
 
       <div className="card">
         <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="overflow-x-auto">
-            <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.value || 'all'}
-                  type="button"
-                  role="tab"
-                  aria-selected={status === tab.value}
-                  onClick={() => setStatus(tab.value)}
-                  className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="segmented" role="tablist" aria-label="How to show tickets">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'board'}
+                onClick={() => changeView('board')}
+                className={`segmented-item inline-flex items-center gap-1.5 ${view === 'board' ? 'segmented-item-active' : ''}`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden /> Board
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'list'}
+                onClick={() => changeView('list')}
+                className={`segmented-item inline-flex items-center gap-1.5 ${view === 'list' ? 'segmented-item-active' : ''}`}
+              >
+                <List className="h-3.5 w-3.5" aria-hidden /> List
+              </button>
             </div>
+
+            {/* Only the list needs a status filter; the board's columns are one. */}
+            {view === 'list' && (
+              <div className="overflow-x-auto">
+                <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
+                  {STATUS_TABS.map((tab) => (
+                    <button
+                      key={tab.value || 'all'}
+                      type="button"
+                      role="tab"
+                      aria-selected={status === tab.value}
+                      onClick={() => setStatus(tab.value)}
+                      className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <SearchInput value={search} onChange={setSearch} placeholder="Search tickets, key or reporter" className="lg:w-72" />
         </div>
@@ -237,7 +281,10 @@ export function ManagerTicketsPage() {
             action={hasFilters && (
               <button
                 type="button"
-                onClick={() => { setSearch(''); setProjectId(''); setReporterId(''); setSeverity(''); setStatus('unresolved'); }}
+                onClick={() => {
+                  setSearch(''); setProjectId(''); setReporterId(''); setSeverity('');
+                  setStatus(view === 'board' ? '' : 'unresolved');
+                }}
                 className="btn-secondary"
               >
                 Clear filters
@@ -248,16 +295,27 @@ export function ManagerTicketsPage() {
           <>
             <p className="px-4 py-2 text-xs text-ink-500">
               {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
+              {view === 'board' && ' · drag a card to another column to change its status'}
             </p>
-            <TicketList
-              tickets={tickets}
-              highlightId={highlightId}
-              updatingId={updatingId}
-              allowedStatuses={MANAGER_STATUSES}
-              onStatusChange={changeStatus}
-              onDelete={setConfirmDelete}
-              linkReporter
-            />
+            {view === 'board' ? (
+              <TicketBoard
+                tickets={tickets}
+                allowedStatuses={MANAGER_STATUSES}
+                onMove={changeStatus}
+                onDelete={setConfirmDelete}
+                busyId={updatingId}
+              />
+            ) : (
+              <TicketList
+                tickets={tickets}
+                highlightId={highlightId}
+                updatingId={updatingId}
+                allowedStatuses={MANAGER_STATUSES}
+                onStatusChange={changeStatus}
+                onDelete={setConfirmDelete}
+                linkReporter
+              />
+            )}
           </>
         )}
       </div>

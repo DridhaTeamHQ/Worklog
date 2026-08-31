@@ -12,12 +12,29 @@ import { formatDateShort, todayIso, addDaysIso } from '../../lib/format';
 import type { AnalyticsPayload, TeamMember } from '../../types';
 import { isAdmin } from '../../types';
 
-/** One colour per status, matching the badges so the charts read the same way. */
+/*
+ * Chart colours, drawn from the app's own palette rather than the saturated status
+ * set the badges use. Every one is a light tint, and the four are spread across the
+ * ramp — orchid, periwinkle, indigo, lavender — so neighbouring slices stay apart
+ * from each other rather than only from the background.
+ *
+ * Overdue is the exception and stays red. It is the one series that reports a
+ * problem, and a reader should not have to consult a legend to notice it; a lighter
+ * red keeps it in step with the rest without giving that up.
+ */
 const STATUS_COLORS = {
-  pending: '#94560a',
-  in_progress: '#1e4fc4',
-  completed: '#15794c',
-  overdue: '#b32626',
+  pending: '#ea98da',
+  in_progress: '#a591ee',
+  completed: '#808cfa',
+  overdue: '#f08a8a',
+};
+
+/** The same tints for the series that are not statuses. */
+const SERIES = {
+  assigned: '#808cfa',
+  completed: '#8a71bb',
+  overdue: '#f08a8a',
+  reports: '#d488ae',
 };
 
 export function AnalyticsPage() {
@@ -182,14 +199,14 @@ export function AnalyticsPage() {
             <div className="mt-4 h-72 w-full">
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={productivityChart} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
-                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
+                  <CartesianGrid strokeDasharray="3 3" stroke="#e4e4f0" vertical={false} />
+                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e4e4f0', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
-                  <Bar dataKey="assigned" name="Assigned" fill="#bd5579" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="completed" name="Completed" fill="#15794c" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="overdue" name="Overdue" fill="#b32626" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="assigned" name="Assigned" fill={SERIES.assigned} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="completed" name="Completed" fill={SERIES.completed} radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="overdue" name="Overdue" fill={SERIES.overdue} radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -208,7 +225,7 @@ export function AnalyticsPage() {
                   <Pie data={pieData} dataKey="value" nameKey="name" innerRadius="55%" outerRadius="80%" paddingAngle={2}>
                     {pieData.map((slice) => <Cell key={slice.name} fill={slice.color} />)}
                   </Pie>
-                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
+                  <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e4e4f0', fontSize: 12 }} />
                   <Legend wrapperStyle={{ fontSize: 12 }} />
                 </PieChart>
               </ResponsiveContainer>
@@ -241,14 +258,14 @@ export function AnalyticsPage() {
         <div className="mt-4 h-72 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={trend} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
-              <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+              <Tooltip contentStyle={{ borderRadius: 10, border: '1px solid #e4e4f0', fontSize: 12 }} />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Line type="monotone" dataKey="assigned" name="Assigned" stroke="#a33e63" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="completed" name="Completed" stroke="#15794c" strokeWidth={2} dot={false} />
-              <Line type="monotone" dataKey="reports" name="Reports" stroke="#94560a" strokeWidth={2} dot={false} />
+              <Line type="monotone" dataKey="assigned" name="Assigned" stroke={SERIES.assigned} strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="completed" name="Completed" stroke={SERIES.completed} strokeWidth={2.5} dot={false} />
+              <Line type="monotone" dataKey="reports" name="Reports" stroke={SERIES.reports} strokeWidth={2.5} dot={false} />
             </LineChart>
           </ResponsiveContainer>
         </div>

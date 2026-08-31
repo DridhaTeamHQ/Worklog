@@ -281,7 +281,7 @@ export function AllTasksPage() {
                 >
                   <Filter className="h-4 w-4" /> Filter
                   {activeFilterCount > 0 && (
-                    <span className="rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                    <span className="btn-tint-1 rounded-full px-1.5 py-0 text-[11px] font-bold">
                       {activeFilterCount}
                     </span>
                   )}

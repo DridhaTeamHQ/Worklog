@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Bug, Plus } from 'lucide-react';
+import { Bug, Plus, LayoutGrid, List } from 'lucide-react';
 import { ticketApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { RaiseTicketModal } from '../../components/RaiseTicketModal';
 import { TicketList } from '../../components/TicketList';
+import { TicketBoard } from '../../components/TicketBoard';
 import { TICKET_STATUS_LABEL } from '../../components/Badges';
 import {
   EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput, StatCard,
@@ -24,6 +25,8 @@ const STATUS_TABS: { value: string; label: string }[] = [
 /** A reporter may withdraw their own ticket or reopen it, but not declare it resolved. */
 const EMPLOYEE_STATUSES: TicketStatus[] = ['open', 'closed'];
 
+type View = 'board' | 'list';
+
 export function TicketsPage() {
   const toast = useToast();
   const [params, setParams] = useSearchParams();
@@ -31,6 +34,7 @@ export function TicketsPage() {
 
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [counts, setCounts] = useState<TicketCounts | null>(null);
+  const [view, setView] = useState<View>('board');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -65,6 +69,8 @@ export function TicketsPage() {
     const timer = window.setTimeout(() => { void load(controller.signal); }, search ? 300 : 0);
     return () => { window.clearTimeout(timer); controller.abort(); };
   }, [load, search]);
+
+  useEffect(() => { if (highlightId) setView('list'); }, [highlightId]);
 
   // Arriving from a notification: bring the ticket into view once, then drop the marker.
   useEffect(() => {
@@ -123,21 +129,47 @@ export function TicketsPage() {
 
       <div className="card">
         <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="overflow-x-auto">
-            <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
-              {STATUS_TABS.map((tab) => (
-                <button
-                  key={tab.value || 'all'}
-                  type="button"
-                  role="tab"
-                  aria-selected={status === tab.value}
-                  onClick={() => setStatus(tab.value)}
-                  className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
-                >
-                  {tab.label}
-                </button>
-              ))}
+          <div className="flex flex-wrap items-center gap-3">
+            <div className="segmented" role="tablist" aria-label="How to show tickets">
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'board'}
+                onClick={() => { setView('board'); setStatus(''); }}
+                className={`segmented-item inline-flex items-center gap-1.5 ${view === 'board' ? 'segmented-item-active' : ''}`}
+              >
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden /> Board
+              </button>
+              <button
+                type="button"
+                role="tab"
+                aria-selected={view === 'list'}
+                onClick={() => setView('list')}
+                className={`segmented-item inline-flex items-center gap-1.5 ${view === 'list' ? 'segmented-item-active' : ''}`}
+              >
+                <List className="h-3.5 w-3.5" aria-hidden /> List
+              </button>
             </div>
+
+            {/* Only the list needs a status filter; the board's columns are one. */}
+            {view === 'list' && (
+              <div className="overflow-x-auto">
+                <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
+                  {STATUS_TABS.map((tab) => (
+                    <button
+                      key={tab.value || 'all'}
+                      type="button"
+                      role="tab"
+                      aria-selected={status === tab.value}
+                      onClick={() => setStatus(tab.value)}
+                      className={`segmented-item ${status === tab.value ? 'segmented-item-active' : ''}`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
           <SearchInput value={search} onChange={setSearch} placeholder="Search your tickets" className="lg:w-64" />
         </div>
@@ -170,17 +202,27 @@ export function TicketsPage() {
             <p className="px-4 py-2 text-xs text-ink-500">
               {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
             </p>
-            <TicketList
-              tickets={tickets}
-              highlightId={highlightId}
-              updatingId={updatingId}
-              allowedStatuses={EMPLOYEE_STATUSES}
-              onStatusChange={changeStatus}
-              showReporter={false}
-            />
+            {view === 'board' ? (
+              <TicketBoard
+                tickets={tickets}
+                allowedStatuses={EMPLOYEE_STATUSES}
+                onMove={changeStatus}
+                busyId={updatingId}
+                showReporter={false}
+              />
+            ) : (
+              <TicketList
+                tickets={tickets}
+                highlightId={highlightId}
+                updatingId={updatingId}
+                allowedStatuses={EMPLOYEE_STATUSES}
+                onStatusChange={changeStatus}
+                showReporter={false}
+              />
+            )}
             <p className="border-t border-ink-100 px-4 py-3 text-xs text-ink-500">
-              You can reopen or close your own tickets. Marking one <strong>Resolved</strong> is
-              your manager's call.
+              You can reopen or close your own tickets — on the board, that is the Open and
+              Closed columns. Marking one <strong>Resolved</strong> is your manager's call.
             </p>
           </>
         )}

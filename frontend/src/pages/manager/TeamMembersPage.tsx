@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Eye, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle,
+  Users, Eye, Pencil, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { adminApi, teamApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
@@ -11,8 +11,10 @@ import {
 } from '../../components/ui';
 import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
+import { EditTeamMemberModal } from '../../components/EditTeamMemberModal';
 import { useToast } from '../../components/Toast';
 import { formatDate, formatDateShort } from '../../lib/format';
+import { chipTint } from '../../lib/tints';
 import type { Manager, Role, TeamMember } from '../../types';
 import { isAdmin, roleLabel } from '../../types';
 
@@ -33,6 +35,9 @@ export function TeamMembersPage() {
 
   /** Which kind of account the modal is creating, or null when it is closed. */
   const [addingRole, setAddingRole] = useState<Role | null>(null);
+
+  /** The member being edited, or null when that modal is closed. */
+  const [editing, setEditing] = useState<TeamMember | null>(null);
 
   /** The member awaiting delete confirmation, or null when nothing is pending. */
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
@@ -179,7 +184,7 @@ export function TeamMembersPage() {
           {([
             { key: 'team' as const, label: 'Team Members', icon: <Users className="h-4 w-4" />, count: members.length },
             { key: 'admins' as const, label: 'Admins', icon: <ShieldCheck className="h-4 w-4" />, count: admins.length },
-          ]).map((t) => (
+          ]).map((t, i) => (
             <button
               key={t.key}
               type="button"
@@ -187,16 +192,12 @@ export function TeamMembersPage() {
               aria-selected={tab === t.key}
               onClick={() => { setTab(t.key); setSearch(''); setDepartment(''); }}
               className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold
-                transition-all duration-200 ease-out active:scale-[0.97] ${
-                tab === t.key
-                  ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-                  : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
-              }`}
+                transition-all duration-200 ease-out active:scale-[0.97] ${chipTint(i, tab === t.key)}`}
             >
               {t.icon}
               {t.label}
-              <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                tab === t.key ? 'bg-white/20 text-white' : 'bg-ink-100 text-ink-600'
+              <span className={`rounded-full bg-white/70 px-1.5 text-[11px] tabular-nums ${
+                tab === t.key ? '' : 'opacity-80'
               }`}
               >
                 {t.count}
@@ -311,7 +312,19 @@ export function TeamMembersPage() {
                           <Link to={`/manager/team/${m.id}`} className="btn-secondary btn-sm">
                             <Eye className="h-3.5 w-3.5" /> View
                           </Link>
-                          {/* Removing an account is administration, like creating one. */}
+                          {/* Editing and removing an account are both administration,
+                              like creating one, so they travel with the same right. */}
+                          {canAdminister && (
+                            <button
+                              type="button"
+                              onClick={() => setEditing(m)}
+                              aria-label={`Edit ${m.name}`}
+                              title={`Edit ${m.name}`}
+                              className="rounded-md p-1.5 text-ink-400 hover:bg-brand-50 hover:text-brand-600"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                           {canAdminister && (
                             <button
                               type="button"
@@ -511,8 +524,8 @@ export function TeamMembersPage() {
               people's work with them.
             */}
             {confirmRemoveAdmin.assigned_tasks > 0 ? (
-              <div className="flex items-start gap-3 rounded-xl border border-cream-300 bg-cream-50 px-4 py-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-cream-700" aria-hidden />
+              <div className="flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700" aria-hidden />
                 <div className="min-w-0 text-sm">
                   <p className="font-semibold text-ink-900">
                     Their {confirmRemoveAdmin.assigned_tasks} assigned task
@@ -536,6 +549,14 @@ export function TeamMembersPage() {
           </div>
         )}
       </Modal>
+
+      <EditTeamMemberModal
+        open={editing !== null}
+        member={editing}
+        departments={departments}
+        onClose={() => setEditing(null)}
+        onSaved={reloadBoth}
+      />
 
       <AddUserModal
         open={addingRole !== null}

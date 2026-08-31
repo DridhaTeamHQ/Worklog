@@ -21,6 +21,7 @@ import projectRoutes from './routes/projects.js';
 import ticketRoutes from './routes/tickets.js';
 import adminRoutes from './routes/admins.js';
 import dashboardRoutes from './routes/dashboard.js';
+import todoRoutes from './routes/todos.js';
 import profileRoutes from './routes/profile.js';
 
 export function createApp() {
@@ -113,6 +114,7 @@ export function createApp() {
   app.use('/api/tickets', ticketRoutes);
   app.use('/api/admins', adminRoutes);
   app.use('/api/dashboard', dashboardRoutes);
+  app.use('/api/todos', todoRoutes);
 
   // Serve frontend SPA if built files are present (frontend/dist or backend/public)
   const candidateDirs = [

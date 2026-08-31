@@ -6,17 +6,23 @@ import {
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { dashboardApi } from '../../api/endpoints';
+import { dashboardApi, taskApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
+import { useToast } from '../../components/Toast';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { PriorityBadge, StatusBadge, SeverityBadge } from '../../components/Badges';
-import { formatDate, formatDateShort, reportLines, taskLabel } from '../../lib/format';
-import type { ManagerDashboard as ManagerDashboardData } from '../../types';
+import { SeverityBadge } from '../../components/Badges';
+import { TaskBoard } from '../../components/TaskBoard';
+import { TimelineStrip } from '../../components/TimelineStrip';
+import { formatDate, formatDateShort, reportLines } from '../../lib/format';
+import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from '../../types';
 
 export function ManagerDashboard() {
+  const toast = useToast();
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  /** The card waiting on a status change, so the board can show it as busy. */
+  const [movingId, setMovingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -33,6 +39,27 @@ export function ManagerDashboard() {
 
   useEffect(() => { void load(); }, [load]);
 
+  /**
+   * A card dropped in another column. The board is updated straight away and the
+   * summary is reloaded afterwards, since moving a task changes the counts above it.
+   */
+  const moveTask = async (task: Task, next: TaskStatus) => {
+    if (next === task.status) return;
+    setMovingId(task.id);
+    try {
+      const { data: updated } = await taskApi.updateStatus(task.id, next);
+      setData((prev) => (prev ? {
+        ...prev,
+        recent_tasks: prev.recent_tasks.map((t) => (t.id === task.id ? updated : t)),
+      } : prev));
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not move the task.');
+    } finally {
+      setMovingId(null);
+    }
+  };
+
   if (loading) return <PageLoader />;
   if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
 
@@ -46,8 +73,8 @@ export function ManagerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink-900 sm:text-2xl">Dashboard overview</h1>
-        <p className="mt-1 text-sm text-ink-500">{formatDate(new Date().toISOString())}</p>
+        <h1 className="text-xl font-bold text-white drop-shadow-sm sm:text-2xl">Dashboard overview</h1>
+        <p className="mt-1 text-sm text-white/85">{formatDate(new Date().toISOString())}</p>
       </div>
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -163,96 +190,89 @@ export function ManagerDashboard() {
             <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gAssigned" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#a33e63" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#a33e63" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#808cfa" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#808cfa" stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gCompleted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#15794c" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#15794c" stopOpacity={0} />
+                  <stop offset="5%" stopColor="#8a71bb" stopOpacity={0.35} />
+                  <stop offset="95%" stopColor="#8a71bb" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+              <CartesianGrid strokeDasharray="3 3" stroke="#e4e4f0" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: '#6a6a88' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
               <Tooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }}
-                labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+                contentStyle={{ borderRadius: 10, border: '1px solid #e4e4f0', fontSize: 12 }}
+                labelStyle={{ fontWeight: 600, color: '#191924' }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="assigned" name="Assigned" stroke="#a33e63" strokeWidth={2} fill="url(#gAssigned)" />
-              <Area type="monotone" dataKey="completed" name="Completed" stroke="#15794c" strokeWidth={2} fill="url(#gCompleted)" />
-              <Area type="monotone" dataKey="reports" name="Reports" stroke="#94560a" strokeWidth={2} fillOpacity={0} />
+              <Area type="monotone" dataKey="assigned" name="Assigned" stroke="#808cfa" strokeWidth={2} fill="url(#gAssigned)" />
+              <Area type="monotone" dataKey="completed" name="Completed" stroke="#8a71bb" strokeWidth={2} fill="url(#gCompleted)" />
+              <Area type="monotone" dataKey="reports" name="Reports" stroke="#d488ae" strokeWidth={2} fillOpacity={0} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Recently assigned</h2>
-            <Link to="/manager/tasks" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
-          </header>
-          {tasks.length === 0 ? (
-            <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="No tasks assigned yet" description="Assign work from a team member's page to get started." />
-          ) : (
-            <ul className="divide-y divide-ink-100">
-              {tasks.map((task) => (
-                <li key={task.id} className="flex items-start gap-3 px-5 py-3.5">
-                  <Avatar name={task.employee_name} src={task.employee_profile_image} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink-900">
-                      {task.task_key && (
-                        <span className={`mr-1.5 font-mono text-xs ${
-                          task.status === 'completed' ? 'text-ink-400 line-through' : 'text-brand-700'
-                        }`}
-                        >
-                          {task.task_key}
-                        </span>
-                      )}
-                      {taskLabel(task)}
-                    </p>
-                    <p className="truncate text-xs text-ink-500">
-                      {task.employee_name} · {task.project_name || 'No project'} · {formatDateShort(task.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <StatusBadge status={task.effective_status} />
-                    <PriorityBadge priority={task.priority} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      <TimelineStrip
+        tasks={tasks}
+        taskHref={(task) => `/manager/tasks?highlight=${task.id}`}
+      />
 
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Latest task reports</h2>
-            <Link to="/manager/reports" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
-          </header>
-          {reports.length === 0 ? (
-            <EmptyState icon={<FileText className="h-6 w-6" />} title="No reports submitted yet" description="Daily reports from your team will appear here." />
-          ) : (
-            <ul className="divide-y divide-ink-100">
-              {reports.map((report) => (
-                <li key={report.id} className="flex items-start gap-3 px-5 py-3.5">
-                  <Avatar name={report.employee_name} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-ink-900">{report.employee_name}</p>
-                      <p className="shrink-0 text-xs text-ink-400">{formatDateShort(report.report_date)}</p>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-500">
-                      {reportLines(report.task_description).slice(0, 2).join(' · ')}
-                    </p>
+      <section className="card">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-ink-200 px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-ink-900">Recently assigned</h2>
+            <p className="text-xs text-ink-500">
+              Drag a card to another column to change its status, or focus one and press
+              Ctrl and an arrow key.
+            </p>
+          </div>
+          <Link to="/manager/tasks" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
+        </header>
+        {tasks.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardCheck className="h-6 w-6" />}
+            title="No tasks assigned yet"
+            description="Assign work from a team member's page to get started."
+          />
+        ) : (
+          <TaskBoard
+            tasks={tasks}
+            onMove={moveTask}
+            busyId={movingId}
+            taskHref={(task) => `/manager/tasks?highlight=${task.id}`}
+          />
+        )}
+      </section>
+
+      <section className="card">
+        <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
+          <h2 className="font-semibold text-ink-900">Latest task reports</h2>
+          <Link to="/manager/reports" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
+        </header>
+        {reports.length === 0 ? (
+          <EmptyState icon={<FileText className="h-6 w-6" />} title="No reports submitted yet" description="Daily reports from your team will appear here." />
+        ) : (
+          <ul className="divide-y divide-ink-100">
+            {reports.map((report) => (
+              <li key={report.id} className="flex items-start gap-3 px-5 py-3.5">
+                <Avatar name={report.employee_name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-ink-900">{report.employee_name}</p>
+                    <p className="shrink-0 text-xs text-ink-400">{formatDateShort(report.report_date)}</p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+                  <p className="mt-0.5 truncate text-xs text-ink-500">
+                    {reportLines(report.task_description).slice(0, 2).join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
     </div>
   );
 }

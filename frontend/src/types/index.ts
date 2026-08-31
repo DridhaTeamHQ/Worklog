@@ -156,6 +156,32 @@ export interface Ticket {
   task_key: string | null;
 }
 
+/**
+ * A private note-to-self about what someone plans to do on a day.
+ *
+ * Deliberately not a `Task`: nobody assigns these, nobody else can see them, and they
+ * never reach a report or an analytic. Keeping the two types apart is what stops one
+ * being rendered where the other is meant.
+ */
+export interface PersonalTodo {
+  id: number;
+  user_id: number;
+  title: string;
+  /** The day it is for, 'YYYY-MM-DD'. */
+  todo_date: string;
+  is_done: boolean;
+  done_at: string | null;
+  /** Optional context. Null when the note is not filed against anything. */
+  project_id: number | null;
+  task_id: number | null;
+  project_name: string | null;
+  project_key: string | null;
+  task_title: string | null;
+  task_key: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface TicketCounts {
   total: number;
   open: number;

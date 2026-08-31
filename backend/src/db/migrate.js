@@ -16,6 +16,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Ordered child-first so foreign keys never block a --fresh rebuild.
 const TABLES = [
+  'personal_todos',
   'password_reset_tokens',
   'notifications',
   'tickets',
@@ -247,6 +248,13 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'notifications', 'related_ticket_id', 'INTEGER REFERENCES tickets (id) ON DELETE CASCADE')) {
     added.push('notifications.related_ticket_id');
+  }
+  // Personal to-dos gained optional project/task context after the table shipped.
+  if (await ensureColumn(db, 'personal_todos', 'project_id', 'INTEGER REFERENCES projects (id) ON DELETE SET NULL')) {
+    added.push('personal_todos.project_id');
+  }
+  if (await ensureColumn(db, 'personal_todos', 'task_id', 'INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL')) {
+    added.push('personal_todos.task_id');
   }
 
   // Databases created before the admin role existed still reject role = 'admin'.
