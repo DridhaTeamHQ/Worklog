@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Eye, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle,
+  Users, Eye, Pencil, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle,
 } from 'lucide-react';
 import { adminApi, teamApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
@@ -11,6 +11,7 @@ import {
 } from '../../components/ui';
 import { StatusBadge } from '../../components/Badges';
 import { AddUserModal } from '../../components/AddUserModal';
+import { EditTeamMemberModal } from '../../components/EditTeamMemberModal';
 import { useToast } from '../../components/Toast';
 import { formatDate, formatDateShort } from '../../lib/format';
 import type { Manager, Role, TeamMember } from '../../types';
@@ -33,6 +34,9 @@ export function TeamMembersPage() {
 
   /** Which kind of account the modal is creating, or null when it is closed. */
   const [addingRole, setAddingRole] = useState<Role | null>(null);
+
+  /** The member being edited, or null when that modal is closed. */
+  const [editing, setEditing] = useState<TeamMember | null>(null);
 
   /** The member awaiting delete confirmation, or null when nothing is pending. */
   const [confirmRemove, setConfirmRemove] = useState<TeamMember | null>(null);
@@ -311,7 +315,19 @@ export function TeamMembersPage() {
                           <Link to={`/manager/team/${m.id}`} className="btn-secondary btn-sm">
                             <Eye className="h-3.5 w-3.5" /> View
                           </Link>
-                          {/* Removing an account is administration, like creating one. */}
+                          {/* Editing and removing an account are both administration,
+                              like creating one, so they travel with the same right. */}
+                          {canAdminister && (
+                            <button
+                              type="button"
+                              onClick={() => setEditing(m)}
+                              aria-label={`Edit ${m.name}`}
+                              title={`Edit ${m.name}`}
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-primary/10 hover:text-primary-strong"
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </button>
+                          )}
                           {canAdminister && (
                             <button
                               type="button"
@@ -536,6 +552,14 @@ export function TeamMembersPage() {
           </div>
         )}
       </Modal>
+
+      <EditTeamMemberModal
+        open={editing !== null}
+        member={editing}
+        departments={departments}
+        onClose={() => setEditing(null)}
+        onSaved={reloadBoth}
+      />
 
       <AddUserModal
         open={addingRole !== null}

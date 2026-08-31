@@ -6,12 +6,16 @@ import {
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
 } from 'recharts';
-import { dashboardApi } from '../../api/endpoints';
+import { dashboardApi, taskApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
+import { useToast } from '../../components/Toast';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { PriorityBadge, StatusBadge, SeverityBadge } from '../../components/Badges';
-import { formatDate, formatDateShort, reportLines, taskLabel } from '../../lib/format';
+import { SeverityBadge } from '../../components/Badges';
+import { TaskBoard } from '../../components/TaskBoard';
+import { TimelineStrip } from '../../components/TimelineStrip';
+import { formatDate, formatDateShort, reportLines } from '../../lib/format';
 import { CHART, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
+import type { ManagerDashboard as ManagerDashboardData, Task, TaskStatus } from '../../types';
 
 /*
   Drawn at rest, for the same reason as the analytics charts: the library only paints
@@ -20,12 +24,14 @@ import { CHART, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '.
   empty grid.
 */
 const STILL = { isAnimationActive: false } as const;
-import type { ManagerDashboard as ManagerDashboardData } from '../../types';
 
 export function ManagerDashboard() {
+  const toast = useToast();
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
+  /** The card waiting on a status change, so the board can show it as busy. */
+  const [movingId, setMovingId] = useState<number | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -41,6 +47,27 @@ export function ManagerDashboard() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  /**
+   * A card dropped in another column. The board is updated straight away and the
+   * summary is reloaded afterwards, since moving a task changes the counts above it.
+   */
+  const moveTask = async (task: Task, next: TaskStatus) => {
+    if (next === task.status) return;
+    setMovingId(task.id);
+    try {
+      const { data: updated } = await taskApi.updateStatus(task.id, next);
+      setData((prev) => (prev ? {
+        ...prev,
+        recent_tasks: prev.recent_tasks.map((t) => (t.id === task.id ? updated : t)),
+      } : prev));
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not move the task.');
+    } finally {
+      setMovingId(null);
+    }
+  };
 
   if (loading) return <PageLoader />;
   if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
@@ -198,72 +225,65 @@ export function ManagerDashboard() {
         </div>
       </section>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="font-semibold text-foreground">Recently assigned</h2>
-            <Link to="/manager/tasks" className="text-sm font-medium text-primary-strong hover:underline">View all</Link>
-          </header>
-          {tasks.length === 0 ? (
-            <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="No tasks assigned yet" description="Assign work from a team member's page to get started." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {tasks.map((task) => (
-                <li key={task.id} className="flex items-start gap-3 px-5 py-3.5">
-                  <Avatar name={task.employee_name} src={task.employee_profile_image} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-foreground">
-                      {task.task_key && (
-                        <span className={`mr-1.5 font-mono text-xs ${
-                          task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'
-                        }`}
-                        >
-                          {task.task_key}
-                        </span>
-                      )}
-                      {taskLabel(task)}
-                    </p>
-                    <p className="truncate text-xs text-muted-foreground">
-                      {task.employee_name} · {task.project_name || 'No project'} · {formatDateShort(task.created_at)}
-                    </p>
-                  </div>
-                  <div className="flex shrink-0 flex-col items-end gap-1.5">
-                    <StatusBadge status={task.effective_status} />
-                    <PriorityBadge priority={task.priority} />
-                  </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
+      <TimelineStrip
+        tasks={tasks}
+        taskHref={(task) => `/manager/tasks?highlight=${task.id}`}
+      />
 
-        <section className="card">
-          <header className="flex items-center justify-between border-b border-border px-5 py-4">
-            <h2 className="font-semibold text-foreground">Latest task reports</h2>
-            <Link to="/manager/reports" className="text-sm font-medium text-primary-strong hover:underline">View all</Link>
-          </header>
-          {reports.length === 0 ? (
-            <EmptyState icon={<FileText className="h-6 w-6" />} title="No reports submitted yet" description="Daily reports from your team will appear here." />
-          ) : (
-            <ul className="divide-y divide-border">
-              {reports.map((report) => (
-                <li key={report.id} className="flex items-start gap-3 px-5 py-3.5">
-                  <Avatar name={report.employee_name} size="sm" />
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-foreground">{report.employee_name}</p>
-                      <p className="shrink-0 text-xs text-muted-foreground">{formatDateShort(report.report_date)}</p>
-                    </div>
-                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                      {reportLines(report.task_description).slice(0, 2).join(' · ')}
-                    </p>
+      <section className="card">
+        <header className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-5 py-4">
+          <div className="min-w-0">
+            <h2 className="font-semibold text-foreground">Recently assigned</h2>
+            <p className="text-xs text-muted-foreground">
+              Drag a card to another column to change its status, or focus one and press
+              Ctrl and an arrow key.
+            </p>
+          </div>
+          <Link to="/manager/tasks" className="text-sm font-semibold text-primary-strong hover:text-primary-strong">View all</Link>
+        </header>
+        {tasks.length === 0 ? (
+          <EmptyState
+            icon={<ClipboardCheck className="h-6 w-6" />}
+            title="No tasks assigned yet"
+            description="Assign work from a team member's page to get started."
+          />
+        ) : (
+          <TaskBoard
+            tasks={tasks}
+            onMove={moveTask}
+            busyId={movingId}
+            taskHref={(task) => `/manager/tasks?highlight=${task.id}`}
+          />
+        )}
+      </section>
+
+      <section className="card">
+        <header className="flex items-center justify-between border-b border-border px-5 py-4">
+          <h2 className="font-semibold text-foreground">Latest task reports</h2>
+          <Link to="/manager/reports" className="text-sm font-semibold text-primary-strong hover:text-primary-strong">View all</Link>
+        </header>
+        {reports.length === 0 ? (
+          <EmptyState icon={<FileText className="h-6 w-6" />} title="No reports submitted yet" description="Daily reports from your team will appear here." />
+        ) : (
+          <ul className="divide-y divide-border">
+            {reports.map((report) => (
+              <li key={report.id} className="flex items-start gap-3 px-5 py-3.5">
+                <Avatar name={report.employee_name} size="sm" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-baseline justify-between gap-2">
+                    <p className="truncate text-sm font-medium text-foreground">{report.employee_name}</p>
+                    <p className="shrink-0 text-xs text-muted-foreground">{formatDateShort(report.report_date)}</p>
                   </div>
-                </li>
-              ))}
-            </ul>
-          )}
-        </section>
-      </div>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">
+                    {reportLines(report.task_description).slice(0, 2).join(' · ')}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+
     </div>
   );
 }

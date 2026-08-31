@@ -10,7 +10,7 @@ import { resolveRange } from '../utils/dates.js';
 import { ROLES } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
-  listTeamMembers, getTeamMember, listDepartments, createUser, deleteTeamMember,
+  listTeamMembers, getTeamMember, listDepartments, createUser, deleteTeamMember, updateTeamMember,
 } from '../models/user.js';
 import { listTasks } from '../models/task.js';
 import { listReports } from '../models/report.js';
@@ -93,6 +93,21 @@ export const create = asyncHandler(async (req, res) => {
       ? `${user.name} has been invited and emailed a link to set their password.`
       : `${user.name} has been added to the team.`,
   });
+});
+
+/**
+ * PATCH /api/team/:id — edit a team member's details.
+ *
+ * Admin-only (the route applies `requireAdmin`), because this can move someone's email
+ * address — the thing they sign in with — and switch their account off. It still goes
+ * through `getMemberInScope` so the same "is this person mine to look at?" answer
+ * governs editing as governs viewing.
+ */
+export const update = asyncHandler(async (req, res) => {
+  const employeeId = parseId(req.params.id);
+  await getMemberInScope(req, employeeId);
+  const employee = await updateTeamMember(employeeId, req.body);
+  return ok(res, employee, { message: `${employee.name}'s details have been updated.` });
 });
 
 /** The employee detail page: profile, counts, their tasks and their recent reports. */

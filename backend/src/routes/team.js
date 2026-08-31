@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireManager, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText, isoDate } from '../middleware/validate.js';
 import {
-  list, departments, create, getOne, memberReports, memberTasks, remove,
+  list, departments, create, getOne, update, memberReports, memberTasks, remove,
 } from '../controllers/team.js';
 
 const router = Router();
@@ -33,6 +33,20 @@ const createSchema = z.object({
   phone: optionalText(40),
 });
 
+/*
+ * Every field optional: the edit modal sends only what the admin actually changed, so
+ * a save can never blank a field that was left alone. Department and job title stay
+ * non-empty when present, for the same roster reasons they are required on create.
+ */
+const updateSchema = z.object({
+  name: safeText(120, 'Name').optional(),
+  email: z.string().trim().toLowerCase().email('Enter a valid email address.').max(190).optional(),
+  department: safeText(120, 'Department').optional(),
+  jobTitle: safeText(120, 'Job title').optional(),
+  phone: optionalText(40),
+  isActive: z.boolean().optional(),
+}).refine((v) => Object.keys(v).length > 0, { message: 'Nothing to update.' });
+
 const reportQuery = z.object({
   range: z.enum(['today', 'week', 'month', 'custom', 'all']).optional(),
   from: isoDate.optional(),
@@ -48,6 +62,9 @@ router.get('/departments', departments);
 // Admin-only. A manager runs their department but does not decide who is in it.
 router.post('/', requireAdmin, validate(createSchema), create);
 router.get('/:id', getOne);
+// Admin-only, like create and delete: a manager runs their department but does not
+// edit the accounts in it.
+router.patch('/:id', requireAdmin, validate(updateSchema), update);
 router.get('/:id/reports', validate(reportQuery, 'query'), memberReports);
 router.get('/:id/tasks', memberTasks);
 router.delete('/:id', requireAdmin, remove);

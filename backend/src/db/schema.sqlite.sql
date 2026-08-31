@@ -118,3 +118,25 @@ CREATE TABLE IF NOT EXISTS password_reset_tokens (
   created_at  TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_reset_user ON password_reset_tokens (user_id);
+
+-- Personal to-dos: private notes-to-self about what someone plans to do on a day.
+-- Deliberately unrelated to assigned_tasks. Nothing here is assigned by a manager,
+-- reaches a daily report, or counts towards any analytic — it is the owner's own
+-- list, readable and writable by nobody else.
+CREATE TABLE IF NOT EXISTS personal_todos (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  -- The day the note is for, 'YYYY-MM-DD'.
+  todo_date  TEXT NOT NULL,
+  -- Optional context: which project, and which of the owner's tasks, this note is
+  -- about. Both are ON DELETE SET NULL — losing the task must not delete the note,
+  -- which is the owner's own writing.
+  project_id INTEGER REFERENCES projects (id) ON DELETE SET NULL,
+  task_id    INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL,
+  is_done    INTEGER NOT NULL DEFAULT 0,
+  done_at    TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_personal_todos_owner_day ON personal_todos (user_id, todo_date, id);

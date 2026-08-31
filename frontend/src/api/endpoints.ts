@@ -1,7 +1,7 @@
 import { api } from './client';
 import type {
   AnalyticsPayload, AppNotification, DailyReport, EmployeeDashboard, ManagerDashboard,
-  Manager, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
+  Manager, PersonalTodo, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
   TicketCounts, TicketSeverity, TicketStatus, User,
 } from '../types';
 
@@ -130,6 +130,16 @@ export interface NewTeamMemberInput {
   phone?: string;
 }
 
+/** An edit of an existing team member. Every field optional: only what changed is sent. */
+export interface EditTeamMemberInput {
+  name?: string;
+  email?: string;
+  department?: string;
+  jobTitle?: string;
+  phone?: string | null;
+  isActive?: boolean;
+}
+
 export const teamApi = {
   list: (params: { search?: string; department?: string } = {}, signal?: AbortSignal) =>
     api.get<TeamMember[]>('/team', params, signal),
@@ -140,6 +150,8 @@ export const teamApi = {
       email: { delivered: boolean; mode: string; error?: string };
       message: string;
     }>('/team', input),
+  /** Admin-only: edit an existing team member's details. */
+  update: (id: number, patch: EditTeamMemberInput) => api.patch<User>(`/team/${id}`, patch),
   departments: () => api.get<string[]>('/team/departments'),
   detail: (id: number) =>
     api.get<{ employee: TeamMemberDetail; tasks: Task[]; reports: DailyReport[] }>(`/team/${id}`),
@@ -225,6 +237,24 @@ export const ticketApi = {
 };
 
 export type { TicketCounts };
+
+/* ------------------------------------------------------------ personal todos */
+
+/**
+ * Private notes-to-self. The server answers only ever from the signed-in account, so
+ * there is no user id to pass — and no way to ask for anybody else's list.
+ */
+export const todoApi = {
+  list: (date?: string, signal?: AbortSignal) =>
+    api.get<PersonalTodo[]>('/todos', { date }, signal),
+  create: (title: string, date?: string, context?: { projectId?: number; taskId?: number }) =>
+    api.post<PersonalTodo>('/todos', { title, date, ...context }),
+  update: (
+    id: number,
+    patch: { title?: string; date?: string; isDone?: boolean; projectId?: number | null; taskId?: number | null },
+  ) => api.patch<PersonalTodo>(`/todos/${id}`, patch),
+  remove: (id: number) => api.delete<{ id: number; message: string }>(`/todos/${id}`),
+};
 
 /* ------------------------------------------------------------------ profile */
 

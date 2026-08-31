@@ -57,7 +57,10 @@ export const overview = asyncHandler(async (req, res) => {
 
   const [summary, tasks, reports, todayReport, myTickets] = await Promise.all([
     employeeOverview(req.user.id),
-    listTasks({ employeeId: req.user.id, sort: 'deadline_asc', limit: 6 }),
+    // The schedule strip on the dashboard plots six weeks of start dates, deadlines
+    // and completions, so it needs the employee's whole set rather than the handful a
+    // preview list used to want — a task missing from the fetch is a day left blank.
+    listTasks({ employeeId: req.user.id, sort: 'deadline_asc', limit: 100 }),
     listReports({ employeeId: req.user.id, limit: 5 }),
     getReportForDate(req.user.id, today()),
     listTickets({ reporterId: req.user.id, sort: 'created_desc', limit: 5 }),
