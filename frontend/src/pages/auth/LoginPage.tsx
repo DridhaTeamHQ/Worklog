@@ -113,7 +113,21 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login-legacy relative flex min-h-screen flex-col bg-lavender-500 lg:h-screen lg:flex-row lg:overflow-hidden">
+    <div className="login-legacy relative flex min-h-screen flex-col bg-foreground lg:h-screen lg:flex-row lg:overflow-hidden">
+      {/*
+        The near-black the navigation is drawn on, warmed by two wide coral blooms so
+        the screen reads as the product's own black-and-orange rather than as a flat
+        dark panel. They are fixed rather than scrolled, and sit under everything.
+      */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 z-0"
+        style={{
+          backgroundImage:
+            'radial-gradient(55rem 38rem at 8% 92%, rgba(244, 85, 60, 0.30), transparent 62%),'
+            + 'radial-gradient(42rem 30rem at 88% 6%, rgba(244, 85, 60, 0.18), transparent 60%)',
+        }}
+      />
       {/*
         Purely decorative: aria-hidden and pointer-events-none, so they are invisible
         to assistive tech and can never intercept a click meant for the form. They sit
@@ -136,7 +150,7 @@ export function LoginPage() {
       {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
       <div className="relative z-10 hidden overflow-hidden lg:flex lg:h-screen lg:w-[45%] lg:flex-col lg:p-12 lg:pb-0">
         <div className="relative flex shrink-0 items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-gradient-to-br from-blush-300 to-brand-500 text-white shadow-sm">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
             <CheckSquare className="h-6 w-6" />
           </span>
           <span className="text-xl font-bold leading-tight text-white">Taskr</span>
@@ -146,7 +160,7 @@ export function LoginPage() {
           <h2 className="font-display text-2xl leading-snug text-white">
             Track the work.<br />Not the paperwork.
           </h2>
-          <p className="mt-5 text-xs text-brand-200">
+          <p className="mt-5 text-xs text-white/60">
             © {new Date().getFullYear()} Taskr. Internal use only.
           </p>
 
@@ -203,7 +217,7 @@ export function LoginPage() {
         <div className="relative w-full max-w-md">
           <span
             aria-hidden
-            className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-petal-300/45 blur-3xl"
+            className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-primary/35 blur-3xl"
           />
           {/*
             Positioned against the card rather than the viewport, so it holds the
