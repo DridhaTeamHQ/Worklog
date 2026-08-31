@@ -3,10 +3,11 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell,
   LogOut, Menu, X, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen, Pencil,
-  NotebookPen,
+  NotebookPen, Sun, Moon,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
+import { applyTheme, currentTheme, type Theme } from '../lib/theme';
 import { Avatar } from './ui';
 import { isManagerLevel, roleLabel } from '../types';
 
@@ -80,7 +81,7 @@ export function AppLayout() {
         can never be dismissed with no route left to reopen it.
       */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 flex transform flex-col bg-foreground lg:border-r lg:border-border transition-[transform,width] duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 flex transform flex-col bg-sidebar lg:border-r lg:border-border transition-[transform,width] duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } lg:translate-x-0 ${collapsed ? 'w-64 lg:w-[4.75rem]' : 'w-64'}`}
         aria-label="Main navigation"
@@ -214,7 +215,7 @@ export function AppLayout() {
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-foreground/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden
         />
@@ -245,6 +246,7 @@ export function AppLayout() {
               </p>
             </div>
 
+            <ThemeToggle />
             <NotificationBell />
           </div>
         </header>
@@ -254,6 +256,43 @@ export function AppLayout() {
         </main>
       </div>
     </div>
+  );
+}
+
+/**
+ * Light and dark.
+ *
+ * The state is seeded from what is already on the document rather than from storage,
+ * so the button agrees with the theme the pre-paint script chose — including the case
+ * where that came from the operating system and nothing is stored yet.
+ *
+ * One button rather than two, because there are exactly two states: it shows the moon
+ * when clicking it would go dark, and the sun when clicking it would come back.
+ */
+function ThemeToggle() {
+  const [theme, setTheme] = useState<Theme>(() => (
+    typeof document !== 'undefined' && document.documentElement.classList.contains('dark')
+      ? 'dark'
+      : currentTheme()
+  ));
+
+  const flip = () => {
+    const next: Theme = theme === 'dark' ? 'light' : 'dark';
+    applyTheme(next);
+    setTheme(next);
+  };
+
+  const goingDark = theme !== 'dark';
+  return (
+    <button
+      type="button"
+      onClick={flip}
+      aria-label={goingDark ? 'Switch to dark mode' : 'Switch to light mode'}
+      title={goingDark ? 'Dark mode' : 'Light mode'}
+      className="rounded-full p-2 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+    >
+      {goingDark ? <Moon className="h-5 w-5" /> : <Sun className="h-5 w-5" />}
+    </button>
   );
 }
 

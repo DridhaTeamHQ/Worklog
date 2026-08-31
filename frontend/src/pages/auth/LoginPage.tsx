@@ -120,7 +120,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-foreground lg:h-screen lg:flex-row lg:overflow-hidden">
+    <div className="relative flex min-h-screen flex-col bg-sidebar lg:h-screen lg:flex-row lg:overflow-hidden">
       {/*
         The near-black the navigation is drawn on, warmed by two wide coral blooms so
         the screen reads as the product's own black-and-orange rather than as a flat

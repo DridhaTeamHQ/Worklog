@@ -11,9 +11,7 @@ import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { EmptyState, ErrorState, Spinner, Select } from '../../components/ui';
 import { formatDateShort, formatWeekday, todayIso, addDaysIso } from '../../lib/format';
-import {
-  CHART, STATUS_COLORS, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE,
-} from '../../lib/chart';
+import { useChartTheme } from '../../lib/chart';
 import type { AnalyticsPayload, ActivityPoint, TeamMember } from '../../types';
 import { isAdmin } from '../../types';
 
@@ -155,6 +153,9 @@ function percentChange(current: number, previous: number): number | null {
 }
 
 export function AnalyticsPage() {
+  const {
+    CHART, STATUS_COLORS, TOOLTIP_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_ITEM_STYLE,
+  } = useChartTheme();
   const { user } = useAuth();
   /** Only an admin spans more than one department, so only they get the filter. */
   const canSeeAllDepartments = isAdmin(user?.role);

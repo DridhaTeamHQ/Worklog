@@ -14,6 +14,23 @@
     <link href="https://fonts.googleapis.com/css2?family=Audiowide&display=swap" rel="stylesheet" />
   </head>
   <body>
+    <!--
+      Applied before first paint, so a dark-mode user never sees a white flash while
+      the bundle loads. Deliberately inline and dependency-free: anything imported
+      would arrive too late to matter. Mirrors `src/lib/theme.ts`.
+    -->
+    <script>
+      (function () {
+        try {
+          var stored = localStorage.getItem('taskr.theme');
+          var dark = stored
+            ? stored === 'dark'
+            : window.matchMedia('(prefers-color-scheme: dark)').matches;
+          if (dark) document.documentElement.classList.add('dark');
+          document.documentElement.style.colorScheme = dark ? 'dark' : 'light';
+        } catch (e) { /* storage unavailable; the app applies it on mount */ }
+      })();
+    </script>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>

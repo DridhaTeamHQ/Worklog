@@ -13,7 +13,7 @@ import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../comp
 import { TaskBoard } from '../../components/TaskBoard';
 import { TimelineStrip } from '../../components/TimelineStrip';
 import { formatDate, formatDateShort, reportLines } from '../../lib/format';
-import { CHART, STATUS_COLORS, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
+import { useChartTheme } from '../../lib/chart';
 import type {
   DashboardRange, ManagerDashboard as ManagerDashboardData, Task, TaskStatus,
 } from '../../types';
@@ -41,6 +41,9 @@ const RANGES: { key: DashboardRange; label: string }[] = [
 ];
 
 export function ManagerDashboard() {
+  const {
+    CHART, STATUS_COLORS, TOOLTIP_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_ITEM_STYLE,
+  } = useChartTheme();
   const navigate = useNavigate();
   const toast = useToast();
   const [data, setData] = useState<ManagerDashboardData | null>(null);
