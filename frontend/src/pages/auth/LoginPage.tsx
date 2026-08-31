@@ -113,7 +113,7 @@ export function LoginPage() {
   };
 
   return (
-    <div className="login-legacy relative flex min-h-screen flex-col bg-foreground lg:h-screen lg:flex-row lg:overflow-hidden">
+    <div className="relative flex min-h-screen flex-col bg-foreground lg:h-screen lg:flex-row lg:overflow-hidden">
       {/*
         The near-black the navigation is drawn on, warmed by two wide coral blooms so
         the screen reads as the product's own black-and-orange rather than as a flat
@@ -232,25 +232,25 @@ export function LoginPage() {
             style={{ animationDuration: '9s', animationDelay: '1.2s' }}
             className="animate-float-tilt pointer-events-none absolute -right-14 -top-12 z-20 hidden w-28 drop-shadow-lg lg:block"
           />
-          <div className="relative overflow-hidden rounded-3xl bg-white shadow-2xl shadow-lavender-950/40 ring-1 ring-petal-300/70">
+          <div className="relative overflow-hidden rounded-3xl bg-card shadow-2xl shadow-black/50 ring-1 ring-border">
             <span
               aria-hidden
-              className="animate-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-petal-300/40 to-transparent"
+              className="animate-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-primary/20 to-transparent"
             />
           <div className="relative px-8 py-14 sm:px-10 sm:py-20">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
               <CheckSquare className="h-6 w-6" />
             </span>
-            <span className="text-lg font-bold leading-tight text-ink-900">Taskr</span>
+            <span className="text-lg font-bold leading-tight text-foreground">Taskr</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-ink-900">Sign in</h1>
+          <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
 
           {error && (
-            <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3" role="alert">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
-              <p className="text-sm font-medium text-red-700">{error}</p>
+            <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-3" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
+              <p className="text-sm font-medium text-destructive">{error}</p>
             </div>
           )}
 
@@ -277,14 +277,14 @@ export function LoginPage() {
               is the only route in for someone who has never set a password.
             */}
             {invite && (
-              <div className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3">
+              <div className="rounded-lg border border-border bg-muted px-3.5 py-3">
                 <div className="flex items-start gap-2.5">
-                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-brand-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {invite.name ? `Welcome, ${invite.name}` : 'You have been invited'}
                     </p>
-                    <p className="mt-0.5 text-sm text-brand-800">
+                    <p className="mt-0.5 text-sm text-muted-foreground">
                       Your account is ready but has no password yet.
                     </p>
                   </div>
@@ -302,7 +302,7 @@ export function LoginPage() {
             <div>
               <div className="flex items-baseline justify-between">
                 <label className="label" htmlFor="password">Password</label>
-                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">
+                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-primary hover:text-primary-strong">
                   Forgot password?
                 </Link>
               </div>
@@ -321,7 +321,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
@@ -332,7 +332,7 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={submitting}
-              className="btn-primary mt-2 w-full py-3 bg-petal-300 text-ink-900 shadow-petal-400/40 hover:bg-petal-400 disabled:hover:bg-petal-300"
+              className="btn-primary mt-2 w-full py-3"
             >
               {submitting ? <><Spinner className="h-4 w-4" /> Signing in…</> : <><LogIn className="h-4 w-4" /> Login</>}
             </button>

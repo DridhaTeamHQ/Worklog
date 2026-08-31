@@ -350,80 +350,18 @@
     .no-print { display: none !important; }
   }
 }
-
 /*
   ---------------------------------------------------------------------------
-  Sign-in page — kept on the previous design.
+  Sign-in page.
 
-  The rest of the app moved to the token set above; the sign-in screen did not,
-  so the handful of colours, the display face and the two animations it uses are
-  redeclared here rather than left dangling. Everything that could collide with
-  the new design — the shared `.card`, `.input`, `.label` and `.btn-primary` — is
-  scoped under `.login-legacy`, which only that page's root element carries, so
-  nothing else in the product picks these up.
+  It shares the product's palette and components now; what it does not share is
+  the display face on its headline and the two animations behind it — the
+  drifting decorations and the band of light crossing the card. Nothing else
+  uses either, so they live here rather than in the sections above.
   ---------------------------------------------------------------------------
 */
 @theme {
-  /* Indigo. Used by the invite-flow button and its copy. */
-  --color-brand-50: #eef0fe;
-  --color-brand-100: #dfe3fd;
-  --color-brand-200: #c5cbfc;
-  --color-brand-300: #a4adfb;
-  --color-brand-500: #5b6cf9;
-  --color-brand-600: #4450e6;
-  --color-brand-700: #363fc0;
-  --color-brand-800: #2d3499;
-  --color-brand-900: #282d78;
-
-  /* Orchid, on the logo tile. */
-  --color-blush-300: #ea98da;
-
-  /* The panel behind the artwork, and the card's shadow. */
-  --color-lavender-500: #6d51a5;
-  --color-lavender-950: #1c1430;
-
-  /* The sign-in button and the sheen crossing the card. */
-  --color-petal-200: #f0cadd;
-  --color-petal-300: #e4a7c5;
-  --color-petal-400: #d488ae;
-
-  /* Neutrals for the form itself. */
-  --color-ink-100: #f2f2f9;
-  --color-ink-200: #e4e4f0;
-  --color-ink-300: #cbcbdf;
-  --color-ink-400: #9494b0;
-  --color-ink-500: #6a6a88;
-  --color-ink-600: #52526c;
-  --color-ink-700: #3e3e55;
-  --color-ink-900: #191924;
-
   --font-display: 'Audiowide', ui-sans-serif, system-ui, sans-serif;
-}
-
-@layer components {
-  .login-legacy .card {
-    @apply bg-white rounded-2xl border border-ink-200/80 shadow-sm;
-  }
-
-  .login-legacy .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
-           transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed
-           disabled:active:scale-100 whitespace-nowrap
-           border border-brand-200 bg-brand-100 text-brand-800 shadow-sm shadow-brand-600/10
-           hover:border-brand-300 hover:bg-brand-200;
-  }
-
-  .login-legacy .input {
-    @apply w-full rounded-xl border border-ink-300 bg-white px-3.5 py-2.5 text-sm text-ink-900
-           placeholder:text-ink-400 transition-all duration-200 ease-out
-           hover:border-ink-400 focus:border-brand-500 focus:bg-brand-50/30
-           disabled:bg-ink-100 disabled:text-ink-500 disabled:hover:border-ink-300;
-  }
-  .login-legacy .input-error { @apply border-red-400 focus:border-red-500 focus:bg-red-50/30; }
-
-  .login-legacy .label { @apply block text-sm font-medium text-ink-700 mb-1.5 transition-colors duration-200; }
-  .login-legacy .hint { @apply text-xs text-ink-500 mt-1.5; }
-  .login-legacy .field-error { @apply text-xs text-red-600 mt-1.5; }
 }
 
 @layer utilities {
