@@ -85,10 +85,10 @@ function HomeRedirect() {
 function NotFoundPage() {
   const { user } = useAuth();
   return (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-ink-100 px-6 text-center">
-      <p className="text-5xl font-bold text-ink-300">404</p>
-      <h1 className="mt-4 text-xl font-bold text-ink-900">This page doesn't exist</h1>
-      <p className="mt-2 max-w-sm text-sm text-ink-500">
+    <div className="flex min-h-screen flex-col items-center justify-center bg-muted px-6 text-center">
+      <p className="text-5xl font-bold text-muted-foreground">404</p>
+      <h1 className="display-title mt-4 text-2xl text-foreground">This page doesn't exist</h1>
+      <p className="mt-2 max-w-sm text-sm text-muted-foreground">
         The link may be out of date, or the page may have moved.
       </p>
       <Link to={user ? homeFor(user.role) : '/login'} className="btn-primary mt-6">

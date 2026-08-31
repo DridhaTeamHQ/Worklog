@@ -32,6 +32,14 @@ export function formatDateShort(iso: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
 }
 
+/** The weekday on its own — the label under a bar in a week strip. */
+export function formatWeekday(iso: string | null | undefined): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString(undefined, { weekday: 'short' });
+}
+
 export function formatTime(iso: string | null | undefined): string {
   if (!iso) return '—';
   const d = new Date(iso);
@@ -107,21 +115,7 @@ export function initials(name: string): string {
     .join('');
 }
 
-/** Deterministic avatar tint so a person keeps the same colour across the app. */
-export function avatarTint(seed: string): string {
-  const palette = [
-    'bg-brand-100 text-brand-700',
-    'bg-emerald-100 text-emerald-700',
-    'bg-amber-100 text-amber-700',
-    'bg-rose-100 text-rose-700',
-    'bg-sky-100 text-sky-700',
-    'bg-violet-100 text-violet-700',
-    'bg-teal-100 text-teal-700',
-  ];
-  let hash = 0;
-  for (let i = 0; i < seed.length; i += 1) hash = (hash * 31 + seed.charCodeAt(i)) % 100_000;
-  return palette[hash % palette.length];
-}
+
 
 /**
  * What to show where a task is named.

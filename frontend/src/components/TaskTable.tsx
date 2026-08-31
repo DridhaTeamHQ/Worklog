@@ -11,10 +11,10 @@ import type { Task, TaskStatus } from '../types';
  * screen-reader friendly, but painted as a coloured chip to read like a status badge.
  */
 const STATUS_CHIP: Record<string, string> = {
-  pending: 'bg-amber-50 text-amber-800 border-amber-300',
-  in_progress: 'bg-blue-50 text-blue-800 border-blue-300',
-  completed: 'bg-emerald-50 text-emerald-800 border-emerald-300',
-  overdue: 'bg-red-50 text-red-800 border-red-300',
+  pending: 'bg-warning/10 text-warning border-warning/30',
+  in_progress: 'bg-info/10 text-info border-info/25',
+  completed: 'bg-success/10 text-success border-success/25',
+  overdue: 'bg-destructive/10 text-destructive border-destructive/25',
 };
 
 function StatusSelect({
@@ -107,7 +107,7 @@ export function TaskTable({
     <div className="overflow-x-auto">
       <table className="w-full min-w-[1080px] border-collapse text-sm">
         <thead>
-          <tr className="border-b border-brand-100 bg-brand-50">
+          <tr className="border-b border-border bg-muted">
             {selectable && (
               <th scope="col" className="w-10 px-3 py-2.5">
                 <input
@@ -116,11 +116,11 @@ export function TaskTable({
                   ref={(el) => { if (el) el.indeterminate = someSelected; }}
                   onChange={toggleAll}
                   aria-label={allSelected ? 'Deselect all tasks' : 'Select all tasks'}
-                  className="h-4 w-4 cursor-pointer accent-brand-600"
+                  className="h-4 w-4 cursor-pointer accent-primary"
                 />
               </th>
             )}
-            <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-brand-800">
+            <th scope="col" className="min-w-[22rem] px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
               Work
             </th>
             {showAssignee && <Th>Assignee</Th>}
@@ -144,8 +144,8 @@ export function TaskTable({
               <Fragment key={task.id}>
                 <tr
                   ref={rowRef?.(task.id)}
-                  className={`border-b border-ink-100 transition-colors duration-200 ease-out ${
-                    task.id === highlightId ? 'bg-cream-100' : 'hover:bg-brand-50/70'
+                  className={`border-b border-border transition-colors duration-200 ease-out ${
+                    task.id === highlightId ? 'bg-warning/10' : 'hover:bg-muted/60'
                   }`}
                 >
                   {selectable && (
@@ -155,7 +155,7 @@ export function TaskTable({
                         checked={selected?.has(task.id) ?? false}
                         onChange={() => toggleOne(task.id)}
                         aria-label={`Select ${task.task_key ?? task.title}`}
-                        className="h-4 w-4 cursor-pointer accent-brand-600"
+                        className="h-4 w-4 cursor-pointer accent-primary"
                       />
                     </td>
                   )}
@@ -168,7 +168,7 @@ export function TaskTable({
                         disabled={!hasDetail}
                         aria-expanded={isOpen}
                         aria-label={isOpen ? 'Hide details' : 'Show details'}
-                        className="mt-0.5 shrink-0 rounded p-0.5 text-ink-400 transition-transform hover:bg-ink-100 hover:text-ink-700 disabled:invisible"
+                        className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-transform hover:bg-muted hover:text-foreground disabled:invisible"
                         style={{ transform: isOpen ? 'rotate(90deg)' : undefined }}
                       >
                         <ChevronRight className="h-3.5 w-3.5" />
@@ -177,19 +177,19 @@ export function TaskTable({
                       {task.task_key && (
                         <span
                           className={`shrink-0 font-mono text-xs font-semibold ${
-                            isDone ? 'text-ink-400 line-through' : 'text-brand-700'
+                            isDone ? 'text-muted-foreground line-through' : 'text-foreground'
                           }`}
                         >
                           {task.task_key}
                         </span>
                       )}
 
-                      <span className="min-w-0 flex-1 truncate text-ink-900" title={task.title}>
+                      <span className="min-w-0 flex-1 truncate text-foreground" title={task.title}>
                         {taskLabel(task)}
                       </span>
 
                       {task.notes && (
-                        <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-ink-300" aria-label="Has notes" />
+                        <StickyNote className="mt-0.5 h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Has notes" />
                       )}
                     </div>
                   </td>
@@ -219,10 +219,10 @@ export function TaskTable({
                   </td>
 
                   {/* Jira's Resolution: set once the work is actually finished. */}
-                  <td className="px-3 py-2.5 text-ink-600">{isDone ? 'Done' : <span className="text-ink-300">—</span>}</td>
+                  <td className="px-3 py-2.5 text-muted-foreground">{isDone ? 'Done' : <span className="text-muted-foreground">—</span>}</td>
 
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs text-ink-500">{formatDateTime(task.created_at)}</td>
-                  <td className="whitespace-nowrap px-3 py-2.5 text-xs text-ink-500">{formatDateTime(task.updated_at)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground">{formatDateTime(task.created_at)}</td>
+                  <td className="whitespace-nowrap px-3 py-2.5 text-xs text-muted-foreground">{formatDateTime(task.updated_at)}</td>
 
                   {hasActions && (
                     <td className="px-3 py-2.5">
@@ -232,7 +232,7 @@ export function TaskTable({
                             type="button"
                             onClick={() => onEdit(task)}
                             aria-label={`Edit ${task.task_key ?? task.title}`}
-                            className="rounded p-1.5 text-ink-400 transition-colors hover:bg-brand-50 hover:text-brand-600"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           >
                             <Pencil className="h-4 w-4" />
                           </button>
@@ -242,7 +242,7 @@ export function TaskTable({
                             type="button"
                             onClick={() => onDelete(task)}
                             aria-label={`Delete ${task.task_key ?? task.title}`}
-                            className="rounded p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -253,39 +253,39 @@ export function TaskTable({
                 </tr>
 
                 {isOpen && (
-                  <tr className="border-b border-ink-100 bg-brand-50/50">
+                  <tr className="border-b border-border bg-muted/50">
                     <td colSpan={columnCount} className="px-3 py-3">
                       <div className="space-y-2.5 pl-8">
-                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-700">{task.description}</p>
+                        <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">{task.description}</p>
 
                         {task.notes && (
-                          <div className="flex items-start gap-2 rounded-lg border border-ink-200 bg-white px-3 py-2">
-                            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-ink-400" aria-hidden />
-                            <p className="min-w-0 text-sm text-ink-600">{task.notes}</p>
+                          <div className="flex items-start gap-2 rounded-lg border border-border bg-card px-3 py-2">
+                            <StickyNote className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
+                            <p className="min-w-0 text-sm text-muted-foreground">{task.notes}</p>
                           </div>
                         )}
 
-                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-ink-500">
+                        <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 text-xs text-muted-foreground">
                           {task.project_name && (
-                            <span><span className="text-ink-400">Project: </span>{task.project_name}</span>
+                            <span><span className="text-muted-foreground">Project: </span>{task.project_name}</span>
                           )}
                           {task.start_date && (
-                            <span><span className="text-ink-400">Starts: </span>{task.start_date}</span>
+                            <span><span className="text-muted-foreground">Starts: </span>{task.start_date}</span>
                           )}
                           <span className="inline-flex items-center gap-1.5">
-                            <CalendarClock className="h-3.5 w-3.5 text-ink-400" aria-hidden />
+                            <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" aria-hidden />
                             <span className={
-                              due.tone === 'danger' ? 'font-semibold text-red-600'
-                                : due.tone === 'warn' ? 'font-semibold text-amber-600' : ''
+                              due.tone === 'danger' ? 'font-semibold text-primary-strong'
+                                : due.tone === 'warn' ? 'font-semibold text-warning' : ''
                             }
                             >
                               {due.text}
                             </span>
                           </span>
                           {task.completed_at && (
-                            <span><span className="text-ink-400">Completed: </span>{formatDateTime(task.completed_at)}</span>
+                            <span><span className="text-muted-foreground">Completed: </span>{formatDateTime(task.completed_at)}</span>
                           )}
-                          <span className="text-ink-400">Status: {STATUS_LABEL[task.effective_status]}</span>
+                          <span className="text-muted-foreground">Status: {STATUS_LABEL[task.effective_status]}</span>
                         </div>
                       </div>
                     </td>
@@ -302,7 +302,7 @@ export function TaskTable({
 
 function Th({ children }: { children: React.ReactNode }) {
   return (
-    <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-semibold uppercase tracking-wide text-brand-800">
+    <th scope="col" className="whitespace-nowrap px-3 py-2.5 text-left text-xs font-medium uppercase tracking-wide text-muted-foreground">
       {children}
     </th>
   );
@@ -317,10 +317,10 @@ function Person({ name, image, to }: { name: string; image?: string | null; to?:
   );
   if (to) {
     return (
-      <Link to={to} className="flex items-center gap-2 text-ink-700 hover:text-brand-600">
+      <Link to={to} className="flex items-center gap-2 text-foreground hover:text-primary-strong">
         {body}
       </Link>
     );
   }
-  return <span className="flex items-center gap-2 text-ink-700">{body}</span>;
+  return <span className="flex items-center gap-2 text-foreground">{body}</span>;
 }

@@ -112,16 +112,16 @@ export function TasksDonePage() {
       />
 
       <section className="card overflow-hidden">
-        <header className="flex flex-col gap-2 border-b border-ink-200 bg-ink-50 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-2 border-b border-border bg-muted px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex items-center gap-2.5">
-            <CalendarDays className="h-5 w-5 text-brand-600" aria-hidden />
+            <CalendarDays className="h-5 w-5 text-primary-strong" aria-hidden />
             <div>
-              <p className="font-semibold text-ink-900">{formatDate(today)}</p>
-              <p className="text-xs text-ink-500">{user?.name}{user?.department ? ` · ${user.department}` : ''}</p>
+              <p className="font-semibold text-foreground">{formatDate(today)}</p>
+              <p className="text-xs text-muted-foreground">{user?.name}{user?.department ? ` · ${user.department}` : ''}</p>
             </div>
           </div>
           {isEditing && (
-            <span className="badge border-emerald-200 bg-emerald-50 text-emerald-700 self-start sm:self-auto">
+            <span className="badge border-success/25 bg-success/10 text-success self-start sm:self-auto">
               <CheckCircle2 className="h-3 w-3" aria-hidden />
               Submitted {formatTime(todayReport?.created_at)}
             </span>
@@ -149,7 +149,7 @@ export function TasksDonePage() {
             <p id="report-hint" className={fieldError ? 'field-error' : 'hint'}>
               {fieldError || 'Put each completed task on its own line. Press Ctrl+Enter to save.'}
             </p>
-            <p className="text-xs tabular-nums text-ink-400">{text.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}</p>
+            <p className="text-xs tabular-nums text-muted-foreground">{text.length.toLocaleString()} / {MAX_LENGTH.toLocaleString()}</p>
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -170,7 +170,7 @@ export function TasksDonePage() {
               </button>
             )}
             {isEditing && !dirty && (
-              <p className="text-xs text-ink-500">
+              <p className="text-xs text-muted-foreground">
                 Last updated {formatTime(todayReport?.updated_at)} — edit the text above to make changes.
               </p>
             )}
@@ -179,10 +179,10 @@ export function TasksDonePage() {
       </section>
 
       <section className="card">
-        <header className="flex flex-col gap-3 border-b border-ink-200 px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
+        <header className="flex flex-col gap-3 border-b border-border px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h2 className="font-semibold text-ink-900">Previous reports</h2>
-            <p className="text-xs text-ink-500">
+            <h2 className="font-semibold text-foreground">Previous reports</h2>
+            <p className="text-xs text-muted-foreground">
               {previous.length} earlier report{previous.length === 1 ? '' : 's'}, newest first
             </p>
           </div>
@@ -203,20 +203,20 @@ export function TasksDonePage() {
             action={<button type="button" onClick={() => setSearch('')} className="btn-secondary">Clear search</button>}
           />
         ) : (
-          <ol className="divide-y divide-ink-100">
+          <ol className="divide-y divide-border">
             {filtered.map((report) => (
               <li key={report.id} className="px-5 py-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <h3 className="font-semibold text-ink-900">{formatDate(report.report_date)}</h3>
-                  <p className="text-xs text-ink-400">
+                  <h3 className="font-semibold text-foreground">{formatDate(report.report_date)}</h3>
+                  <p className="text-xs text-muted-foreground">
                     Submitted {formatTime(report.created_at)}
                     {report.updated_at !== report.created_at && ` · edited ${formatTime(report.updated_at)}`}
                   </p>
                 </div>
                 <ul className="mt-2.5 space-y-1.5">
                   {reportLines(report.task_description).map((line, i) => (
-                    <li key={i} className="flex items-start gap-2.5 text-sm text-ink-700">
-                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+                    <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
+                      <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                       <span className="min-w-0">{line}</span>
                     </li>
                   ))}

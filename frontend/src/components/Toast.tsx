@@ -36,9 +36,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   }), [push]);
 
   const tones: Record<ToastTone, { className: string; Icon: typeof Info }> = {
-    success: { className: 'bg-emerald-600 text-white', Icon: CheckCircle2 },
-    error: { className: 'bg-red-600 text-white', Icon: AlertCircle },
-    info: { className: 'bg-ink-800 text-white', Icon: Info },
+    success: { className: 'bg-success text-background', Icon: CheckCircle2 },
+    error: { className: 'bg-destructive text-destructive-foreground', Icon: AlertCircle },
+    info: { className: 'bg-foreground text-background', Icon: Info },
   };
 
   return (

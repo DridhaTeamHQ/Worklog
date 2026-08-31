@@ -122,7 +122,7 @@ export function TicketsPage() {
       )}
 
       <div className="card">
-        <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="overflow-x-auto">
             <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
               {STATUS_TABS.map((tab) => (
@@ -167,7 +167,7 @@ export function TicketsPage() {
           />
         ) : (
           <>
-            <p className="px-4 py-2 text-xs text-ink-500">
+            <p className="px-4 py-2 text-xs text-muted-foreground">
               {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
             </p>
             <TicketList
@@ -178,7 +178,7 @@ export function TicketsPage() {
               onStatusChange={changeStatus}
               showReporter={false}
             />
-            <p className="border-t border-ink-100 px-4 py-3 text-xs text-ink-500">
+            <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
               You can reopen or close your own tickets. Marking one <strong>Resolved</strong> is
               your manager's call.
             </p>

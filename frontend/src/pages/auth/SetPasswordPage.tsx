@@ -72,18 +72,18 @@ export function SetPasswordPage() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-ink-100 px-5 py-10">
+    <div className="flex min-h-screen items-center justify-center bg-muted px-5 py-10">
       <div className="w-full max-w-md">
         <div className="mb-6 flex items-center justify-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <CheckSquare className="h-6 w-6" />
           </span>
-          <span className="text-lg font-bold leading-tight text-ink-900">Taskr</span>
+          <span className="text-lg font-bold leading-tight text-foreground">Taskr</span>
         </div>
 
         <div className="card p-6 sm:p-8">
           {checking && (
-            <div className="flex items-center justify-center gap-2.5 py-6 text-sm text-ink-500">
+            <div className="flex items-center justify-center gap-2.5 py-6 text-sm text-muted-foreground">
               <Spinner className="h-4 w-4" /> Checking your invitation…
             </div>
           )}
@@ -95,11 +95,11 @@ export function SetPasswordPage() {
           */}
           {!checking && !valid && (
             <div className="text-center">
-              <span className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-amber-50 text-amber-600">
+              <span className="mx-auto mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-warning/10 text-warning">
                 <AlertCircle className="h-7 w-7" />
               </span>
-              <h1 className="text-xl font-bold text-ink-900">No invitation waiting</h1>
-              <p className="mt-2 text-sm text-ink-500">
+              <h1 className="display-title text-2xl text-foreground">No invitation waiting</h1>
+              <p className="mt-2 text-sm text-muted-foreground">
                 There is no unclaimed invitation for{email ? ' that address' : ' this link'}. If you
                 have already set a password, sign in as usual — or use "Forgot password?" if you
                 cannot remember it.
@@ -110,25 +110,25 @@ export function SetPasswordPage() {
 
           {!checking && valid && (
             <>
-              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3">
-                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+              <div className="mb-5 flex items-start gap-2.5 rounded-lg border border-primary/25 bg-primary/10 px-3.5 py-3">
+                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary-strong" aria-hidden />
                 <div className="min-w-0">
-                  <p className="text-sm font-semibold text-brand-900">
+                  <p className="text-sm font-semibold text-foreground">
                     {invitedName ? `Welcome, ${invitedName}` : 'Welcome to Taskr'}
                   </p>
-                  <p className="mt-0.5 break-words text-sm text-brand-800">{email}</p>
+                  <p className="mt-0.5 break-words text-sm text-primary-strong">{email}</p>
                 </div>
               </div>
 
-              <h1 className="text-xl font-bold text-ink-900">Set your password</h1>
-              <p className="mt-1.5 text-sm text-ink-500">
+              <h1 className="display-title text-2xl text-foreground">Set your password</h1>
+              <p className="mt-1.5 text-sm text-muted-foreground">
                 Choose a password for your account. You will use it to sign in from now on.
               </p>
 
               {error && (
-                <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3" role="alert">
-                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
-                  <p className="text-sm font-medium text-red-700">{error}</p>
+                <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-primary/25 bg-primary/10 px-3.5 py-3" role="alert">
+                  <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary-strong" aria-hidden />
+                  <p className="text-sm font-medium text-primary-strong">{error}</p>
                 </div>
               )}
 
@@ -170,7 +170,7 @@ export function SetPasswordPage() {
 
         <Link
           to="/login"
-          className="mt-5 flex items-center justify-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900"
+          className="mt-5 flex items-center justify-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground"
         >
           <ArrowLeft className="h-4 w-4" /> Back to sign in
         </Link>

@@ -152,11 +152,11 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
     >
       <form id="assign-task-form" onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="label" htmlFor="t-assignee">Assignee <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="t-assignee">Assignee <span className="text-destructive">*</span></label>
           {assigneeIsFixed ? (
-            <div className="flex items-center gap-2.5 rounded-lg border border-ink-200 bg-ink-50 px-3.5 py-2.5">
+            <div className="flex items-center gap-2.5 rounded-lg border border-border bg-muted px-3.5 py-2.5">
               <Avatar name={employee!.name} size="sm" />
-              <span className="text-sm font-medium text-ink-900">{employee!.name}</span>
+              <span className="text-sm font-medium text-foreground">{employee!.name}</span>
             </div>
           ) : (
             <>
@@ -177,7 +177,7 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
                   <p className="hint">
                     Currently {selectedMember.counts.pending} pending
                     {selectedMember.counts.overdue > 0 && (
-                      <span className="font-semibold text-red-600"> · {selectedMember.counts.overdue} overdue</span>
+                      <span className="font-semibold text-destructive"> · {selectedMember.counts.overdue} overdue</span>
                     )}
                   </p>
                 )}
@@ -186,7 +186,7 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
         </div>
 
         <div>
-          <label className="label" htmlFor="t-project">Project <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="t-project">Project <span className="text-destructive">*</span></label>
           <Select
             id="t-project"
             value={projectId}
@@ -255,8 +255,8 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
                 key={p.value}
                 className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2.5 transition-colors ${
                   priority === p.value
-                    ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                    : 'border-ink-300 hover:border-ink-400'
+                    ? 'border-primary bg-primary/10 ring-1 ring-ring'
+                    : 'border-input hover:border-muted-foreground/40'
                 }`}
               >
                 <span className="flex items-center gap-2">
@@ -266,11 +266,11 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
                     value={p.value}
                     checked={priority === p.value}
                     onChange={() => setPriority(p.value)}
-                    className="h-3.5 w-3.5 accent-brand-600"
+                    className="h-3.5 w-3.5 accent-primary"
                   />
-                  <span className="text-sm font-semibold text-ink-900">{p.label}</span>
+                  <span className="text-sm font-semibold text-foreground">{p.label}</span>
                 </span>
-                <span className="mt-0.5 pl-5.5 text-[11px] text-ink-500">{p.hint}</span>
+                <span className="mt-0.5 pl-5.5 text-[11px] text-muted-foreground">{p.hint}</span>
               </label>
             ))}
           </div>

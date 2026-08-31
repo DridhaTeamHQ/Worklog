@@ -1,79 +1,148 @@
 @import 'tailwindcss';
 
 /*
-  Design tokens.
+  Design tokens — the shadcn/ui palette.
 
-  The brand ramp runs rose to plum: #BD5579 sits at 500 and #601D49 at 900, both taken
-  from the palette, with the steps between and either side interpolated along the same
-  hue so the ramp reads as one colour rather than two.
+  The colours are semantic, not a scale: a surface is `card`, quiet text is
+  `muted-foreground`, a line is `border`. Nothing in the app names a step on a ramp any
+  more, so a repaint happens here and nowhere else.
 
-  #601D49 is dark, so the sidebar and the login panel are back to white text on a deep
-  surface — 11.9:1, with plenty of headroom. The active nav item is a cream pill, which
-  is the one place the warmest colour in the palette carries weight instead of being
-  decoration.
+  The base is shadcn's own neutral: white surfaces, zinc lines, near-black text. Every
+  neutral value below is the one shadcn ships, converted to hex.
 
-  Blush (#EA9D9D) and cream (#FFEBB8) are the accents. Both are pale, so they are used
-  as surfaces and chart fills; wherever they carry text it is one of their own dark
-  steps, never white.
+  Primary is the reference's coral, #f4553c, and it is used as a primary colour rather
+  than as decoration: the primary button, the active navigation item, the focus ring,
+  the one figure a screen is actually about, and the leading series in a chart. It is
+  not a background for whole cards and it is not sprinkled across icons — a surface is
+  a surface, and the coral is what marks the thing to act on.
 
-  The neutrals are warmed slightly towards mauve so they sit with the plum instead of
-  fighting it. The status palette stays as it is: those four colours mean something,
-  and are tuned for legibility rather than to match a theme.
+  Two things are honest extensions of the shadcn set:
 
-  Every pairing here was checked against WCAG AA (4.5:1, or 3:1 for chart fills and
-  block accents) before being committed.
+  `--primary-strong` is the same coral taken down the ramp until it clears white at
+  4.5:1. Coral on white is 3.4:1, which is fine for a fill or a chart series but fails
+  for small text, so anywhere the primary has to be a *word* it uses this instead. It
+  is the same colour, not a second one.
+
+  `--success`, `--warning` and `--info` join `--destructive` to cover the four task
+  states. shadcn ships only destructive because it only needs to describe a button;
+  this app has to distinguish pending from in-progress from completed from overdue, and
+  colour is the fastest way in. They appear on badges, status dots and the breakdown
+  ring — never as a surface.
 */
-@theme {
-  /* Rose to plum. 500 and 900 are the palette's own colours. */
-  --color-brand-50: #fcf2f7;
-  --color-brand-100: #f8e4ee;
-  --color-brand-200: #f1c6d9;
-  --color-brand-300: #e29fb8;
-  --color-brand-400: #d0789a;
-  --color-brand-500: #bd5579;
-  --color-brand-600: #a33e63;
-  --color-brand-700: #86304f;
-  --color-brand-800: #6e2540;
-  --color-brand-900: #601d49;
-  --color-brand-950: #3f1230;
+:root {
+  --background: #ffffff;
+  --foreground: #09090b;
 
-  /* Blush accent, from #EA9D9D at 300. */
-  --color-blush-50: #fdf4f4;
-  --color-blush-100: #fae8e8;
-  --color-blush-200: #f5d2d2;
-  --color-blush-300: #ea9d9d;
-  --color-blush-400: #db7a7a;
-  --color-blush-500: #c45a5a;
-  --color-blush-600: #a34444;
-  --color-blush-700: #833737;
+  --card: #ffffff;
+  --card-foreground: #09090b;
 
-  /* Cream accent, from #FFEBB8 at 200. */
-  --color-cream-50: #fffcf2;
-  --color-cream-100: #fff7e1;
-  --color-cream-200: #ffebb8;
-  --color-cream-300: #fbd98a;
-  --color-cream-400: #eebf56;
-  --color-cream-500: #d4a12c;
-  --color-cream-600: #a87c1b;
-  --color-cream-700: #845f16;
+  --popover: #ffffff;
+  --popover-foreground: #09090b;
 
-  /* Neutrals warmed towards mauve so they sit with the plum. */
-  --color-ink-50: #fbf8fa;
-  --color-ink-100: #f5f0f3;
-  --color-ink-200: #e8dfe5;
-  --color-ink-300: #d2c4cd;
-  --color-ink-400: #9e8b97;
-  --color-ink-500: #71606b;
-  --color-ink-600: #574853;
-  --color-ink-700: #42353e;
-  --color-ink-800: #2c222a;
-  --color-ink-900: #1c151a;
-  --color-ink-950: #100b0e;
+  /* The reference's coral. Its foreground is near-black rather than white: white on
+     this coral is 3.4:1, and the near-black is 5.9:1. */
+  --primary: #f4553c;
+  --primary-foreground: #1c0f0b;
+  --primary-strong: #b32f1c;
 
-  --color-status-pending: #94560a;
-  --color-status-progress: #1e4fc4;
-  --color-status-completed: #15794c;
-  --color-status-overdue: #b32626;
+  --secondary: #f4f4f5;
+  --secondary-foreground: #18181b;
+
+  --muted: #f4f4f5;
+  --muted-foreground: #71717a;
+
+  --accent: #f4f4f5;
+  --accent-foreground: #18181b;
+
+  --destructive: #b91c1c;
+  --destructive-foreground: #fafafa;
+
+  --success: #15803d;
+  --warning: #a16207;
+  --info: #1d4ed8;
+
+  --border: #e4e4e7;
+  --input: #e4e4e7;
+  --ring: #f4553c;
+
+  --radius: 0.75rem;
+
+  /*
+    The sidebar keeps its dark surface. shadcn's sidebar is a separate token group for
+    exactly this reason — it is allowed to be a different weight from the page without
+    the app being in dark mode. Primary appears on it once, on the item you are on.
+  */
+  --sidebar: #09090b;
+  --sidebar-foreground: #d4d4d8;
+  --sidebar-primary: #f4553c;
+  --sidebar-primary-foreground: #1c0f0b;
+  --sidebar-accent: #27272a;
+  --sidebar-accent-foreground: #fafafa;
+  --sidebar-border: #27272a;
+  --sidebar-ring: #f4553c;
+
+  /* Charts. 1 is the primary series; 2–5 step down through the neutrals so a chart
+     never invents colours the rest of the page does not have. */
+  --chart-1: #f4553c;
+  --chart-2: #52525b;
+  --chart-3: #a1a1aa;
+  --chart-4: #d4d4d8;
+  --chart-5: #18181b;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-primary-strong: var(--primary-strong);
+
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-xl: calc(var(--radius) + 4px);
 
   --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
 }
@@ -82,39 +151,28 @@
   html { -webkit-text-size-adjust: 100%; }
 
   body {
-    @apply text-ink-800 antialiased;
+    @apply bg-background text-foreground antialiased;
     font-family: var(--font-sans);
-    /*
-      A very faint wash rather than flat grey. Two wide, low-opacity blooms in the
-      accent colours, fixed so they do not slide around as the page scrolls; the base
-      colour underneath is what everything is actually contrast-checked against.
-    */
-    background-color: var(--color-ink-100);
-    background-image:
-      radial-gradient(60rem 40rem at 12% -8%, rgba(234, 157, 157, 0.28), transparent 60%),
-      radial-gradient(50rem 34rem at 92% 4%, rgba(255, 235, 184, 0.5), transparent 62%);
-    background-attachment: fixed;
   }
 
-  /* A single visible focus treatment for every interactive element. */
   /*
-    One focus treatment everywhere, and it animates. The ring is drawn at zero width
-    at rest so moving between fields grows and shrinks it rather than snapping it on,
+    One focus treatment everywhere, and it animates. The ring is drawn at zero width at
+    rest so moving between fields grows and shrinks it rather than snapping it on,
     which is what makes tabbing through a form feel continuous.
   */
   :where(a, button, input, select, textarea, [tabindex]) {
-    @apply outline-none ring-0 ring-brand-500/0 ring-offset-0 ring-offset-white;
+    @apply outline-none ring-0 ring-ring/0 ring-offset-0 ring-offset-background;
     transition: box-shadow 180ms ease-out, border-color 180ms ease-out,
                 background-color 180ms ease-out, color 180ms ease-out;
   }
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
-    @apply ring-2 ring-brand-500/70 ring-offset-2;
+    @apply ring-2 ring-ring ring-offset-2;
   }
 
   ::-webkit-scrollbar { width: 10px; height: 10px; }
   ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-ink-300 rounded-full border-2 border-solid border-transparent bg-clip-padding; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-ink-400; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full border-2 border-solid border-transparent bg-clip-padding; }
+  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/50; }
 }
 
 @keyframes fade-in {
@@ -133,35 +191,43 @@
 
 @layer components {
   .card {
-    @apply bg-white rounded-2xl border border-ink-200/80 shadow-sm;
+    @apply bg-card text-card-foreground rounded-xl border border-border shadow-sm;
   }
 
   .card-hover {
-    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg hover:border-brand-300;
+    @apply transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md;
   }
 
-  /*
-    Soft tinted panels for the places that should feel light rather than
-    administrative — empty states, headline figures, callouts.
-  */
-  .panel-brand { @apply rounded-2xl border border-brand-200 bg-brand-50; }
-  .panel-blush { @apply rounded-2xl border border-blush-200 bg-blush-50; }
-  .panel-cream { @apply rounded-2xl border border-cream-200 bg-cream-50; }
+  /* The uppercase display heading. Weight and case carry a title here; colour does not. */
+  .display-title {
+    @apply font-black uppercase leading-[0.95] tracking-[-0.02em];
+  }
+
+  /* The small all-caps label above a figure. */
+  .eyebrow {
+    @apply text-[11px] font-bold uppercase tracking-[0.12em];
+  }
 
   /*
     Tailwind v4 cannot @apply one component class inside another, so each variant
     repeats the shared base rather than extending `.btn`.
   */
   .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold
-           transition-all active:scale-[0.97] disabled:opacity-50 disabled:cursor-not-allowed
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium
+           transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
            disabled:active:scale-100 whitespace-nowrap;
   }
-  .btn-primary { @apply bg-brand-600 text-white shadow-sm shadow-brand-600/25 hover:bg-brand-700; }
-  .btn-secondary { @apply bg-white text-ink-700 border border-ink-300 hover:bg-ink-50; }
-  .btn-ghost { @apply text-ink-600 hover:bg-ink-100; }
-  .btn-danger { @apply bg-red-600 text-white hover:bg-red-700; }
+  .btn-primary { @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90; }
+  .btn-secondary { @apply bg-background text-foreground border border-border shadow-sm hover:bg-accent hover:text-accent-foreground; }
+  .btn-ghost { @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground; }
+  .btn-danger { @apply bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90; }
   .btn-sm { @apply px-3 py-1.5 text-xs; }
+
+/* The round icon button that marks a screen. Neutral: it is chrome, not an action. */
+  .icon-btn {
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full
+           bg-foreground text-background transition-transform active:scale-95 hover:bg-foreground/90;
+  }
 
   /*
     `transition-all` rather than `transition-colors`: the focus state changes the
@@ -169,12 +235,12 @@
     three is what makes a field look like it snaps.
   */
   .input {
-    @apply w-full rounded-xl border border-ink-300 bg-white px-3.5 py-2.5 text-sm text-ink-900
-           placeholder:text-ink-400 transition-all duration-200 ease-out
-           hover:border-ink-400 focus:border-brand-500 focus:bg-brand-50/30
-           disabled:bg-ink-100 disabled:text-ink-500 disabled:hover:border-ink-300;
+    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm
+           placeholder:text-muted-foreground transition-all duration-200 ease-out
+           hover:border-muted-foreground/40 focus:border-ring
+           disabled:bg-muted disabled:text-muted-foreground disabled:hover:border-input;
   }
-  .input-error { @apply border-red-400 focus:border-red-500 focus:bg-red-50/30; }
+  .input-error { @apply border-destructive focus:border-destructive; }
 
   /*
     A select renders the platform's own chevron, which is grey on every OS and cannot
@@ -185,42 +251,42 @@
   select.input {
     @apply cursor-pointer pr-10;
     appearance: none;
-    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%23a33e63' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2371717a' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
     background-repeat: no-repeat;
     background-position: right 0.7rem center;
     background-size: 1.1rem 1.1rem;
   }
   select.input:disabled { @apply cursor-not-allowed opacity-70; }
 
-  /* Checkboxes and radios follow the brand rather than the browser default blue. */
-  input[type='checkbox'], input[type='radio'] { accent-color: var(--color-brand-600); }
+  /* Checkboxes and radios follow the primary rather than the browser default blue. */
+  input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
 
-  .label { @apply block text-sm font-medium text-ink-700 mb-1.5 transition-colors duration-200; }
-  .hint { @apply text-xs text-ink-500 mt-1.5; }
-  .field-error { @apply text-xs text-red-600 mt-1.5; }
+  .label { @apply block text-sm font-medium text-foreground mb-1.5; }
+  .hint { @apply text-xs text-muted-foreground mt-1.5; }
+  .field-error { @apply text-xs text-destructive mt-1.5; }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-semibold
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium
            border whitespace-nowrap;
   }
 
   /*
-    The segmented control — date ranges, ticket statuses, notification filters. It was
-    repeated inline on three pages with a grey track and a white selected pill; defining
-    it once means those three stay in step with the theme rather than drifting apart.
+    The segmented control — date ranges, ticket statuses, notification filters. A muted
+    track with a plain raised pill for the selection, which is how shadcn marks the
+    active item in a tab list. The coral is not needed to say "this one": position and
+    elevation already do.
   */
-  .segmented { @apply flex gap-1 rounded-xl border border-brand-100 bg-brand-50 p-1; }
+  .segmented { @apply inline-flex gap-1 rounded-lg bg-muted p-1; }
   .segmented-item {
-    @apply rounded-lg px-3 py-1.5 text-sm font-medium text-brand-800
-           transition-all duration-200 ease-out hover:bg-white/70 hover:text-brand-900;
+    @apply rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground
+           transition-all duration-200 ease-out hover:text-foreground;
   }
   .segmented-item-active {
-    @apply bg-brand-600 text-white shadow-sm shadow-brand-600/30
-           hover:bg-brand-600 hover:text-white;
+    @apply bg-background text-foreground shadow-sm hover:text-foreground;
   }
 
   /* The filter strip that sits under a page's tabs. */
-  .filter-bar { @apply border-b border-brand-100 bg-brand-50/60 p-4; }
+  .filter-bar { @apply border-b border-border bg-muted/50 p-4; }
 
   .table-wrap {
     /* Tables stay readable on phones by scrolling inside their own container
@@ -229,50 +295,41 @@
   }
   .table { @apply w-full min-w-[640px] text-sm border-collapse; }
 
-  /*
-    The header carries the brand tint so a table reads as part of the theme rather
-    than as a plain grid. It stays a tint rather than a solid: the labels sit on it,
-    and brand-800 on brand-50 is 8.4:1, where white on a solid brand fill would need
-    the header to go much darker than the page around it.
-  */
   .table thead th {
-    @apply text-left text-xs font-semibold uppercase tracking-wide text-brand-800
-           px-4 py-3 border-b border-brand-100 bg-brand-50 whitespace-nowrap;
+    @apply text-left text-xs font-medium text-muted-foreground
+           px-4 py-3 border-b border-border bg-muted/50 whitespace-nowrap;
   }
   .table thead th:first-child { @apply rounded-tl-xl; }
   .table thead th:last-child { @apply rounded-tr-xl; }
 
-  .table tbody td { @apply px-4 py-3 border-b border-ink-100 align-middle; }
+  .table tbody td { @apply px-4 py-3 border-b border-border align-middle; }
   .table tbody tr:last-child td { @apply border-b-0; }
 
-  /*
-    Row hover is a brand wash rather than grey, and the duration is long enough to
-    read as a fade instead of a flicker as the pointer crosses rows.
-  */
   .table tbody tr {
     @apply transition-colors duration-200 ease-out;
   }
-  .table tbody tr:hover { @apply bg-brand-50/70; }
+  .table tbody tr:hover { @apply bg-muted/60; }
 
   /*
-    The sidebar is brand-900 (#601D49), a deep surface, so the navigation is white on
-    it at 11.9:1 and hover lightens the surface rather than the text.
+    The sidebar. Its own token group, so the dark surface is a decision about the
+    sidebar rather than about the app being in dark mode.
   */
   .nav-link {
-    @apply flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium
-           text-brand-200 transition-colors hover:bg-white/12 hover:text-white;
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium
+           text-sidebar-foreground transition-colors
+           hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
   }
   /*
-    Cream, not a darker plum. On a deep surface the active item has to be lighter than
-    everything around it to read as selected — this clears the sidebar at 10:1 and
-    carries plum text at 13.3:1.
+    The one place the coral appears in the navigation: the item you are on. Its label
+    is the near-black foreground, which clears the coral at 5.9:1 where white would
+    manage 3.4:1.
   */
   .nav-link-active {
-    @apply bg-cream-200 text-brand-950 shadow-sm shadow-brand-950/30
-           hover:bg-cream-200 hover:text-brand-950;
+    @apply bg-sidebar-primary text-sidebar-primary-foreground font-semibold
+           hover:bg-sidebar-primary hover:text-sidebar-primary-foreground;
   }
 
-  .skeleton { @apply animate-pulse rounded bg-ink-200; }
+  .skeleton { @apply animate-pulse rounded-md bg-muted; }
 
   /*
     Used where a list is replaced by another list of the same shape — switching
@@ -280,7 +337,6 @@
     reads as the new set arriving rather than the old one being overwritten.
   */
   .fade-in { animation: fade-in 220ms ease-out both; }
-
 }
 
 @layer utilities {

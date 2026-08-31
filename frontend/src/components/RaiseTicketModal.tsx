@@ -166,11 +166,11 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
       )}
     >
       {noTasks ? (
-        <div className="flex items-start gap-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3">
-          <Info className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" aria-hidden />
+        <div className="flex items-start gap-3 rounded-lg border border-warning/25 bg-warning/10 px-4 py-3">
+          <Info className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
           <div className="min-w-0">
-            <p className="font-semibold text-amber-900">You have no assigned tasks yet</p>
-            <p className="mt-0.5 text-sm text-amber-800">
+            <p className="font-semibold text-warning">You have no assigned tasks yet</p>
+            <p className="mt-0.5 text-sm text-warning">
               Tickets are raised against a task you are working on, so there is nothing to
               report against until your manager assigns you something.
             </p>
@@ -179,7 +179,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
       ) : (
         <form id="raise-ticket-form" onSubmit={submit} className="space-y-4" noValidate>
           <div>
-            <label className="label" htmlFor="tk-project">Project <span className="text-red-500">*</span></label>
+            <label className="label" htmlFor="tk-project">Project <span className="text-destructive">*</span></label>
             <Select
               id="tk-project"
               value={projectId}
@@ -197,7 +197,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
           </div>
 
           <div>
-            <label className="label" htmlFor="tk-task">Task <span className="text-red-500">*</span></label>
+            <label className="label" htmlFor="tk-task">Task <span className="text-destructive">*</span></label>
             <Select
               id="tk-task"
               value={taskId}
@@ -217,17 +217,17 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
           </div>
 
           {selectedTask && (
-            <div className="rounded-lg border border-ink-200 bg-ink-50 px-3.5 py-2.5">
-              <p className="text-xs font-semibold uppercase tracking-wide text-ink-400">Working on</p>
-              <p className="mt-1 text-sm text-ink-700">
-                <span className="font-mono text-xs font-semibold text-brand-700">{selectedTask.task_key}</span>
+            <div className="rounded-lg border border-border bg-muted px-3.5 py-2.5">
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Working on</p>
+              <p className="mt-1 text-sm text-foreground">
+                <span className="font-mono text-xs font-semibold text-muted-foreground">{selectedTask.task_key}</span>
                 {' '}{taskLabel(selectedTask)}
               </p>
             </div>
           )}
 
           <div>
-            <label className="label" htmlFor="tk-title">Summary <span className="text-red-500">*</span></label>
+            <label className="label" htmlFor="tk-title">Summary <span className="text-destructive">*</span></label>
             <input
               id="tk-title"
               value={title}
@@ -242,7 +242,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
 
           <div>
             <label className="label" htmlFor="tk-desc">
-              What happened? <span className="text-red-500">*</span>
+              What happened? <span className="text-destructive">*</span>
             </label>
             <textarea
               id="tk-desc"
@@ -267,8 +267,8 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
                   key={sv.value}
                   className={`flex cursor-pointer flex-col rounded-lg border px-3 py-2.5 transition-colors ${
                     severity === sv.value
-                      ? 'border-brand-500 bg-brand-50 ring-1 ring-brand-500'
-                      : 'border-ink-300 hover:border-ink-400'
+                      ? 'border-primary bg-primary/10 ring-1 ring-ring'
+                      : 'border-input hover:border-muted-foreground/40'
                   }`}
                 >
                   <span className="flex items-center gap-2">
@@ -278,11 +278,11 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
                       value={sv.value}
                       checked={severity === sv.value}
                       onChange={() => setSeverity(sv.value)}
-                      className="h-3.5 w-3.5 accent-brand-600"
+                      className="h-3.5 w-3.5 accent-primary"
                     />
-                    <span className="text-sm font-semibold text-ink-900">{sv.label}</span>
+                    <span className="text-sm font-semibold text-foreground">{sv.label}</span>
                   </span>
-                  <span className="mt-0.5 pl-5.5 text-[11px] text-ink-500">{sv.hint}</span>
+                  <span className="mt-0.5 pl-5.5 text-[11px] text-muted-foreground">{sv.hint}</span>
                 </label>
               ))}
             </div>

@@ -182,7 +182,7 @@ export function ManagerTicketsPage() {
       )}
 
       <div className="card">
-        <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="overflow-x-auto">
             <div className="segmented min-w-max" role="tablist" aria-label="Filter tickets by status">
               {STATUS_TABS.map((tab) => (
@@ -246,7 +246,7 @@ export function ManagerTicketsPage() {
           />
         ) : (
           <>
-            <p className="px-4 py-2 text-xs text-ink-500">
+            <p className="px-4 py-2 text-xs text-muted-foreground">
               {tickets.length} ticket{tickets.length === 1 ? '' : 's'}
             </p>
             <TicketList
@@ -279,9 +279,9 @@ export function ManagerTicketsPage() {
       >
         {resolving && (
           <div className="space-y-4">
-            <div className="rounded-lg border border-ink-200 bg-ink-50 p-3.5">
-              <p className="font-medium text-ink-900">{resolving.title}</p>
-              <p className="mt-1 text-xs text-ink-500">
+            <div className="rounded-lg border border-border bg-muted p-3.5">
+              <p className="font-medium text-foreground">{resolving.title}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
                 Raised by {resolving.reporter_name} on {resolving.task_key ?? 'a deleted task'}
               </p>
             </div>
@@ -318,12 +318,12 @@ export function ManagerTicketsPage() {
         )}
       >
         {confirmDelete && (
-          <div className="rounded-lg border border-ink-200 bg-ink-50 p-4">
-            <p className="font-semibold text-ink-900">
-              <span className="mr-2 font-mono text-xs text-brand-700">{confirmDelete.ticket_key}</span>
+          <div className="rounded-lg border border-border bg-muted p-4">
+            <p className="font-semibold text-foreground">
+              <span className="mr-2 font-mono text-xs text-muted-foreground">{confirmDelete.ticket_key}</span>
               {confirmDelete.title}
             </p>
-            <p className="mt-1 text-sm text-ink-600">Raised by {confirmDelete.reporter_name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Raised by {confirmDelete.reporter_name}</p>
           </div>
         )}
       </Modal>

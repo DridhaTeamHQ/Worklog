@@ -94,13 +94,13 @@ function Tab({
       className={`flex items-center gap-2 rounded-xl border px-3 py-1.5 text-sm font-medium
         transition-all duration-200 ease-out active:scale-[0.97] ${
         active
-          ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-          : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
+          ? 'border-primary bg-primary text-primary-foreground shadow-sm '
+          : 'border-input bg-card text-foreground hover:border-primary/40 hover:bg-primary/10'
       }`}
     >
       {icon}
       {badge && (
-        <span className={`font-mono text-[11px] font-bold ${active ? 'text-brand-100' : 'text-brand-700'}`}>
+        <span className={`font-mono text-[11px] font-bold ${active ? 'text-primary-foreground' : 'text-muted-foreground'}`}>
           {badge}
         </span>
       )}
@@ -108,7 +108,7 @@ function Tab({
       {count !== undefined && (
         <span
           className={`rounded-full px-1.5 text-[11px] font-semibold tabular-nums ${
-            active ? 'bg-white/20 text-white' : 'bg-ink-100 text-ink-600'
+            active ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground'
           }`}
         >
           {count}

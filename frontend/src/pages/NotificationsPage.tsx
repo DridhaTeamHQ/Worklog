@@ -66,7 +66,7 @@ export function NotificationsPage() {
       />
 
       <div className="card">
-        <div className="border-b border-ink-200 px-4 py-3">
+        <div className="border-b border-border px-4 py-3">
           <div className="segmented inline-flex" role="tablist" aria-label="Filter notifications">
             {(['all', 'unread'] as const).map((value) => (
               <button
@@ -96,7 +96,7 @@ export function NotificationsPage() {
             }
           />
         ) : (
-          <ul className="divide-y divide-ink-100">
+          <ul className="divide-y divide-border">
             {visible.map((n) => {
               const clickable = Boolean(n.related_task_id || n.related_ticket_id);
               const Tag = clickable ? 'button' : 'div';
@@ -105,11 +105,11 @@ export function NotificationsPage() {
                   <Tag
                     {...(clickable ? { type: 'button' as const, onClick: () => void open(n) } : {})}
                     className={`flex w-full items-start gap-4 px-5 py-4 text-left transition-colors ${
-                      clickable ? 'hover:bg-ink-50' : ''
-                    } ${n.is_read ? '' : 'bg-brand-50/50'}`}
+                      clickable ? 'hover:bg-muted' : ''
+                    } ${n.is_read ? '' : 'bg-muted/50'}`}
                   >
                     <span className={`mt-0.5 inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-                      n.is_read ? 'bg-ink-100 text-ink-500' : 'bg-brand-100 text-brand-700'
+                      n.is_read ? 'bg-muted text-muted-foreground' : 'bg-primary/15 text-primary-strong'
                     }`}
                     >
                       <ClipboardList className="h-5 w-5" />
@@ -117,14 +117,14 @@ export function NotificationsPage() {
 
                     <span className="min-w-0 flex-1">
                       <span className="flex flex-wrap items-center gap-2">
-                        <span className={`text-sm ${n.is_read ? 'font-medium text-ink-700' : 'font-semibold text-ink-900'}`}>
+                        <span className={`text-sm ${n.is_read ? 'font-medium text-foreground' : 'font-semibold text-foreground'}`}>
                           {n.title}
                         </span>
-                        <span className="badge border-ink-200 bg-ink-50 text-ink-500">{TYPE_LABEL[n.type]}</span>
-                        {!n.is_read && <span className="h-2 w-2 rounded-full bg-brand-600" aria-label="Unread" />}
+                        <span className="badge border-border bg-muted text-muted-foreground">{TYPE_LABEL[n.type]}</span>
+                        {!n.is_read && <span className="h-2 w-2 rounded-full bg-primary" aria-label="Unread" />}
                       </span>
-                      <span className="mt-1 block text-sm text-ink-600">{n.message}</span>
-                      <span className="mt-1.5 block text-xs text-ink-400">
+                      <span className="mt-1 block text-sm text-muted-foreground">{n.message}</span>
+                      <span className="mt-1.5 block text-xs text-muted-foreground">
                         {formatDateTime(n.created_at)} · {relativeTime(n.created_at)}
                       </span>
                     </span>
@@ -137,7 +137,7 @@ export function NotificationsPage() {
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); e.stopPropagation(); void markRead(n.id); }
                         }}
-                        className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-brand-600 hover:bg-brand-50"
+                        className="shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold text-primary-strong hover:bg-primary/10"
                       >
                         Mark read
                       </span>

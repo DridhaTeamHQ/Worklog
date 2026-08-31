@@ -102,7 +102,7 @@ export function EditProjectModal({ open, onClose, project, onSaved }: Props) {
     >
       <form id="edit-project-form" onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="label" htmlFor="ep-name">Project name <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="ep-name">Project name <span className="text-destructive">*</span></label>
           <input
             id="ep-name"
             value={name}
@@ -116,7 +116,7 @@ export function EditProjectModal({ open, onClose, project, onSaved }: Props) {
         </div>
 
         <div>
-          <label className="label" htmlFor="ep-key">Project key <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="ep-key">Project key <span className="text-destructive">*</span></label>
           <input
             id="ep-key"
             value={key}
@@ -132,9 +132,9 @@ export function EditProjectModal({ open, onClose, project, onSaved }: Props) {
             so the numbers stay put — but anyone holding an old key needs to know.
           */}
           {keyChanged && !errors.key && (
-            <div className="mt-2 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2.5">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-amber-600" aria-hidden />
-              <p className="text-xs text-amber-900">
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-warning/25 bg-warning/10 px-3 py-2.5">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+              <p className="text-xs text-warning">
                 Every task in this project will be renumbered under the new key —{' '}
                 <span className="font-mono font-semibold">{project.project_key}-1</span> becomes{' '}
                 <span className="font-mono font-semibold">{key.trim().toUpperCase()}-1</span>.
@@ -157,11 +157,11 @@ export function EditProjectModal({ open, onClose, project, onSaved }: Props) {
           />
         </div>
 
-        <div className="border-t border-ink-200 pt-4">
-          <p className="text-sm font-medium text-ink-700">
+        <div className="border-t border-border pt-4">
+          <p className="text-sm font-medium text-foreground">
             {project.is_archived ? 'This project is archived' : 'Archive this project'}
           </p>
-          <p className="mt-0.5 text-xs text-ink-500">
+          <p className="mt-0.5 text-xs text-muted-foreground">
             {project.is_archived
               ? 'Restore it to start assigning tasks to it again.'
               : `Its ${project.counts.total} task${project.counts.total === 1 ? '' : 's'} stay readable, but no new ones can be added.`}

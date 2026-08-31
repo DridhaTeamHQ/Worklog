@@ -98,29 +98,25 @@ export function LoginPage() {
   return (
     <div className="flex min-h-screen flex-col lg:flex-row">
       {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
-      <div className="relative hidden overflow-hidden bg-brand-900 lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
+      <div className="relative hidden overflow-hidden bg-foreground lg:flex lg:w-[45%] lg:flex-col lg:justify-between lg:p-12">
         {/*
-          Rose and blush blooms over the plum — the palette's middle two colours, kept
-          low enough in opacity that the panel never lightens past the surface the text
-          on it was contrast-checked against.
+          One coral block on the near-black, and nothing else. A second colour here
+          would be the loudest thing in the product sitting on the first screen anyone
+          sees, and it would not be saying anything.
         */}
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{ backgroundImage: 'radial-gradient(38rem 30rem at 18% 12%, rgba(189, 85, 121, 0.55), transparent 62%), radial-gradient(34rem 28rem at 88% 78%, rgba(234, 157, 157, 0.32), transparent 60%)' }}
-        />
+        <div aria-hidden className="absolute -bottom-28 -right-24 h-80 w-80 rounded-full bg-primary/90" />
         <div className="relative flex items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-cream-200 text-brand-950 shadow-sm">
+          <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
             <CheckSquare className="h-6 w-6" />
           </span>
-          <span className="text-xl font-bold leading-tight text-white">Taskr</span>
+          <span className="display-title text-2xl leading-tight text-background">Taskr</span>
         </div>
 
         <div className="relative">
-          <h2 className="text-3xl font-bold leading-tight text-white">
+          <h2 className="display-title text-4xl text-background xl:text-5xl">
             Track the work.<br />Not the paperwork.
           </h2>
-          <p className="mt-4 max-w-md text-brand-200">
+          <p className="mt-5 max-w-md text-sidebar-foreground">
             One place for daily work reports, assigned tasks and team progress — so nobody has to
             chase a status update again.
           </p>
@@ -130,36 +126,36 @@ export function LoginPage() {
               'See every task assigned to you, with deadlines and priority',
               'Managers get live progress across the whole team',
             ].map((line) => (
-              <li key={line} className="flex items-start gap-3 text-sm text-brand-200">
-                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-blush-300" aria-hidden />
+              <li key={line} className="flex items-start gap-3 text-sm text-sidebar-foreground">
+                <CheckSquare className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
                 {line}
               </li>
             ))}
           </ul>
         </div>
 
-        <p className="relative text-xs text-brand-200">
+        <p className="relative text-xs text-sidebar-foreground/70">
           © {new Date().getFullYear()} Taskr. Internal use only.
         </p>
       </div>
 
       {/* Form panel */}
-      <div className="flex flex-1 items-center justify-center bg-white px-5 py-10 sm:px-8">
-        <div className="w-full max-w-sm">
+      <div className="flex flex-1 items-center justify-center bg-muted px-5 py-10 sm:px-8">
+        <div className="card w-full max-w-sm p-6 sm:p-8">
           <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-brand-600 text-white">
+            <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground">
               <CheckSquare className="h-6 w-6" />
             </span>
-            <span className="text-lg font-bold leading-tight text-ink-900">Taskr</span>
+            <span className="display-title text-xl leading-tight text-foreground">Taskr</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-ink-900">Sign in</h1>
-          <p className="mt-1.5 text-sm text-ink-500">Use your company account to continue.</p>
+          <h1 className="display-title text-3xl text-foreground">Sign in</h1>
+          <p className="mt-2 text-sm text-muted-foreground">Use your company account to continue.</p>
 
           {error && (
-            <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 px-3.5 py-3" role="alert">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" aria-hidden />
-              <p className="text-sm font-medium text-red-700">{error}</p>
+            <div className="mt-5 flex items-start gap-2.5 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3" role="alert">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-primary-strong" aria-hidden />
+              <p className="text-sm font-medium text-primary-strong">{error}</p>
             </div>
           )}
 
@@ -186,14 +182,14 @@ export function LoginPage() {
               is the only route in for someone who has never set a password.
             */}
             {invite && (
-              <div className="rounded-lg border border-brand-200 bg-brand-50 px-3.5 py-3">
+              <div className="rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3">
                 <div className="flex items-start gap-2.5">
-                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-brand-600" aria-hidden />
+                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary-strong" aria-hidden />
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-brand-900">
+                    <p className="text-sm font-semibold text-foreground">
                       {invite.name ? `Welcome, ${invite.name}` : 'You have been invited'}
                     </p>
-                    <p className="mt-0.5 text-sm text-brand-800">
+                    <p className="mt-0.5 text-sm text-primary-strong">
                       Your account is ready but has no password yet.
                     </p>
                   </div>
@@ -211,7 +207,7 @@ export function LoginPage() {
             <div>
               <div className="flex items-baseline justify-between">
                 <label className="label" htmlFor="password">Password</label>
-                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-brand-600 hover:text-brand-700">
+                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-primary-strong hover:text-primary-strong">
                   Forgot password?
                 </Link>
               </div>
@@ -230,7 +226,7 @@ export function LoginPage() {
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
                   aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-muted-foreground"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>

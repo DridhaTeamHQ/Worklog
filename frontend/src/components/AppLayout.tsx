@@ -68,10 +68,10 @@ export function AppLayout() {
   };
 
   return (
-    <div className="min-h-screen bg-ink-100">
+    <div className="min-h-screen bg-muted">
       {/* Sidebar — permanent from lg up, slide-over below it. */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-brand-900 transition-transform duration-200 ${
+        className={`fixed inset-y-0 left-0 z-50 w-64 transform bg-foreground lg:border-r lg:border-border transition-transform duration-200 ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         } ${collapsed ? 'lg:-translate-x-full' : 'lg:translate-x-0'}`}
         aria-label="Main navigation"
@@ -82,7 +82,7 @@ export function AppLayout() {
             type="button"
             onClick={() => setSidebarOpen(false)}
             aria-label="Close menu"
-            className="rounded-lg p-1.5 text-brand-200 hover:bg-white/12 hover:text-white lg:hidden"
+            className="rounded-lg p-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:hidden"
           >
             <X className="h-5 w-5" />
           </button>
@@ -93,14 +93,14 @@ export function AppLayout() {
             onClick={toggleCollapsed}
             aria-label="Collapse sidebar"
             title="Collapse sidebar"
-            className="hidden rounded-lg p-1.5 text-brand-200 hover:bg-white/12 hover:text-white lg:block"
+            className="hidden rounded-lg p-1.5 text-sidebar-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground lg:block"
           >
             <PanelLeftClose className="h-5 w-5" />
           </button>
         </div>
 
         <div className="px-3 pb-3">
-          <p className="px-3 pb-2 pt-4 text-[11px] font-semibold uppercase tracking-wider text-brand-200">
+          <p className="px-3 pb-2 pt-4 eyebrow text-sidebar-foreground/70">
             {roleLabel(user?.role)}
           </p>
           <nav className="space-y-1">
@@ -118,7 +118,7 @@ export function AppLayout() {
           </nav>
         </div>
 
-        <div className="absolute inset-x-0 bottom-0 border-t border-white/12 p-3">
+        <div className="absolute inset-x-0 bottom-0 border-t border-sidebar-border p-3">
           <button type="button" onClick={handleLogout} className="nav-link w-full">
             <LogOut className="h-[18px] w-[18px]" />
             <span>Logout</span>
@@ -128,20 +128,20 @@ export function AppLayout() {
 
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-ink-950/50 lg:hidden"
+          className="fixed inset-0 z-40 bg-foreground/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
           aria-hidden
         />
       )}
 
       <div className={`transition-[padding] duration-200 ${collapsed ? 'lg:pl-0' : 'lg:pl-64'}`}>
-        <header className="sticky top-0 z-30 border-b border-ink-200 bg-white/95 backdrop-blur">
+        <header className="sticky top-0 z-30 border-b border-border bg-muted/90 backdrop-blur">
           <div className="flex h-16 items-center gap-3 px-4 sm:px-6">
             <button
               type="button"
               onClick={() => setSidebarOpen(true)}
               aria-label="Open menu"
-              className="rounded-lg p-2 text-ink-600 hover:bg-ink-100 lg:hidden"
+              className="rounded-full p-2 text-foreground hover:bg-accent lg:hidden"
             >
               <Menu className="h-5 w-5" />
             </button>
@@ -156,17 +156,17 @@ export function AppLayout() {
                 onClick={toggleCollapsed}
                 aria-label="Show sidebar"
                 title="Show sidebar"
-                className="hidden rounded-lg p-2 text-ink-600 hover:bg-brand-50 hover:text-brand-700 lg:block"
+                className="hidden rounded-full p-2 text-foreground hover:bg-accent hover:text-foreground lg:block"
               >
                 <PanelLeftOpen className="h-5 w-5" />
               </button>
             )}
 
             <div className="min-w-0 flex-1">
-              <p className="truncate text-sm font-semibold text-ink-900 sm:text-base">
+              <p className="display-title truncate text-sm text-foreground sm:text-base">
                 {isManager ? `${roleLabel(user?.role)} Dashboard` : `Welcome, ${user?.name.split(' ')[0]}`}
               </p>
-              <p className="hidden truncate text-xs text-ink-500 sm:block">
+              <p className="hidden truncate text-xs text-muted-foreground sm:block">
                 {isManager
                   ? 'Company-wide task and reporting overview'
                   : user?.department
@@ -192,10 +192,10 @@ export function AppLayout() {
 export function BrandMark() {
   return (
     <span className="flex items-center gap-2.5">
-      <span className="inline-flex h-9 w-9 items-center justify-center rounded-xl bg-cream-200 text-brand-950 shadow-sm">
+      <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground">
         <CheckSquare className="h-5 w-5" />
       </span>
-      <span className="text-base font-bold leading-tight text-white">Taskr</span>
+      <span className="display-title text-lg leading-tight text-background">Taskr</span>
     </span>
   );
 }
@@ -230,23 +230,23 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
         onClick={() => setOpen((o) => !o)}
         aria-expanded={open}
         aria-label="Account menu"
-        className="flex items-center gap-2 rounded-lg py-1 pl-1 pr-2 transition-colors hover:bg-ink-100"
+        className="flex items-center gap-2 rounded-full py-1 pl-1 pr-2 transition-colors hover:bg-accent"
       >
         <Avatar name={user.name} src={user.profile_image} size="sm" />
         <span className="hidden text-left sm:block">
-          <span className="block max-w-[10rem] truncate text-sm font-semibold text-ink-900">{user.name}</span>
-          <span className="block text-xs text-ink-500">{roleLabel(user.role)}</span>
+          <span className="block max-w-[10rem] truncate text-sm font-semibold text-foreground">{user.name}</span>
+          <span className="block text-xs text-muted-foreground">{roleLabel(user.role)}</span>
         </span>
-        <ChevronDown className="h-4 w-4 text-ink-400" aria-hidden />
+        <ChevronDown className="h-4 w-4 text-muted-foreground" aria-hidden />
       </button>
 
       {open && (
-        <div className="animate-in-up absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-xl border border-ink-200 bg-white shadow-xl">
-          <div className="border-b border-ink-200 px-4 py-3">
-            <p className="truncate text-sm font-semibold text-ink-900">{user.name}</p>
-            <p className="truncate text-xs text-ink-500">{user.email}</p>
+        <div className="animate-in-up absolute right-0 z-50 mt-2 w-64 overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-lg">
+          <div className="border-b border-border px-4 py-3">
+            <p className="truncate text-sm font-semibold text-foreground">{user.name}</p>
+            <p className="truncate text-xs text-muted-foreground">{user.email}</p>
             {user.department && (
-              <p className="mt-1.5 inline-block rounded-full bg-ink-100 px-2 py-0.5 text-[11px] font-medium text-ink-600">
+              <p className="mt-1.5 inline-block rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                 {user.department}
               </p>
             )}
@@ -254,14 +254,14 @@ function ProfileMenu({ onLogout }: { onLogout: () => void }) {
           <button
             type="button"
             onClick={() => { setOpen(false); navigate(profilePath); }}
-            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-ink-700 hover:bg-ink-50"
+            className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-foreground hover:bg-muted"
           >
-            <UserIcon className="h-4 w-4 text-ink-400" /> My profile
+            <UserIcon className="h-4 w-4 text-muted-foreground" /> My profile
           </button>
           <button
             type="button"
             onClick={() => { setOpen(false); onLogout(); }}
-            className="flex w-full items-center gap-2.5 border-t border-ink-100 px-4 py-2.5 text-sm font-medium text-red-600 hover:bg-red-50"
+            className="flex w-full items-center gap-2.5 border-t border-border px-4 py-2.5 text-sm font-medium text-destructive hover:bg-destructive/10"
           >
             <LogOut className="h-4 w-4" /> Logout
           </button>

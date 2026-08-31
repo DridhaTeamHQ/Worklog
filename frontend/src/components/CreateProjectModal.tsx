@@ -98,7 +98,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: Props) {
     >
       <form id="create-project-form" onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="label" htmlFor="p-name">Project name <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="p-name">Project name <span className="text-destructive">*</span></label>
           <input
             id="p-name"
             value={name}
@@ -113,7 +113,7 @@ export function CreateProjectModal({ open, onClose, onCreated }: Props) {
         </div>
 
         <div>
-          <label className="label" htmlFor="p-key">Project key <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="p-key">Project key <span className="text-destructive">*</span></label>
           <input
             id="p-key"
             value={key}

@@ -189,14 +189,14 @@ export function TeamMembersPage() {
               className={`flex items-center gap-2 rounded-xl border px-4 py-2 text-sm font-semibold
                 transition-all duration-200 ease-out active:scale-[0.97] ${
                 tab === t.key
-                  ? 'border-brand-600 bg-brand-600 text-white shadow-sm shadow-brand-600/30'
-                  : 'border-ink-300 bg-white text-ink-700 hover:border-brand-300 hover:bg-brand-50'
+                  ? 'border-primary bg-primary text-primary-foreground shadow-sm '
+                  : 'border-input bg-card text-foreground hover:border-primary/40 hover:bg-primary/10'
               }`}
             >
               {t.icon}
               {t.label}
               <span className={`rounded-full px-1.5 text-[11px] tabular-nums ${
-                tab === t.key ? 'bg-white/20 text-white' : 'bg-ink-100 text-ink-600'
+                tab === t.key ? 'bg-background/20 text-background' : 'bg-muted text-muted-foreground'
               }`}
               >
                 {t.count}
@@ -207,7 +207,7 @@ export function TeamMembersPage() {
       )}
 
       <div className="card">
-        <div className="flex flex-col gap-3 border-b border-ink-200 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-4 sm:flex-row sm:items-center sm:justify-between">
           <SearchInput
             value={search}
             onChange={setSearch}
@@ -272,11 +272,11 @@ export function TeamMembersPage() {
                           <Avatar name={m.name} src={m.profile_image} />
                           <span className="min-w-0">
                             <span className="flex items-center gap-2">
-                              <span className="truncate font-semibold text-ink-900 group-hover:text-brand-600">{m.name}</span>
+                              <span className="truncate font-semibold text-foreground group-hover:text-foreground">{m.name}</span>
                               {/* Until they claim the invite they have no password and
                                   have never signed in — worth seeing at a glance. */}
                               {m.invited && (
-                                <span className="badge shrink-0 border-amber-200 bg-amber-50 text-amber-700">Invited</span>
+                                <span className="badge shrink-0 border-warning/25 bg-warning/10 text-warning">Invited</span>
                               )}
                             </span>
                             {/*
@@ -284,23 +284,23 @@ export function TeamMembersPage() {
                               its own — it identifies the person, it is not something
                               the table is scanned by.
                             */}
-                            <span className="block truncate text-xs text-ink-500">
+                            <span className="block truncate text-xs text-muted-foreground">
                               {m.email}
-                              {m.department && <span className="text-ink-400"> · {m.department}</span>}
+                              {m.department && <span className="text-muted-foreground"> · {m.department}</span>}
                             </span>
                           </span>
                         </Link>
                       </td>
                       <td><StatusBadge status={m.current_status} /></td>
-                      <td className="text-right font-semibold tabular-nums text-ink-900">{m.counts.pending}</td>
-                      <td className="text-right font-semibold tabular-nums text-ink-900">{m.counts.completed}</td>
+                      <td className="text-right font-semibold tabular-nums text-foreground">{m.counts.pending}</td>
+                      <td className="text-right font-semibold tabular-nums text-foreground">{m.counts.completed}</td>
                       <td>
                         {m.submitted_today ? (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-emerald-700">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-success">
                             <CheckCircle2 className="h-3.5 w-3.5" aria-hidden /> Submitted
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-amber-700">
+                          <span className="inline-flex items-center gap-1.5 text-xs font-medium text-warning">
                             <Clock className="h-3.5 w-3.5" aria-hidden />
                             {m.last_report_date ? `Last ${formatDateShort(m.last_report_date)}` : 'None yet'}
                           </span>
@@ -318,7 +318,7 @@ export function TeamMembersPage() {
                               onClick={() => setConfirmRemove(m)}
                               aria-label={`Remove ${m.name}`}
                               title={`Remove ${m.name}`}
-                              className="rounded-md p-1.5 text-ink-400 hover:bg-red-50 hover:text-red-600"
+                              className="rounded-md p-1.5 text-muted-foreground hover:bg-accent hover:text-foreground"
                             >
                               <Trash2 className="h-4 w-4" />
                             </button>
@@ -367,32 +367,32 @@ export function TeamMembersPage() {
                           <Avatar name={a.name} src={a.profile_image} />
                           <span className="min-w-0">
                             <span className="flex items-center gap-2">
-                              <span className="truncate font-semibold text-ink-900">{a.name}</span>
+                              <span className="truncate font-semibold text-foreground">{a.name}</span>
                               {a.id === user?.id && (
-                                <span className="badge border-brand-200 bg-brand-50 text-brand-700">You</span>
+                                <span className="badge border-primary/25 bg-primary/10 text-primary-strong">You</span>
                               )}
                               {a.invited && (
-                                <span className="badge shrink-0 border-amber-200 bg-amber-50 text-amber-700">Invited</span>
+                                <span className="badge shrink-0 border-warning/25 bg-warning/10 text-warning">Invited</span>
                               )}
                             </span>
-                            <span className="block truncate text-xs text-ink-500">
+                            <span className="block truncate text-xs text-muted-foreground">
                               {a.email}
-                              {a.department && <span className="text-ink-400"> · {a.department}</span>}
+                              {a.department && <span className="text-muted-foreground"> · {a.department}</span>}
                             </span>
                           </span>
                         </span>
                       </td>
                       <td>
                         <span className={a.role === 'admin'
-                          ? 'badge border-violet-200 bg-violet-50 text-violet-700'
-                          : 'badge border-ink-200 bg-ink-50 text-ink-600'}>
+                          ? 'badge border-info/25 bg-info/10 text-info'
+                          : 'badge border-border bg-muted text-muted-foreground'}>
                           {roleLabel(a.role)}
                         </span>
                       </td>
-                      <td className="text-ink-600">{a.job_title || '—'}</td>
-                      <td className="text-right font-semibold tabular-nums text-ink-900">{a.assigned_tasks}</td>
-                      <td className="text-right tabular-nums text-ink-600">{a.open_tasks}</td>
-                      <td className="whitespace-nowrap text-xs text-ink-500">{formatDate(a.created_at)}</td>
+                      <td className="text-muted-foreground">{a.job_title || '—'}</td>
+                      <td className="text-right font-semibold tabular-nums text-foreground">{a.assigned_tasks}</td>
+                      <td className="text-right tabular-nums text-muted-foreground">{a.open_tasks}</td>
+                      <td className="whitespace-nowrap text-xs text-muted-foreground">{formatDate(a.created_at)}</td>
                       <td className="text-right">
                         {/*
                           No delete on your own row: signing yourself out permanently is
@@ -405,7 +405,7 @@ export function TeamMembersPage() {
                             onClick={() => setConfirmRemoveAdmin(a)}
                             aria-label={`Remove ${a.name}`}
                             title={`Remove ${a.name}`}
-                            className="rounded-md p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                            className="rounded-md p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                           >
                             <Trash2 className="h-4 w-4" />
                           </button>
@@ -416,7 +416,7 @@ export function TeamMembersPage() {
                 </tbody>
               </table>
             </div>
-            <p className="border-t border-ink-100 px-4 py-3 text-xs text-ink-500">
+            <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
               Everyone listed here reaches this portal. <strong>Admins</strong> administer
               accounts and see the whole company. <strong>Managers</strong> see only their
               own department and cannot add or remove people.
@@ -443,11 +443,11 @@ export function TeamMembersPage() {
       >
         {confirmRemove && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 rounded-lg border border-ink-200 bg-ink-50 p-4">
+            <div className="flex items-center gap-3 rounded-lg border border-border bg-muted p-4">
               <Avatar name={confirmRemove.name} src={confirmRemove.profile_image} />
               <div className="min-w-0">
-                <p className="truncate font-semibold text-ink-900">{confirmRemove.name}</p>
-                <p className="truncate text-sm text-ink-500">{confirmRemove.email}</p>
+                <p className="truncate font-semibold text-foreground">{confirmRemove.name}</p>
+                <p className="truncate text-sm text-muted-foreground">{confirmRemove.email}</p>
               </div>
             </div>
 
@@ -455,16 +455,16 @@ export function TeamMembersPage() {
               Their history is destroyed with them — the foreign keys cascade — so the
               cost is stated before the click rather than discovered after it.
             */}
-            <div className="flex items-start gap-3 rounded-lg border border-red-200 bg-red-50 px-4 py-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-red-600" aria-hidden />
+            <div className="flex items-start gap-3 rounded-lg border border-destructive/25 bg-destructive/5 px-4 py-3">
+              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-destructive" aria-hidden />
               <div className="min-w-0 text-sm">
-                <p className="font-semibold text-red-900">This cannot be undone</p>
-                <p className="mt-0.5 text-red-800">
+                <p className="font-semibold text-foreground">This cannot be undone</p>
+                <p className="mt-0.5 text-destructive">
                   Their account and everything attached to it is deleted: every task
                   assigned to them, every daily report they submitted, every ticket they
                   raised, and their notifications.
                 </p>
-                <p className="mt-2 text-red-800">
+                <p className="mt-2 text-destructive">
                   They currently have{' '}
                   <strong>{confirmRemove.counts.total} task{confirmRemove.counts.total === 1 ? '' : 's'}</strong>
                   {confirmRemove.counts.completed > 0 && (
@@ -495,11 +495,11 @@ export function TeamMembersPage() {
       >
         {confirmRemoveAdmin && (
           <div className="space-y-4">
-            <div className="flex items-center gap-3 rounded-xl border border-ink-200 bg-ink-50 p-4">
+            <div className="flex items-center gap-3 rounded-xl border border-border bg-muted p-4">
               <Avatar name={confirmRemoveAdmin.name} src={confirmRemoveAdmin.profile_image} />
               <div className="min-w-0">
-                <p className="truncate font-semibold text-ink-900">{confirmRemoveAdmin.name}</p>
-                <p className="truncate text-sm text-ink-500">
+                <p className="truncate font-semibold text-foreground">{confirmRemoveAdmin.name}</p>
+                <p className="truncate text-sm text-muted-foreground">
                   {roleLabel(confirmRemoveAdmin.role)} · {confirmRemoveAdmin.email}
                 </p>
               </div>
@@ -511,26 +511,26 @@ export function TeamMembersPage() {
               people's work with them.
             */}
             {confirmRemoveAdmin.assigned_tasks > 0 ? (
-              <div className="flex items-start gap-3 rounded-xl border border-cream-300 bg-cream-50 px-4 py-3">
-                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-cream-700" aria-hidden />
+              <div className="flex items-start gap-3 rounded-xl border border-warning/30 bg-warning/10 px-4 py-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
                 <div className="min-w-0 text-sm">
-                  <p className="font-semibold text-ink-900">
+                  <p className="font-semibold text-foreground">
                     Their {confirmRemoveAdmin.assigned_tasks} assigned task
                     {confirmRemoveAdmin.assigned_tasks === 1 ? '' : 's'} will move to you
                   </p>
-                  <p className="mt-0.5 text-ink-700">
+                  <p className="mt-0.5 text-foreground">
                     Nothing is deleted — the tasks and the employees' progress on them stay
                     exactly as they are. Only the record of who assigned them changes.
                   </p>
                 </div>
               </div>
             ) : (
-              <p className="text-sm text-ink-600">
+              <p className="text-sm text-muted-foreground">
                 They have no assigned tasks, so nothing else is affected.
               </p>
             )}
 
-            <p className="text-sm text-ink-600">
+            <p className="text-sm text-muted-foreground">
               They lose access to this portal immediately. This cannot be undone.
             </p>
           </div>

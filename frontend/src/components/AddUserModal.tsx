@@ -163,13 +163,13 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
         )}
       >
         <div className="space-y-4">
-          <div className="flex items-start gap-3 rounded-lg border border-emerald-200 bg-emerald-50 px-4 py-3">
-            <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-emerald-600" aria-hidden />
+          <div className="flex items-start gap-3 rounded-lg border border-success/25 bg-success/10 px-4 py-3">
+            <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden />
             <div className="min-w-0">
-              <p className="font-semibold text-emerald-900">
+              <p className="font-semibold text-success">
                 {invited.user.name} has been invited{isElevated ? ` as ${role === 'admin' ? 'an admin' : 'a manager'}` : ''}
               </p>
-              <p className="mt-0.5 text-sm text-emerald-800">
+              <p className="mt-0.5 text-sm text-success">
                 No password has been set. They enter their email on the sign-in page,
                 click <span className="font-semibold">Invited</span>, and choose one themselves.
               </p>
@@ -183,19 +183,19 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
             the server log for anyone who needs it.
           */}
           {invited.emailed && (
-            <div className="flex items-start gap-3 rounded-xl border border-brand-200 bg-brand-50 px-4 py-3">
-              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-brand-600" aria-hidden />
-              <p className="min-w-0 text-sm text-brand-800">
+            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3">
+              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-strong" aria-hidden />
+              <p className="min-w-0 text-sm text-primary-strong">
                 An invitation has been sent to{' '}
-                <span className="font-medium text-brand-900">{invited.user.email}</span>.
+                <span className="font-medium text-foreground">{invited.user.email}</span>.
               </p>
             </div>
           )}
 
-          <dl className="rounded-xl border border-ink-200 bg-ink-50 p-4 text-sm">
+          <dl className="rounded-xl border border-border bg-muted p-4 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <dt className="text-ink-500">Signs in with</dt>
-              <dd className="font-mono text-ink-900">{invited.user.email}</dd>
+              <dt className="text-muted-foreground">Signs in with</dt>
+              <dd className="font-mono text-foreground">{invited.user.email}</dd>
             </div>
           </dl>
 
@@ -226,7 +226,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
     >
       <form id="add-member-form" onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="label" htmlFor="m-name">Full name <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="m-name">Full name <span className="text-destructive">*</span></label>
           <input
             id="m-name"
             value={name}
@@ -241,7 +241,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
         </div>
 
         <div>
-          <label className="label" htmlFor="m-email">Work email <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="m-email">Work email <span className="text-destructive">*</span></label>
           <input
             id="m-email"
             type="email"
@@ -260,7 +260,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
             <label className="label" htmlFor="m-dept">
-              Department {!isElevated && <span className="text-red-500">*</span>}
+              Department {!isElevated && <span className="text-destructive">*</span>}
             </label>
             <input
               id="m-dept"
@@ -279,7 +279,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
           </div>
           <div>
             <label className="label" htmlFor="m-title">
-              Job title {!isElevated && <span className="text-red-500">*</span>}
+              Job title {!isElevated && <span className="text-destructive">*</span>}
             </label>
             <input
               id="m-title"

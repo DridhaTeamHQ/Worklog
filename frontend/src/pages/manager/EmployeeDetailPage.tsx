@@ -116,7 +116,7 @@ export function EmployeeDetailPage() {
 
   return (
     <div className="space-y-6">
-      <Link to="/manager/team" className="inline-flex items-center gap-1.5 text-sm font-medium text-ink-600 hover:text-ink-900">
+      <Link to="/manager/team" className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
         <ArrowLeft className="h-4 w-4" /> Back to Team Members
       </Link>
 
@@ -125,21 +125,21 @@ export function EmployeeDetailPage() {
           <div className="flex items-start gap-4">
             <Avatar name={employee.name} src={employee.profile_image} size="xl" />
             <div className="min-w-0">
-              <h1 className="text-xl font-bold text-ink-900 sm:text-2xl">{employee.name}</h1>
+              <h1 className="display-title text-2xl text-foreground sm:text-4xl">{employee.name}</h1>
               <dl className="mt-2 space-y-1 text-sm">
-                <div className="flex items-center gap-2 text-ink-600">
-                  <Mail className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Mail className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <dt className="sr-only">Email</dt>
                   <dd className="truncate">{employee.email}</dd>
                 </div>
-                <div className="flex items-center gap-2 text-ink-600">
-                  <Building2 className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                   <dt className="sr-only">Department</dt>
                   <dd>{employee.department || 'No department'}{employee.job_title ? ` · ${employee.job_title}` : ''}</dd>
                 </div>
                 {employee.phone && (
-                  <div className="flex items-center gap-2 text-ink-600">
-                    <Phone className="h-4 w-4 shrink-0 text-ink-400" aria-hidden />
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Phone className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
                     <dt className="sr-only">Phone</dt>
                     <dd>{employee.phone}</dd>
                   </div>
@@ -163,7 +163,7 @@ export function EmployeeDetailPage() {
 
       {/* The two cards the brief asks for, as tabs so neither is buried below the fold. */}
       <div className="card">
-        <div className="border-b border-ink-200 px-4 pt-4">
+        <div className="border-b border-border px-4 pt-4">
           <div className="flex gap-1" role="tablist" aria-label="Employee sections">
             {([
               { key: 'reports' as const, label: 'Tasks Done', icon: <FileText className="h-4 w-4" />, count: employee.report_count },
@@ -177,13 +177,13 @@ export function EmployeeDetailPage() {
                 onClick={() => setTab(t.key)}
                 className={`flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-semibold transition-colors ${
                   tab === t.key
-                    ? 'border-brand-600 text-brand-700'
-                    : 'border-transparent text-ink-500 hover:text-ink-800'
+                    ? 'border-primary text-primary-strong'
+                    : 'border-transparent text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {t.icon}
                 {t.label}
-                <span className="rounded-full bg-ink-100 px-1.5 py-0.5 text-[11px] tabular-nums text-ink-600">{t.count}</span>
+                <span className="rounded-full bg-muted px-1.5 py-0.5 text-[11px] tabular-nums text-muted-foreground">{t.count}</span>
               </button>
             ))}
           </div>
@@ -191,7 +191,7 @@ export function EmployeeDetailPage() {
 
         {tab === 'reports' ? (
           <div>
-            <div className="flex flex-col gap-3 border-b border-ink-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
               <div className="table-wrap sm:overflow-visible">
                 <div className="segmented min-w-max">
                   {RANGES.map((r) => (
@@ -240,21 +240,21 @@ export function EmployeeDetailPage() {
                 )}
               />
             ) : (
-              <ol className="divide-y divide-ink-100">
+              <ol className="divide-y divide-border">
                 {reports.map((report) => (
                   <li key={report.id} className="px-5 py-4">
                     <div className="flex flex-wrap items-baseline justify-between gap-2">
-                      <h3 className="font-semibold text-ink-900">{formatDate(report.report_date)}</h3>
-                      <p className="text-xs text-ink-400">
+                      <h3 className="font-semibold text-foreground">{formatDate(report.report_date)}</h3>
+                      <p className="text-xs text-muted-foreground">
                         Submitted {formatTime(report.created_at)}
                         {report.updated_at !== report.created_at && ` · last updated ${formatTime(report.updated_at)}`}
                       </p>
                     </div>
-                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-ink-400">Completed tasks</p>
+                    <p className="mt-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">Completed tasks</p>
                     <ul className="mt-1.5 space-y-1.5">
                       {reportLines(report.task_description).map((line, i) => (
-                        <li key={i} className="flex items-start gap-2.5 text-sm text-ink-700">
-                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+                        <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
+                          <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                           <span className="min-w-0">{line}</span>
                         </li>
                       ))}

@@ -103,7 +103,7 @@ export function EditTaskModal({ open, onClose, task, onSaved }: Props) {
     >
       <form id="edit-task-form" onSubmit={submit} className="space-y-4" noValidate>
         <div>
-          <label className="label" htmlFor="et-title">Task title <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="et-title">Task title <span className="text-destructive">*</span></label>
           <input
             id="et-title"
             value={title}
@@ -117,7 +117,7 @@ export function EditTaskModal({ open, onClose, task, onSaved }: Props) {
         </div>
 
         <div>
-          <label className="label" htmlFor="et-desc">Task description <span className="text-red-500">*</span></label>
+          <label className="label" htmlFor="et-desc">Task description <span className="text-destructive">*</span></label>
           <textarea
             id="et-desc"
             value={description}

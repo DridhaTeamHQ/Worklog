@@ -91,7 +91,7 @@ export function TaskReportsPage() {
       <PageHeader title="Task Reports" subtitle="Daily work reports submitted across the company." />
 
       <div className="card">
-        <div className="flex flex-col gap-3 border-b border-ink-200 p-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-4 lg:flex-row lg:items-center lg:justify-between">
           <div className="table-wrap sm:overflow-visible">
             <div className="segmented min-w-max">
               {RANGES.map((r) => (
@@ -161,16 +161,16 @@ export function TaskReportsPage() {
             )}
           />
         ) : (
-          <div className="divide-y divide-ink-200">
+          <div className="divide-y divide-border">
             {dates.map((date) => (
               <section key={date}>
-                <h2 className="sticky top-16 z-10 border-b border-brand-100 bg-brand-50/95 px-5 py-2.5 text-sm font-semibold text-brand-800 backdrop-blur">
+                <h2 className="sticky top-16 z-10 border-b border-primary/20 bg-muted/95 px-5 py-2.5 text-sm font-semibold text-primary-strong backdrop-blur">
                   {formatDate(date)}
-                  <span className="ml-2 font-normal text-ink-500">
+                  <span className="ml-2 font-normal text-muted-foreground">
                     · {grouped[date].length} report{grouped[date].length === 1 ? '' : 's'}
                   </span>
                 </h2>
-                <ul className="divide-y divide-ink-100">
+                <ul className="divide-y divide-border">
                   {grouped[date].map((report) => (
                     <li key={report.id} className="flex gap-4 px-5 py-4">
                       <Avatar name={report.employee_name} size="md" />
@@ -178,19 +178,19 @@ export function TaskReportsPage() {
                         <div className="flex flex-wrap items-baseline justify-between gap-2">
                           <Link
                             to={`/manager/team/${report.employee_id}`}
-                            className="font-semibold text-ink-900 hover:text-brand-600"
+                            className="font-semibold text-foreground hover:text-primary-strong"
                           >
                             {report.employee_name}
                           </Link>
-                          <p className="text-xs text-ink-400">
+                          <p className="text-xs text-muted-foreground">
                             {report.employee_department || '—'} · submitted {formatTime(report.created_at)}
                             {report.updated_at !== report.created_at && ` · edited ${formatTime(report.updated_at)}`}
                           </p>
                         </div>
                         <ul className="mt-2 space-y-1.5">
                           {reportLines(report.task_description).map((line, i) => (
-                            <li key={i} className="flex items-start gap-2.5 text-sm text-ink-700">
-                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-500" aria-hidden />
+                            <li key={i} className="flex items-start gap-2.5 text-sm text-foreground">
+                              <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                               <span className="min-w-0">{line}</span>
                             </li>
                           ))}

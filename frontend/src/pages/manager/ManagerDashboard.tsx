@@ -11,6 +11,15 @@ import { ApiError } from '../../api/client';
 import { Avatar, EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
 import { PriorityBadge, StatusBadge, SeverityBadge } from '../../components/Badges';
 import { formatDate, formatDateShort, reportLines, taskLabel } from '../../lib/format';
+import { CHART, TOOLTIP_ITEM_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_STYLE } from '../../lib/chart';
+
+/*
+  Drawn at rest, for the same reason as the analytics charts: the library only paints
+  a series as its entry animation advances, and that animation stops when the tab is
+  not being given frames — leaving a dashboard opened in a background tab showing an
+  empty grid.
+*/
+const STILL = { isAnimationActive: false } as const;
 import type { ManagerDashboard as ManagerDashboardData } from '../../types';
 
 export function ManagerDashboard() {
@@ -46,8 +55,8 @@ export function ManagerDashboard() {
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-xl font-bold text-ink-900 sm:text-2xl">Dashboard overview</h1>
-        <p className="mt-1 text-sm text-ink-500">{formatDate(new Date().toISOString())}</p>
+        <h1 className="display-title text-2xl text-foreground sm:text-4xl">Dashboard overview</h1>
+        <p className="mt-1 text-sm text-muted-foreground">{formatDate(new Date().toISOString())}</p>
       </div>
 
       <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
@@ -59,27 +68,27 @@ export function ManagerDashboard() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <div className={`card p-5 ${summary.overdue_tasks > 0 ? 'border-red-200 bg-red-50' : ''}`}>
+        <div className={`card p-5 ${summary.overdue_tasks > 0 ? 'border-destructive/25 bg-destructive/5' : ''}`}>
           <div className="flex items-start gap-3">
             <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-              summary.overdue_tasks > 0 ? 'bg-red-100 text-red-600' : 'bg-emerald-50 text-emerald-600'
+              summary.overdue_tasks > 0 ? 'bg-destructive/10 text-destructive' : 'bg-success/10 text-success'
             }`}
             >
               {summary.overdue_tasks > 0 ? <AlertTriangle className="h-5 w-5" /> : <CheckCircle2 className="h-5 w-5" />}
             </span>
             <div className="min-w-0">
-              <p className={`font-semibold ${summary.overdue_tasks > 0 ? 'text-red-900' : 'text-ink-900'}`}>
+              <p className={`font-semibold ${summary.overdue_tasks > 0 ? 'text-foreground' : 'text-foreground'}`}>
                 {summary.overdue_tasks > 0
                   ? `${summary.overdue_tasks} overdue task${summary.overdue_tasks === 1 ? '' : 's'}`
                   : 'Nothing overdue'}
               </p>
-              <p className={`mt-0.5 text-sm ${summary.overdue_tasks > 0 ? 'text-red-800' : 'text-ink-500'}`}>
+              <p className={`mt-0.5 text-sm ${summary.overdue_tasks > 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
                 {summary.overdue_tasks > 0
                   ? 'These are past their deadline and not yet complete.'
                   : 'Every open task is still within its deadline.'}
               </p>
               {summary.overdue_tasks > 0 && (
-                <Link to="/manager/tasks?status=overdue" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-red-700 hover:text-red-800">
+                <Link to="/manager/tasks?status=overdue" className="mt-2 inline-flex items-center gap-1 text-sm font-semibold text-destructive hover:underline">
                   Review them <ArrowRight className="h-3.5 w-3.5" />
                 </Link>
               )}
@@ -89,21 +98,21 @@ export function ManagerDashboard() {
 
         <div className="card p-5">
           <div className="flex items-start gap-3">
-            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-brand-50 text-brand-600">
+            <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary-strong">
               <FileText className="h-5 w-5" />
             </span>
             <div className="min-w-0">
-              <p className="font-semibold text-ink-900">
+              <p className="font-semibold text-foreground">
                 {summary.reports_submitted_today} of {summary.total_team_members} reports submitted today
               </p>
-              <p className="mt-0.5 text-sm text-ink-500">
+              <p className="mt-0.5 text-sm text-muted-foreground">
                 {summary.reports_pending_today === 0
                   ? 'Everyone has logged their day.'
                   : `${summary.reports_pending_today} still to come.`}
               </p>
-              <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-ink-100">
+              <div className="mt-2.5 h-2 overflow-hidden rounded-full bg-muted">
                 <div
-                  className="h-full rounded-full bg-brand-500 transition-all"
+                  className="h-full rounded-full bg-primary transition-all"
                   style={{
                     width: `${summary.total_team_members
                       ? Math.round((summary.reports_submitted_today / summary.total_team_members) * 100)
@@ -118,32 +127,32 @@ export function ManagerDashboard() {
 
       {summary.open_tickets > 0 && (
         <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
+          <header className="flex items-center justify-between border-b border-border px-5 py-4">
             <div className="flex items-center gap-2.5">
-              <Bug className="h-5 w-5 text-red-600" aria-hidden />
-              <h2 className="font-semibold text-ink-900">
+              <Bug className="h-5 w-5 text-destructive" aria-hidden />
+              <h2 className="font-semibold text-foreground">
                 {summary.open_tickets} open ticket{summary.open_tickets === 1 ? '' : 's'}
                 {summary.critical_tickets > 0 && (
-                  <span className="ml-2 font-normal text-red-600">
+                  <span className="ml-2 font-normal text-destructive">
                     · {summary.critical_tickets} critical
                   </span>
                 )}
               </h2>
             </div>
-            <Link to="/manager/tickets" className="text-sm font-semibold text-brand-600 hover:text-brand-700">
+            <Link to="/manager/tickets" className="text-sm font-medium text-primary-strong hover:underline">
               View all
             </Link>
           </header>
-          <ul className="divide-y divide-ink-100">
+          <ul className="divide-y divide-border">
             {tickets.map((ticket) => (
               <li key={ticket.id} className="flex items-start gap-3 px-5 py-3.5">
                 <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-medium text-ink-900">
-                    <span className="mr-1.5 font-mono text-xs text-brand-700">{ticket.ticket_key}</span>
+                  <p className="truncate text-sm font-medium text-foreground">
+                    <span className="mr-1.5 font-mono text-xs text-muted-foreground">{ticket.ticket_key}</span>
                     {ticket.title}
                   </p>
-                  <p className="truncate text-xs text-ink-500">
+                  <p className="truncate text-xs text-muted-foreground">
                     {ticket.reporter_name} · {ticket.project_name}
                     {ticket.task_key && ` · on ${ticket.task_key}`}
                   </p>
@@ -156,32 +165,34 @@ export function ManagerDashboard() {
       )}
 
       <section className="card p-5">
-        <h2 className="font-semibold text-ink-900">Activity — last 14 days</h2>
-        <p className="text-xs text-ink-500">Tasks assigned and completed, plus daily reports submitted.</p>
+        <h2 className="font-semibold text-foreground">Activity — last 14 days</h2>
+        <p className="text-xs text-muted-foreground">Tasks assigned and completed, plus daily reports submitted.</p>
         <div className="mt-4 h-64 w-full">
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={chartData} margin={{ top: 5, right: 8, left: -18, bottom: 0 }}>
               <defs>
                 <linearGradient id="gAssigned" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#a33e63" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#a33e63" stopOpacity={0} />
+                  <stop offset="5%" stopColor={CHART.primary} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={CHART.primary} stopOpacity={0} />
                 </linearGradient>
                 <linearGradient id="gCompleted" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#15794c" stopOpacity={0.35} />
-                  <stop offset="95%" stopColor="#15794c" stopOpacity={0} />
+                  <stop offset="5%" stopColor={CHART.neutral} stopOpacity={0.35} />
+                  <stop offset="95%" stopColor={CHART.neutral} stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <CartesianGrid strokeDasharray="3 3" stroke="#e8dfe5" vertical={false} />
-              <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fontSize: 11, fill: '#71606b' }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
+              <CartesianGrid strokeDasharray="3 3" stroke={CHART.grid} vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
+              <YAxis tick={{ fontSize: 11, fill: CHART.axis }} tickLine={false} axisLine={false} allowDecimals={false} width={40} />
               <Tooltip
-                contentStyle={{ borderRadius: 10, border: '1px solid #e8dfe5', fontSize: 12 }}
-                labelStyle={{ fontWeight: 600, color: '#0f172a' }}
+                contentStyle={TOOLTIP_STYLE}
+                labelStyle={TOOLTIP_LABEL_STYLE}
+                itemStyle={TOOLTIP_ITEM_STYLE}
+                cursor={{ stroke: CHART.axis, strokeOpacity: 0.4 }}
               />
               <Legend wrapperStyle={{ fontSize: 12 }} />
-              <Area type="monotone" dataKey="assigned" name="Assigned" stroke="#a33e63" strokeWidth={2} fill="url(#gAssigned)" />
-              <Area type="monotone" dataKey="completed" name="Completed" stroke="#15794c" strokeWidth={2} fill="url(#gCompleted)" />
-              <Area type="monotone" dataKey="reports" name="Reports" stroke="#94560a" strokeWidth={2} fillOpacity={0} />
+              <Area type="monotone" dataKey="assigned" name="Assigned" stroke={CHART.primary} strokeWidth={2} fill="url(#gAssigned)" {...STILL} />
+              <Area type="monotone" dataKey="completed" name="Completed" stroke={CHART.neutral} strokeWidth={2} fill="url(#gCompleted)" {...STILL} />
+              <Area type="monotone" dataKey="reports" name="Reports" stroke={CHART.neutralSoft} strokeWidth={2} fillOpacity={0} {...STILL} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -189,22 +200,22 @@ export function ManagerDashboard() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Recently assigned</h2>
-            <Link to="/manager/tasks" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
+          <header className="flex items-center justify-between border-b border-border px-5 py-4">
+            <h2 className="font-semibold text-foreground">Recently assigned</h2>
+            <Link to="/manager/tasks" className="text-sm font-medium text-primary-strong hover:underline">View all</Link>
           </header>
           {tasks.length === 0 ? (
             <EmptyState icon={<ClipboardCheck className="h-6 w-6" />} title="No tasks assigned yet" description="Assign work from a team member's page to get started." />
           ) : (
-            <ul className="divide-y divide-ink-100">
+            <ul className="divide-y divide-border">
               {tasks.map((task) => (
                 <li key={task.id} className="flex items-start gap-3 px-5 py-3.5">
                   <Avatar name={task.employee_name} src={task.employee_profile_image} size="sm" />
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-ink-900">
+                    <p className="truncate text-sm font-medium text-foreground">
                       {task.task_key && (
                         <span className={`mr-1.5 font-mono text-xs ${
-                          task.status === 'completed' ? 'text-ink-400 line-through' : 'text-brand-700'
+                          task.status === 'completed' ? 'text-muted-foreground line-through' : 'text-foreground'
                         }`}
                         >
                           {task.task_key}
@@ -212,7 +223,7 @@ export function ManagerDashboard() {
                       )}
                       {taskLabel(task)}
                     </p>
-                    <p className="truncate text-xs text-ink-500">
+                    <p className="truncate text-xs text-muted-foreground">
                       {task.employee_name} · {task.project_name || 'No project'} · {formatDateShort(task.created_at)}
                     </p>
                   </div>
@@ -227,23 +238,23 @@ export function ManagerDashboard() {
         </section>
 
         <section className="card">
-          <header className="flex items-center justify-between border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Latest task reports</h2>
-            <Link to="/manager/reports" className="text-sm font-semibold text-brand-600 hover:text-brand-700">View all</Link>
+          <header className="flex items-center justify-between border-b border-border px-5 py-4">
+            <h2 className="font-semibold text-foreground">Latest task reports</h2>
+            <Link to="/manager/reports" className="text-sm font-medium text-primary-strong hover:underline">View all</Link>
           </header>
           {reports.length === 0 ? (
             <EmptyState icon={<FileText className="h-6 w-6" />} title="No reports submitted yet" description="Daily reports from your team will appear here." />
           ) : (
-            <ul className="divide-y divide-ink-100">
+            <ul className="divide-y divide-border">
               {reports.map((report) => (
                 <li key={report.id} className="flex items-start gap-3 px-5 py-3.5">
                   <Avatar name={report.employee_name} size="sm" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-baseline justify-between gap-2">
-                      <p className="truncate text-sm font-medium text-ink-900">{report.employee_name}</p>
-                      <p className="shrink-0 text-xs text-ink-400">{formatDateShort(report.report_date)}</p>
+                      <p className="truncate text-sm font-medium text-foreground">{report.employee_name}</p>
+                      <p className="shrink-0 text-xs text-muted-foreground">{formatDateShort(report.report_date)}</p>
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-ink-500">
+                    <p className="mt-0.5 truncate text-xs text-muted-foreground">
                       {reportLines(report.task_description).slice(0, 2).join(' · ')}
                     </p>
                   </div>

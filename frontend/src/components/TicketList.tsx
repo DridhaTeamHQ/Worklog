@@ -35,7 +35,7 @@ export function TicketList({
   };
 
   return (
-    <ul className="divide-y divide-ink-100">
+    <ul className="divide-y divide-border">
       {tickets.map((ticket) => {
         const isOpen = expanded.has(ticket.id);
         const settled = ticket.status === 'resolved' || ticket.status === 'closed';
@@ -45,7 +45,7 @@ export function TicketList({
             key={ticket.id}
             id={`ticket-${ticket.id}`}
             className={`px-4 py-3.5 transition-colors sm:px-5 ${
-              ticket.id === highlightId ? 'bg-brand-50' : ''
+              ticket.id === highlightId ? 'bg-primary/10' : ''
             }`}
           >
             <div className="flex items-start gap-2.5">
@@ -54,7 +54,7 @@ export function TicketList({
                 onClick={() => toggle(ticket.id)}
                 aria-expanded={isOpen}
                 aria-label={isOpen ? 'Hide details' : 'Show details'}
-                className="mt-0.5 shrink-0 rounded p-0.5 text-ink-400 transition-transform hover:bg-ink-100 hover:text-ink-700"
+                className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground transition-transform hover:bg-muted hover:text-foreground"
                 style={{ transform: isOpen ? 'rotate(90deg)' : undefined }}
               >
                 <ChevronRight className="h-4 w-4" />
@@ -64,30 +64,30 @@ export function TicketList({
                 <div className="flex flex-wrap items-center gap-2">
                   <span
                     className={`font-mono text-xs font-semibold ${
-                      settled ? 'text-ink-400 line-through' : 'text-brand-700'
+                      settled ? 'text-muted-foreground line-through' : 'text-foreground'
                     }`}
                   >
                     {ticket.ticket_key}
                   </span>
-                  <span className="min-w-0 font-medium text-ink-900">{ticket.title}</span>
+                  <span className="min-w-0 font-medium text-foreground">{ticket.title}</span>
                   <SeverityBadge severity={ticket.severity} />
                   <TicketStatusBadge status={ticket.status} />
                 </div>
 
-                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-ink-500">
+                <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                   <span>
-                    <span className="text-ink-400">Project </span>{ticket.project_name}
+                    <span className="text-muted-foreground">Project </span>{ticket.project_name}
                   </span>
                   {ticket.task_key ? (
                     <span>
-                      <span className="text-ink-400">on </span>
+                      <span className="text-muted-foreground">on </span>
                       <span className="font-mono">{ticket.task_key}</span> {ticket.task_title}
                     </span>
                   ) : (
-                    <span className="italic text-ink-400">the linked task was deleted</span>
+                    <span className="italic text-muted-foreground">the linked task was deleted</span>
                   )}
                   <span title={formatDateTime(ticket.created_at)}>
-                    <span className="text-ink-400">raised </span>{relativeTime(ticket.created_at)}
+                    <span className="text-muted-foreground">raised </span>{relativeTime(ticket.created_at)}
                   </span>
                 </div>
 
@@ -97,40 +97,40 @@ export function TicketList({
                     {linkReporter ? (
                       <Link
                         to={`/manager/team/${ticket.reporter_id}`}
-                        className="text-ink-700 hover:text-brand-600"
+                        className="text-foreground hover:text-primary-strong"
                       >
                         {ticket.reporter_name}
                       </Link>
                     ) : (
-                      <span className="text-ink-700">{ticket.reporter_name}</span>
+                      <span className="text-foreground">{ticket.reporter_name}</span>
                     )}
                     {ticket.reporter_department && (
-                      <span className="text-xs text-ink-400">· {ticket.reporter_department}</span>
+                      <span className="text-xs text-muted-foreground">· {ticket.reporter_department}</span>
                     )}
                   </div>
                 )}
 
                 {isOpen && (
                   <div className="mt-3 space-y-3">
-                    <div className="rounded-lg border border-ink-200 bg-ink-50 px-3.5 py-3">
-                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-ink-700">
+                    <div className="rounded-lg border border-border bg-muted px-3.5 py-3">
+                      <p className="whitespace-pre-wrap text-sm leading-relaxed text-foreground">
                         {ticket.description}
                       </p>
                     </div>
 
                     {ticket.resolution_note && (
-                      <div className="flex items-start gap-2.5 rounded-lg border border-emerald-200 bg-emerald-50 px-3.5 py-3">
-                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-600" aria-hidden />
+                      <div className="flex items-start gap-2.5 rounded-lg border border-success/25 bg-success/10 px-3.5 py-3">
+                        <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-success" aria-hidden />
                         <div className="min-w-0">
-                          <p className="text-xs font-semibold uppercase tracking-wide text-emerald-700">
+                          <p className="text-xs font-semibold uppercase tracking-wide text-success">
                             Resolution
                           </p>
-                          <p className="mt-0.5 text-sm text-emerald-900">{ticket.resolution_note}</p>
+                          <p className="mt-0.5 text-sm text-success">{ticket.resolution_note}</p>
                         </div>
                       </div>
                     )}
 
-                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-ink-400">
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
                       <span className="inline-flex items-center gap-1.5">
                         <Clock className="h-3.5 w-3.5" aria-hidden />
                         Raised {formatDateTime(ticket.created_at)}
@@ -160,7 +160,7 @@ export function TicketList({
                     ).map((s) => ({ value: s, label: TICKET_STATUS_LABEL[s] }))}
                   />
                   {updatingId === ticket.id && (
-                    <span className="absolute right-7 top-1/2 -translate-y-1/2 text-ink-400">
+                    <span className="absolute right-7 top-1/2 -translate-y-1/2 text-muted-foreground">
                       <Spinner className="h-3.5 w-3.5" />
                     </span>
                   )}
@@ -171,7 +171,7 @@ export function TicketList({
                     type="button"
                     onClick={() => onDelete(ticket)}
                     aria-label={`Delete ${ticket.ticket_key}`}
-                    className="rounded p-1.5 text-ink-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                    className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

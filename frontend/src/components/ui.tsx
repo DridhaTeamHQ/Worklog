@@ -2,7 +2,7 @@ import {
   useEffect, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
 } from 'react';
 import { Loader2, Search, X, AlertCircle, RefreshCw, ChevronDown, Check } from 'lucide-react';
-import { avatarTint, initials } from '../lib/format';
+import { initials } from '../lib/format';
 
 /* ------------------------------------------------------------------ avatar */
 
@@ -21,7 +21,7 @@ export function Avatar({
   return (
     <span
       aria-hidden
-      className={`${sizes[size]} ${avatarTint(name)} inline-flex shrink-0 items-center justify-center rounded-full font-semibold ${className}`}
+      className={`${sizes[size]} inline-flex shrink-0 items-center justify-center rounded-full bg-muted font-medium text-muted-foreground ${className}`}
     >
       {initials(name)}
     </span>
@@ -41,36 +41,43 @@ export function StatCard({
   onClick?: () => void;
 }) {
   /*
-    Each accent is a pair: a soft wash for the icon tile and a matching hairline down
-    the left edge, so a row of stat cards reads as a set of colours rather than five
-    identical white boxes. The washes are backgrounds only — every number and label on
-    top of them stays on white, which is what keeps the text contrast honest.
+    Every card is the same neutral surface. The accent reaches the icon and nothing
+    else — the figure and its label are always `foreground` and `muted-foreground`,
+    which is what stops a row of five stats turning into a row of five colours.
+
+    Where a stat *is* a state, the icon takes that state's colour, because there the
+    colour is information: pending is warning, in progress is info, completed is
+    success, overdue is destructive. `brand` is the one card a screen is actually
+    about, and it is the only one that gets the primary. `ink` opts out entirely.
+
+    The accent names are the ones the pages already pass, so the mapping lives here in
+    one place rather than being spelled out at every call site.
   */
   const accents = {
-    brand: { tile: 'bg-brand-100 text-brand-700', edge: 'bg-brand-400' },
-    blush: { tile: 'bg-blush-100 text-blush-700', edge: 'bg-blush-300' },
-    cream: { tile: 'bg-cream-100 text-cream-700', edge: 'bg-cream-300' },
-    amber: { tile: 'bg-amber-100 text-amber-700', edge: 'bg-amber-300' },
-    blue: { tile: 'bg-blue-100 text-blue-700', edge: 'bg-blue-300' },
-    emerald: { tile: 'bg-emerald-100 text-emerald-700', edge: 'bg-emerald-300' },
-    red: { tile: 'bg-red-100 text-red-700', edge: 'bg-red-300' },
-    ink: { tile: 'bg-ink-100 text-ink-600', edge: 'bg-ink-300' },
+    brand: 'bg-primary/10 text-primary-strong',
+    blush: 'bg-primary/10 text-primary-strong',
+    cream: 'bg-warning/10 text-warning',
+    amber: 'bg-warning/10 text-warning',
+    blue: 'bg-info/10 text-info',
+    emerald: 'bg-success/10 text-success',
+    red: 'bg-destructive/10 text-destructive',
+    ink: 'bg-muted text-muted-foreground',
   };
-  const a = accents[accent];
   const Tag = onClick ? 'button' : 'div';
   return (
     <Tag
       onClick={onClick}
-      className={`card relative overflow-hidden p-4 sm:p-5 text-left w-full ${onClick ? 'card-hover cursor-pointer' : ''}`}
+      className={`card relative overflow-hidden p-4 sm:p-5 text-left w-full ${
+        onClick ? 'card-hover cursor-pointer' : ''
+      }`}
     >
-      <span className={`absolute inset-y-0 left-0 w-1.5 ${a.edge}`} aria-hidden />
-      <div className="flex items-start justify-between gap-3 pl-2">
+      <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
-          <p className="text-sm font-medium text-ink-500 truncate">{label}</p>
-          <p className="mt-1.5 text-2xl sm:text-3xl font-bold text-ink-900 tabular-nums">{value}</p>
-          {hint && <p className="mt-1 text-xs text-ink-500 truncate">{hint}</p>}
+          <p className="text-sm font-medium leading-tight text-muted-foreground">{label}</p>
+          <p className="mt-2 text-3xl font-bold tabular-nums tracking-[-0.02em] text-foreground">{value}</p>
+          {hint && <p className="mt-1 truncate text-xs text-muted-foreground">{hint}</p>}
         </div>
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${a.tile}`}>
+        <span className={`inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${accents[accent]}`}>
           {icon}
         </span>
       </div>
@@ -86,12 +93,12 @@ export function EmptyState({
   return (
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center">
       {icon && (
-        <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-brand-100 text-brand-600">
+        <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-muted text-muted-foreground">
           {icon}
         </span>
       )}
-      <p className="text-base font-semibold text-ink-800">{title}</p>
-      {description && <p className="mt-1.5 max-w-md text-sm text-ink-500">{description}</p>}
+      <p className="text-base font-semibold text-foreground">{title}</p>
+      {description && <p className="mt-1.5 max-w-md text-sm text-muted-foreground">{description}</p>}
       {action && <div className="mt-5">{action}</div>}
     </div>
   );
@@ -100,11 +107,11 @@ export function EmptyState({
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
   return (
     <div className="flex flex-col items-center justify-center px-6 py-12 text-center" role="alert">
-      <span className="mb-4 inline-flex h-14 w-14 items-center justify-center rounded-full bg-red-50 text-red-500">
-        <AlertCircle className="h-7 w-7" />
+      <span className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 text-destructive">
+        <AlertCircle className="h-6 w-6" />
       </span>
-      <p className="text-base font-semibold text-ink-800">Something went wrong</p>
-      <p className="mt-1.5 max-w-md text-sm text-ink-500">{message}</p>
+      <p className="text-base font-semibold text-foreground">Something went wrong</p>
+      <p className="mt-1.5 max-w-md text-sm text-muted-foreground">{message}</p>
       {onRetry && (
         <button type="button" onClick={onRetry} className="btn-secondary mt-5">
           <RefreshCw className="h-4 w-4" /> Try again
@@ -153,7 +160,7 @@ export function LoadingBlock({ label = 'Loading…', rows = 3, className = '' }:
 
 export function PageLoader() {
   return (
-    <div className="flex min-h-[60vh] items-center justify-center text-ink-400">
+    <div className="flex min-h-[60vh] items-center justify-center text-muted-foreground">
       <Spinner className="h-8 w-8" />
       <span className="sr-only">Loading</span>
     </div>
@@ -167,7 +174,7 @@ export function SearchInput({
 }: { value: string; onChange: (v: string) => void; placeholder?: string; className?: string }) {
   return (
     <div className={`relative ${className}`}>
-      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-ink-400" aria-hidden />
+      <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
       <input
         type="search"
         value={value}
@@ -181,7 +188,7 @@ export function SearchInput({
           type="button"
           onClick={() => onChange('')}
           aria-label="Clear search"
-          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-ink-400 hover:bg-ink-100 hover:text-ink-600"
+          className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
         >
           <X className="h-4 w-4" />
         </button>
@@ -227,7 +234,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
       <div
-        className="absolute inset-0 bg-ink-950/50 backdrop-blur-[2px]"
+        className="absolute inset-0 bg-foreground/50 backdrop-blur-[2px]"
         onClick={onClose}
         aria-hidden
       />
@@ -237,18 +244,18 @@ export function Modal({
         role="dialog"
         aria-modal="true"
         aria-label={title}
-        className={`animate-in-up relative w-full ${widths[size]} max-h-[92vh] overflow-hidden rounded-t-2xl sm:rounded-2xl bg-white shadow-2xl outline-none flex flex-col`}
+        className={`animate-in-up relative w-full ${widths[size]} max-h-[92vh] overflow-hidden rounded-t-3xl sm:rounded-3xl bg-card shadow-2xl outline-none flex flex-col`}
       >
-        <div className="flex items-start justify-between gap-4 border-b border-ink-200 px-5 py-4">
+        <div className="flex items-start justify-between gap-4 border-b border-border px-5 py-4">
           <div className="min-w-0">
-            <h2 className="text-lg font-semibold text-ink-900">{title}</h2>
-            {description && <p className="mt-0.5 text-sm text-ink-500">{description}</p>}
+            <h2 className="text-lg font-semibold text-foreground">{title}</h2>
+            {description && <p className="mt-0.5 text-sm text-muted-foreground">{description}</p>}
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close dialog"
-            className="rounded-lg p-1.5 text-ink-400 hover:bg-ink-100 hover:text-ink-700"
+            className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
@@ -256,7 +263,7 @@ export function Modal({
 
         <div className="flex-1 overflow-y-auto px-5 py-5">{children}</div>
 
-        {footer && <div className="border-t border-ink-200 bg-ink-50 px-5 py-4">{footer}</div>}
+        {footer && <div className="border-t border-border bg-muted px-5 py-4">{footer}</div>}
       </div>
     </div>
   );
@@ -270,8 +277,8 @@ export function PageHeader({
   return (
     <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
       <div className="min-w-0">
-        <h1 className="text-xl sm:text-2xl font-bold text-ink-900">{title}</h1>
-        {subtitle && <p className="mt-1 text-sm text-ink-500">{subtitle}</p>}
+        <h1 className="display-title text-2xl sm:text-4xl text-foreground">{title}</h1>
+        {subtitle && <p className="mt-2 text-sm text-muted-foreground">{subtitle}</p>}
       </div>
       {actions && <div className="flex flex-wrap items-center gap-2">{actions}</div>}
     </div>
@@ -426,19 +433,19 @@ export function Select({
         }}
         onKeyDown={onKeyDown}
         className={`input flex items-center justify-between gap-2 text-left ${invalid ? 'input-error' : ''} ${
-          open ? 'border-brand-500 bg-brand-50/30' : ''
+          open ? 'border-primary' : ''
         }`}
       >
-        <span className={`min-w-0 flex-1 truncate ${selected ? 'text-ink-900' : 'text-ink-400'}`}>
+        <span className={`min-w-0 flex-1 truncate ${selected ? 'text-foreground' : 'text-muted-foreground'}`}>
           {selected ? (
             <>
-              {selected.badge && <span className="mr-1.5 font-mono text-xs text-brand-700">{selected.badge}</span>}
+              {selected.badge && <span className="mr-1.5 font-mono text-xs text-muted-foreground">{selected.badge}</span>}
               {selected.label}
             </>
           ) : placeholder}
         </span>
         <ChevronDown
-          className={`h-4 w-4 shrink-0 text-brand-600 transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
+          className={`h-4 w-4 shrink-0 text-foreground transition-transform duration-200 ${open ? 'rotate-180' : ''}`}
           aria-hidden
         />
       </button>
@@ -449,10 +456,10 @@ export function Select({
           id={listId}
           role="listbox"
           tabIndex={-1}
-          className="fade-in absolute z-50 mt-1.5 max-h-64 w-full overflow-auto rounded-xl border border-brand-950/40 bg-brand-900 p-1 shadow-lg shadow-brand-950/30"
+          className="fade-in absolute z-50 mt-1.5 max-h-64 w-full overflow-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
         >
           {options.length === 0 && (
-            <li className="px-3 py-2 text-sm text-brand-200">No options</li>
+            <li className="px-3 py-2 text-sm text-muted-foreground">No options</li>
           )}
           {options.map((o, i) => {
             const isSelected = o.value === value;
@@ -464,16 +471,16 @@ export function Select({
                 aria-selected={isSelected}
                 onMouseEnter={() => setActive(i)}
                 onMouseDown={(e) => { e.preventDefault(); commit(i); }}
-                className={`flex cursor-pointer items-center gap-2 rounded-lg px-3 py-2 text-sm transition-colors ${
+                className={`flex cursor-pointer items-center gap-2 rounded-sm px-3 py-2 text-sm transition-colors ${
                   isSelected
-                    ? 'bg-cream-200 font-semibold text-brand-950'
+                    ? 'bg-accent font-medium text-accent-foreground'
                     : i === active
-                      ? 'bg-white/15 text-white'
-                      : 'text-brand-200'
+                      ? 'bg-accent/60 text-accent-foreground'
+                      : 'text-popover-foreground'
                 }`}
               >
                 {o.badge && (
-                  <span className={`font-mono text-[11px] font-bold ${isSelected ? 'text-brand-800' : 'text-cream-200'}`}>
+                  <span className="font-mono text-[11px] font-semibold text-muted-foreground">
                     {o.badge}
                   </span>
                 )}

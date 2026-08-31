@@ -144,7 +144,7 @@ export function TasksAssignedPage() {
       )}
 
       <div className="card">
-        <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="overflow-x-auto">
             <div
               className="segmented min-w-max"
@@ -197,9 +197,9 @@ export function TasksAssignedPage() {
           />
         ) : (
           <>
-            <p className="px-4 py-2 text-xs text-ink-500">
+            <p className="px-4 py-2 text-xs text-muted-foreground">
               Showing {tasks.length} task{tasks.length === 1 ? '' : 's'}
-              {overdueCount > 0 && <span className="font-semibold text-red-600"> · {overdueCount} overdue</span>}
+              {overdueCount > 0 && <span className="font-semibold text-destructive"> · {overdueCount} overdue</span>}
             </p>
             <TaskTable
               tasks={tasks}

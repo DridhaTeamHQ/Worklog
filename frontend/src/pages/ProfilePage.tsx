@@ -93,17 +93,17 @@ export function ProfilePage() {
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
           <Avatar name={user.name} src={user.profile_image} size="xl" />
           <div className="min-w-0">
-            <h2 className="text-lg font-bold text-ink-900">{user.name}</h2>
-            <p className="truncate text-sm text-ink-500">{user.email}</p>
+            <h2 className="text-lg font-bold text-foreground">{user.name}</h2>
+            <p className="truncate text-sm text-muted-foreground">{user.email}</p>
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <span className="badge border-brand-200 bg-brand-50 text-brand-700">
+              <span className="badge border-primary/25 bg-primary/10 text-primary-strong">
                 <ShieldCheck className="h-3 w-3" aria-hidden />
                 {roleLabel(user.role)}
               </span>
               {user.department && (
-                <span className="badge border-ink-200 bg-ink-100 text-ink-600">{user.department}</span>
+                <span className="badge border-border bg-muted text-muted-foreground">{user.department}</span>
               )}
-              <span className="text-xs text-ink-400">Joined {formatDate(user.created_at)}</span>
+              <span className="text-xs text-muted-foreground">Joined {formatDate(user.created_at)}</span>
             </div>
           </div>
         </div>
@@ -111,9 +111,9 @@ export function ProfilePage() {
 
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="card">
-          <header className="border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Personal details</h2>
-            <p className="text-xs text-ink-500">Your email and role are managed by your administrator.</p>
+          <header className="border-b border-border px-5 py-4">
+            <h2 className="font-semibold text-foreground">Personal details</h2>
+            <p className="text-xs text-muted-foreground">Your email and role are managed by your administrator.</p>
           </header>
           <form onSubmit={saveProfile} className="space-y-4 p-5" noValidate>
             <div>
@@ -152,13 +152,13 @@ export function ProfilePage() {
         </section>
 
         <section className="card self-start">
-          <header className="border-b border-ink-200 px-5 py-4">
-            <h2 className="font-semibold text-ink-900">Change password</h2>
-            <p className="text-xs text-ink-500">Use at least 8 characters.</p>
+          <header className="border-b border-border px-5 py-4">
+            <h2 className="font-semibold text-foreground">Change password</h2>
+            <p className="text-xs text-muted-foreground">Use at least 8 characters.</p>
           </header>
           <form onSubmit={savePassword} className="space-y-4 p-5" noValidate>
             {passwordError && (
-              <p className="rounded-lg border border-red-200 bg-red-50 px-3.5 py-2.5 text-sm font-medium text-red-700" role="alert">
+              <p className="rounded-lg border border-primary/25 bg-primary/10 px-3.5 py-2.5 text-sm font-medium text-primary-strong" role="alert">
                 {passwordError}
               </p>
             )}

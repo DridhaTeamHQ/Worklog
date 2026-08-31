@@ -265,7 +265,7 @@ export function AllTasksPage() {
           <ProjectSwitcher projects={projects} value={projectId} onChange={setProjectId} />
 
           <div className="card">
-            <div className="flex flex-col gap-3 border-b border-ink-200 p-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
               <SearchInput
                 value={search}
                 onChange={setSearch}
@@ -281,7 +281,7 @@ export function AllTasksPage() {
                 >
                   <Filter className="h-4 w-4" /> Filter
                   {activeFilterCount > 0 && (
-                    <span className="rounded-full bg-brand-600 px-1.5 text-[11px] font-bold text-white">
+                    <span className="rounded-full bg-primary px-1.5 text-[11px] font-bold text-primary-foreground">
                       {activeFilterCount}
                     </span>
                   )}
@@ -328,8 +328,8 @@ export function AllTasksPage() {
 
             {/* Bulk action bar — only present when something is actually selected. */}
             {selected.size > 0 && (
-              <div className="flex flex-wrap items-center gap-3 border-b border-brand-200 bg-brand-50 px-4 py-2.5">
-                <p className="text-sm font-semibold text-brand-900">
+              <div className="flex flex-wrap items-center gap-3 border-b border-border bg-muted px-4 py-2.5">
+                <p className="text-sm font-semibold text-foreground">
                   {selected.size} selected
                 </p>
                 <div className="flex flex-wrap items-center gap-2">
@@ -344,7 +344,7 @@ export function AllTasksPage() {
                       {STATUS_LABEL[s]}
                     </button>
                   ))}
-                  <span className="mx-1 h-5 w-px bg-brand-300" aria-hidden />
+                  <span className="mx-1 h-5 w-px bg-border" aria-hidden />
                   <button
                     type="button"
                     disabled={bulkBusy}
@@ -353,12 +353,12 @@ export function AllTasksPage() {
                   >
                     <Trash2 className="h-3.5 w-3.5" /> Delete
                   </button>
-                  {bulkBusy && <Spinner className="h-4 w-4 text-brand-700" />}
+                  {bulkBusy && <Spinner className="h-4 w-4 text-primary-strong" />}
                 </div>
                 <button
                   type="button"
                   onClick={() => setSelected(new Set())}
-                  className="ml-auto text-sm font-semibold text-brand-700 hover:text-brand-900"
+                  className="ml-auto text-sm font-semibold text-primary-strong hover:text-foreground"
                 >
                   Clear selection
                 </button>
@@ -402,7 +402,7 @@ export function AllTasksPage() {
                 would be instantaneous rather than animated.
               */
               <div key={projectId ?? 'all'} className="fade-in min-h-[420px]">
-                <p className="px-4 py-2 text-xs text-ink-500">
+                <p className="px-4 py-2 text-xs text-muted-foreground">
                   {tasks.length} task{tasks.length === 1 ? '' : 's'}
                 </p>
                 <TaskTable
@@ -476,12 +476,12 @@ export function AllTasksPage() {
         )}
       >
         {/* Named rather than counted: deleting the wrong five is easy to do blind. */}
-        <ul className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-ink-200 bg-ink-50 p-3">
+        <ul className="max-h-64 space-y-1.5 overflow-y-auto rounded-lg border border-border bg-muted p-3">
           {tasks.filter((t) => selected.has(t.id)).map((t) => (
             <li key={t.id} className="flex items-baseline gap-2 text-sm">
-              {t.task_key && <span className="font-mono text-xs text-brand-700">{t.task_key}</span>}
-              <span className="min-w-0 truncate text-ink-900">{taskLabel(t)}</span>
-              <span className="ml-auto shrink-0 text-xs text-ink-500">{t.employee_name}</span>
+              {t.task_key && <span className="font-mono text-xs text-muted-foreground">{t.task_key}</span>}
+              <span className="min-w-0 truncate text-foreground">{taskLabel(t)}</span>
+              <span className="ml-auto shrink-0 text-xs text-muted-foreground">{t.employee_name}</span>
             </li>
           ))}
         </ul>
@@ -503,14 +503,14 @@ export function AllTasksPage() {
         )}
       >
         {confirmDelete && (
-          <div className="rounded-lg border border-ink-200 bg-ink-50 p-4">
-            <p className="font-semibold text-ink-900">
+          <div className="rounded-lg border border-border bg-muted p-4">
+            <p className="font-semibold text-foreground">
               {confirmDelete.task_key && (
-                <span className="mr-2 font-mono text-xs text-brand-700">{confirmDelete.task_key}</span>
+                <span className="mr-2 font-mono text-xs text-muted-foreground">{confirmDelete.task_key}</span>
               )}
               {taskLabel(confirmDelete)}
             </p>
-            <p className="mt-1 text-sm text-ink-600">Assigned to {confirmDelete.employee_name}</p>
+            <p className="mt-1 text-sm text-muted-foreground">Assigned to {confirmDelete.employee_name}</p>
           </div>
         )}
       </Modal>

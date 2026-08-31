@@ -7,16 +7,16 @@ import { PRIORITY_LABEL, STATUS_LABEL } from '../lib/format';
  * the four states indistinguishable to anyone who cannot separate red from green.
  */
 const STATUS_STYLE: Record<EffectiveStatus, { className: string; Icon: typeof Circle }> = {
-  pending: { className: 'bg-amber-50 text-amber-700 border-amber-200', Icon: Circle },
-  in_progress: { className: 'bg-blue-50 text-blue-700 border-blue-200', Icon: Loader2 },
-  completed: { className: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: CheckCircle2 },
-  overdue: { className: 'bg-red-50 text-red-700 border-red-200', Icon: AlertTriangle },
+  pending: { className: 'bg-warning/10 text-warning border-warning/25', Icon: Circle },
+  in_progress: { className: 'bg-info/10 text-info border-info/25', Icon: Loader2 },
+  completed: { className: 'bg-success/10 text-success border-success/25', Icon: CheckCircle2 },
+  overdue: { className: 'bg-destructive/10 text-destructive border-destructive/25', Icon: AlertTriangle },
 };
 
 export function StatusBadge({ status, className = '' }: { status: EffectiveStatus | 'idle'; className?: string }) {
   if (status === 'idle') {
     return (
-      <span className={`badge bg-ink-100 text-ink-600 border-ink-200 ${className}`}>
+      <span className={`badge bg-muted text-muted-foreground border-border ${className}`}>
         <Circle className="h-3 w-3" aria-hidden />
         No tasks
       </span>
@@ -32,10 +32,10 @@ export function StatusBadge({ status, className = '' }: { status: EffectiveStatu
 }
 
 const PRIORITY_STYLE: Record<Priority, string> = {
-  low: 'bg-ink-100 text-ink-600 border-ink-200',
-  medium: 'bg-sky-50 text-sky-700 border-sky-200',
-  high: 'bg-orange-50 text-orange-700 border-orange-200',
-  urgent: 'bg-red-600 text-white border-red-600',
+  low: 'bg-muted text-muted-foreground border-border',
+  medium: 'bg-info/10 text-info border-info/25',
+  high: 'bg-warning/10 text-warning border-warning/30',
+  urgent: 'bg-destructive text-destructive-foreground border-destructive',
 };
 
 export function PriorityBadge({ priority, className = '' }: { priority: Priority; className?: string }) {
@@ -52,16 +52,16 @@ export function PriorityBadge({ priority, className = '' }: { priority: Priority
  * urgency, plus the word itself so it never depends on colour alone.
  */
 const PRIORITY_MARK: Record<Priority, { className: string; glyph: string }> = {
-  low: { className: 'text-ink-400', glyph: '↓' },
-  medium: { className: 'text-amber-500', glyph: '=' },
-  high: { className: 'text-orange-500', glyph: '↑' },
-  urgent: { className: 'text-red-600', glyph: '⇈' },
+  low: { className: 'text-muted-foreground', glyph: '↓' },
+  medium: { className: 'text-info', glyph: '=' },
+  high: { className: 'text-warning', glyph: '↑' },
+  urgent: { className: 'text-destructive', glyph: '⇈' },
 };
 
 export function PriorityMark({ priority }: { priority: Priority }) {
   const { className, glyph } = PRIORITY_MARK[priority];
   return (
-    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-ink-700">
+    <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-sm text-foreground">
       <span aria-hidden className={`font-bold leading-none ${className}`}>{glyph}</span>
       {PRIORITY_LABEL[priority]}
     </span>
@@ -71,10 +71,10 @@ export function PriorityMark({ priority }: { priority: Priority }) {
 /* ------------------------------------------------------------------ tickets */
 
 const SEVERITY_STYLE: Record<TicketSeverity, string> = {
-  low: 'bg-ink-100 text-ink-600 border-ink-200',
-  medium: 'bg-sky-50 text-sky-700 border-sky-200',
-  high: 'bg-orange-50 text-orange-700 border-orange-200',
-  critical: 'bg-red-600 text-white border-red-600',
+  low: 'bg-muted text-muted-foreground border-border',
+  medium: 'bg-info/10 text-info border-info/25',
+  high: 'bg-warning/10 text-warning border-warning/30',
+  critical: 'bg-destructive text-destructive-foreground border-destructive',
 };
 
 const SEVERITY_LABEL: Record<TicketSeverity, string> = {
@@ -95,10 +95,10 @@ export function SeverityBadge({ severity }: { severity: TicketSeverity }) {
 
 /** Ticket status carries an icon as well as colour, same as task status. */
 const TICKET_STATUS_STYLE: Record<TicketStatus, { className: string; Icon: typeof Circle }> = {
-  open: { className: 'bg-red-50 text-red-700 border-red-200', Icon: CircleDot },
-  in_progress: { className: 'bg-blue-50 text-blue-700 border-blue-200', Icon: Loader2 },
-  resolved: { className: 'bg-emerald-50 text-emerald-700 border-emerald-200', Icon: CheckCircle2 },
-  closed: { className: 'bg-ink-100 text-ink-600 border-ink-200', Icon: CircleSlash },
+  open: { className: 'bg-destructive/10 text-destructive border-destructive/25', Icon: CircleDot },
+  in_progress: { className: 'bg-info/10 text-info border-info/25', Icon: Loader2 },
+  resolved: { className: 'bg-success/10 text-success border-success/25', Icon: CheckCircle2 },
+  closed: { className: 'bg-muted text-muted-foreground border-border', Icon: CircleSlash },
 };
 
 export const TICKET_STATUS_LABEL: Record<TicketStatus, string> = {
