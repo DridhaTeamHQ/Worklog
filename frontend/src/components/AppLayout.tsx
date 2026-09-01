@@ -155,7 +155,7 @@ export function AppLayout() {
                 <span className="block truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-sidebar-foreground/70">
                   {roleLabel(user?.role)}
                 </span>
-                <span className="block truncate text-sm font-bold text-background">{user?.name}</span>
+                <span className="block truncate text-sm font-bold text-sidebar-foreground">{user?.name}</span>
               </span>
             )}
             {!collapsed && (
