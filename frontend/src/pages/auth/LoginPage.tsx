@@ -1,40 +1,23 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { AlertCircle, Eye, EyeOff, LogIn, CheckSquare, MailCheck } from 'lucide-react';
+import { AlertCircle, Eye, EyeOff, Lock, Mail, CheckSquare, MailCheck, Users, TrendingUp } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { authApi } from '../../api/endpoints';
 import { homeFor } from '../../components/RouteGuards';
 import { Spinner } from '../../components/ui';
-/*
-  Imported rather than referenced from `public/`, so the build fingerprints it.
-  The artwork has been replaced several times under the same name, and at a fixed
-  URL a browser that has seen an older one keeps serving it — which looks exactly
-  like the change never landed.
-*/
-import illustration from '../../assets/login-illustration.gif';
 
-/** Long enough that typing an address is one request, short enough to feel immediate. */
 const INVITE_CHECK_DELAY_MS = 450;
-
 const looksLikeEmail = (value: string) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
 
-/**
- * The drifting decorations on the sign-in page.
- *
- * Positions are chosen around what is already on screen — the headline sits top-left,
- * the artwork fills the bottom-left, and the card is centred in the right half — so
- * these fill the corners those leave empty rather than landing on top of them.
- *
- * Each carries its own duration and delay: identical timing would have four objects
- * rocking in unison, which reads as a glitch rather than as drift.
- */
-const DECORATIONS = [
-  // Moved clear of the card's top-left corner, which the astronaut now occupies.
-  { src: '/deco-bug.png', className: 'left-[45%] top-[6%] w-14', duration: '7s', delay: '0s' },
-  // Clear of the card's bottom-right corner, which was clipping it.
-  { src: '/deco-calendar.png', className: 'right-[3%] bottom-[7%] w-24', duration: '8s', delay: '0.6s' },
-];
+const GoogleIcon = () => (
+  <svg className="h-5 w-5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" />
+    <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" />
+    <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" />
+    <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" />
+  </svg>
+);
 
 export function LoginPage() {
   const { login } = useAuth();
@@ -46,17 +29,9 @@ export function LoginPage() {
   const [error, setError] = useState('');
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
-
-  /** Set when the typed address is an account a manager added that nobody has claimed. */
   const [invite, setInvite] = useState<{ email: string; name?: string } | null>(null);
   const inviteRequest = useRef<AbortController | null>(null);
 
-  /*
-   * Watches the email field and asks the server whether that address is a pending
-   * invite. Debounced so typing an address is one request rather than one per
-   * keystroke, and the in-flight request is aborted whenever the value moves on, so a
-   * slow answer for an old address can never overwrite the answer for the current one.
-   */
   useEffect(() => {
     const typed = email.trim().toLowerCase();
     inviteRequest.current?.abort();
@@ -67,8 +42,6 @@ export function LoginPage() {
     }
 
     const timer = window.setTimeout(() => {
-      // The body handles every outcome itself, so the promise is intentionally
-      // not awaited.
       void (async () => {
         const controller = new AbortController();
         inviteRequest.current = controller;
@@ -76,8 +49,6 @@ export function LoginPage() {
           const { data } = await authApi.inviteStatus(typed, controller.signal);
           setInvite(data.invited ? { email: typed, name: data.name } : null);
         } catch {
-          // An aborted, rate-limited or failed check simply means no button. Signing
-          // in normally still works, so there is nothing useful to say here.
           setInvite(null);
         }
       })();
@@ -105,7 +76,6 @@ export function LoginPage() {
     setSubmitting(true);
     try {
       const user = await login(email.trim(), password);
-      // The role decides the destination — there is no shared landing page.
       navigate(homeFor(user.role), { replace: true });
     } catch (err) {
       if (err instanceof ApiError) {
@@ -120,217 +90,207 @@ export function LoginPage() {
   };
 
   return (
-    <div className="relative flex min-h-screen flex-col bg-sidebar lg:h-screen lg:flex-row lg:overflow-hidden">
-      {/*
-        The near-black the navigation is drawn on, warmed by two wide coral blooms so
-        the screen reads as the product's own black-and-orange rather than as a flat
-        dark panel. They are fixed rather than scrolled, and sit under everything.
-      */}
+    <div className="relative flex min-h-screen flex-col bg-sidebar lg:h-screen lg:flex-row lg:overflow-hidden font-sans">
       <div
         aria-hidden
         className="pointer-events-none absolute inset-0 z-0"
         style={{
-          backgroundImage:
-            'radial-gradient(55rem 38rem at 8% 92%, rgba(244, 85, 60, 0.30), transparent 62%),'
-            + 'radial-gradient(42rem 30rem at 88% 6%, rgba(244, 85, 60, 0.18), transparent 60%)',
+          backgroundImage: 'radial-gradient(40rem 40rem at 0% 80%, rgba(244, 85, 60, 0.08), transparent 100%)',
         }}
       />
-      {/*
-        Purely decorative: aria-hidden and pointer-events-none, so they are invisible
-        to assistive tech and can never intercept a click meant for the form. They sit
-        behind everything, and each removes itself if its file is missing rather than
-        leaving a broken-image icon on the sign-in screen.
-      */}
-      <div aria-hidden className="pointer-events-none absolute inset-0 z-0 hidden lg:block">
-        {DECORATIONS.map((d) => (
-          <img
-            key={d.src}
-            src={d.src}
-            alt=""
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            style={{ animationDuration: d.duration, animationDelay: d.delay }}
-            className={`animate-float-tilt absolute opacity-90 drop-shadow-lg ${d.className}`}
-          />
-        ))}
-      </div>
 
-      {/* Brand panel — decorative, so it steps aside entirely on small screens. */}
-      <div className="relative z-10 hidden overflow-hidden lg:flex lg:h-screen lg:w-[45%] lg:flex-col lg:p-12 lg:pb-0">
-        <div className="relative flex shrink-0 items-center gap-3">
-          <span className="inline-flex h-11 w-11 items-center justify-center rounded-2xl bg-primary text-primary-foreground shadow-sm">
-            <CheckSquare className="h-6 w-6" />
-          </span>
-          <span className="text-xl font-bold leading-tight text-white">Taskr</span>
-        </div>
-
-        <div className="relative flex flex-1 flex-col pt-6">
-          <h2 className="font-display text-2xl leading-snug text-white">
-            Track the work.<br />Not the paperwork.
-          </h2>
-          <p className="mt-5 text-xs text-white/60">
-            © {new Date().getFullYear()} Taskr. Internal use only.
-          </p>
-
-          {/*
-            Decorative only, so it is hidden from assistive tech and carries no alt
-            text. It removes itself if the file is missing — the panel reads fine
-            without it, and a broken-image icon on the sign-in screen would not.
-
-            A gif rather than a video: this one already carries its own transparency,
-            so it needs no keying to sit on the dark panel, it animates in every
-            browser including Safari, and at 130KB it is a twentieth of the clip it
-            replaces. An <img> also cannot be paused, muted or autoplay-blocked, which
-            is three fewer things to get wrong for something purely decorative.
-
-            Square, so it is held to a width the panel's remaining height can take
-            rather than run edge to edge: at full width it would be as tall as it is
-            wide and the copy above it would have nowhere to go. `mt-auto` keeps it
-            against the bottom edge.
-          */}
-          <img
-            src={illustration}
-            alt=""
-            aria-hidden
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            className="mx-auto mt-auto block w-full max-w-[24rem] pt-6"
-          />
-        </div>
-      </div>
-
-      {/* Form panel */}
-      <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto px-5 py-10 sm:px-8">
-        {/*
-          The card is the only white surface on the page, which is what makes it the
-          thing to look at. #E4A7C5 does the shining rather than sitting as a stripe:
-          a blurred halo bleeding out behind the card, a hairline ring on its edge, and
-          a band of light that sweeps across it. None of it touches the interior, so
-          every label, field and error stays on plain white.
-        */}
-        <div className="relative w-full max-w-md">
-          <span
-            aria-hidden
-            className="pointer-events-none absolute -inset-5 rounded-[2.5rem] bg-primary/35 blur-3xl"
-          />
-          {/*
-            Positioned against the card rather than the viewport, so it holds the
-            top-right corner at any window size instead of drifting under the card when
-            the layout reflows. Above the card, since it is meant to sit on the corner.
-          */}
-          <img
-            src="/deco-astronaut.png"
-            alt=""
-            aria-hidden
-            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-            style={{ animationDuration: '9s', animationDelay: '1.2s' }}
-            className="animate-float-tilt pointer-events-none absolute -right-14 -top-12 z-20 hidden w-28 drop-shadow-lg lg:block"
-          />
-          <div className="relative overflow-hidden rounded-3xl bg-card shadow-2xl shadow-black/50 ring-1 ring-border">
-            <span
-              aria-hidden
-              className="animate-sheen pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 bg-gradient-to-r from-transparent via-primary/20 to-transparent"
-            />
-          <div className="relative px-8 py-14 sm:px-10 sm:py-20">
-          <div className="mb-8 flex items-center gap-3 lg:hidden">
-            <span className="inline-flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground">
-              <CheckSquare className="h-6 w-6" />
+      {/* Left Panel */}
+      <div className="relative z-10 hidden flex-1 flex-col justify-center p-12 lg:flex lg:w-1/2">
+        <div className="max-w-md mx-auto w-full">
+          <div className="mb-12 flex items-center gap-2 text-white">
+            <span className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-primary text-primary">
+              <CheckSquare className="h-5 w-5" strokeWidth={2.5} />
             </span>
-            <span className="text-lg font-bold leading-tight text-foreground">Taskr</span>
+            <span className="text-xl font-bold leading-tight">Taskr</span>
           </div>
 
-          <h1 className="text-2xl font-bold text-foreground">Sign in</h1>
+          <h1 className="text-5xl font-bold leading-tight text-white mb-6 tracking-tight">
+            Track the work.<br />
+            <span className="text-primary">Not the paperwork.</span>
+          </h1>
+          <p className="text-[15px] text-white/70 mb-12 max-w-sm leading-relaxed">
+            Taskr helps teams stay organized, meet deadlines, and get more done.
+          </p>
+
+          <div className="space-y-8">
+            <div className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary/30 text-primary">
+                <CheckSquare className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Stay Organized</h3>
+                <p className="mt-0.5 text-sm text-white/60">Manage tasks and deadlines in one place.</p>
+              </div>
+            </div>
+            
+            <div className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary/30 text-primary">
+                <Users className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Collaborate Easily</h3>
+                <p className="mt-0.5 text-sm text-white/60">Work together and achieve more.</p>
+              </div>
+            </div>
+
+            <div className="flex gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-primary/30 text-primary">
+                <TrendingUp className="h-5 w-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-white">Track Progress</h3>
+                <p className="mt-0.5 text-sm text-white/60">Real-time updates and insightful reports.</p>
+              </div>
+            </div>
+          </div>
+
+          <div className="mt-28 text-xs text-white/40">
+            © {new Date().getFullYear()} Taskr. All rights reserved.
+          </div>
+        </div>
+      </div>
+
+      {/* Right Panel */}
+      <div className="relative z-10 flex flex-1 items-center justify-center overflow-y-auto p-4 sm:p-6 lg:w-1/2">
+        <div className="w-full max-w-md rounded-3xl bg-[#111218] p-6 sm:p-8 shadow-2xl shadow-black/50 ring-1 ring-white/10">
+          <div className="mx-auto mb-6 flex flex-col items-center">
+            <div className="flex items-center gap-2 mb-4">
+              <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-primary text-primary">
+                <CheckSquare className="h-4 w-4" strokeWidth={2.5} />
+              </span>
+              <span className="text-lg font-bold text-white">Taskr</span>
+            </div>
+            <h2 className="text-2xl font-bold text-white mb-2">Welcome back</h2>
+            <p className="text-sm text-white/60">Sign in to your account</p>
+          </div>
 
           {error && (
-            <div className="mt-5 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-3" role="alert">
+            <div className="mb-6 flex items-start gap-2.5 rounded-lg border border-destructive/25 bg-destructive/10 px-3.5 py-3" role="alert">
               <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-destructive" aria-hidden />
               <p className="text-sm font-medium text-destructive">{error}</p>
             </div>
           )}
 
-          <form onSubmit={handleSubmit} className="mt-8 space-y-6" noValidate>
+          {invite && (
+            <div className="mb-6 rounded-lg border border-border bg-muted px-3.5 py-3">
+              <div className="flex items-start gap-2.5">
+                <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-foreground">
+                    {invite.name ? `Welcome, ${invite.name}` : 'You have been invited'}
+                  </p>
+                  <p className="mt-0.5 text-sm text-muted-foreground">
+                    Your account is ready but has no password yet.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => navigate(`/set-password?email=${encodeURIComponent(invite.email)}`)}
+                className="btn-primary mt-3 w-full"
+              >
+                Invited — set your password
+              </button>
+            </div>
+          )}
+
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div>
-              <label className="label" htmlFor="email">Email address</label>
-              <input
-                id="email"
-                type="email"
-                autoComplete="username"
-                autoFocus
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@company.com"
-                aria-invalid={!!fieldErrors.email}
-                className={`input ${fieldErrors.email ? 'input-error' : ''}`}
-              />
-              {fieldErrors.email && <p className="field-error">{fieldErrors.email}</p>}
+              <label className="mb-1.5 block text-[13px] font-medium text-white/90" htmlFor="email">Email address</label>
+              <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-white/40">
+                  <Mail className="h-4 w-4" />
+                </div>
+                <input
+                  id="email"
+                  type="email"
+                  autoComplete="username"
+                  autoFocus
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="manager@company.com"
+                  aria-invalid={!!fieldErrors.email}
+                  className={`w-full rounded-xl border border-white/10 bg-transparent py-2.5 pl-11 pr-4 text-sm text-white placeholder-white/30 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${fieldErrors.email ? 'border-destructive' : ''}`}
+                />
+              </div>
+              {fieldErrors.email && <p className="mt-1 text-xs text-destructive">{fieldErrors.email}</p>}
             </div>
 
-            {/*
-              Only rendered for an address the server confirmed is a pending invite.
-              It replaces nothing — signing in normally is still right there — but it
-              is the only route in for someone who has never set a password.
-            */}
-            {invite && (
-              <div className="rounded-lg border border-border bg-muted px-3.5 py-3">
-                <div className="flex items-start gap-2.5">
-                  <MailCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden />
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-foreground">
-                      {invite.name ? `Welcome, ${invite.name}` : 'You have been invited'}
-                    </p>
-                    <p className="mt-0.5 text-sm text-muted-foreground">
-                      Your account is ready but has no password yet.
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => navigate(`/set-password?email=${encodeURIComponent(invite.email)}`)}
-                  className="btn-primary mt-3 w-full"
-                >
-                  Invited — set your password
-                </button>
-              </div>
-            )}
-
             <div>
-              <div className="flex items-baseline justify-between">
-                <label className="label" htmlFor="password">Password</label>
-                <Link to="/forgot-password" className="mb-1.5 text-xs font-semibold text-primary hover:text-primary-strong">
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-[13px] font-medium text-white/90" htmlFor="password">Password</label>
+                <Link to="/forgot-password" className="text-[13px] font-medium text-primary hover:text-primary/80">
                   Forgot password?
                 </Link>
               </div>
               <div className="relative">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-white/40">
+                  <Lock className="h-4 w-4" />
+                </div>
                 <input
                   id="password"
                   type={showPassword ? 'text' : 'password'}
                   autoComplete="current-password"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Enter your password"
+                  placeholder="••••••••••••"
                   aria-invalid={!!fieldErrors.password}
-                  className={`input pr-11 ${fieldErrors.password ? 'input-error' : ''}`}
+                  className={`w-full rounded-xl border border-white/10 bg-transparent py-2.5 pl-11 pr-11 text-sm text-white placeholder-white/30 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary ${fieldErrors.password ? 'border-destructive' : ''}`}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  aria-label={showPassword ? 'Hide password' : 'Show password'}
-                  className="absolute right-2 top-1/2 -translate-y-1/2 rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                  className="absolute inset-y-0 right-0 flex items-center pr-3.5 text-white/40 hover:text-white"
                 >
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
-              {fieldErrors.password && <p className="field-error">{fieldErrors.password}</p>}
+              {fieldErrors.password && <p className="mt-1 text-xs text-destructive">{fieldErrors.password}</p>}
+            </div>
+
+            <div className="flex items-center mt-3 mb-4">
+              <input
+                id="remember"
+                type="checkbox"
+                className="h-4 w-4 appearance-none rounded bg-[#1f2028] border border-white/10 checked:bg-primary checked:border-primary checked:bg-[url('data:image/svg+xml;utf8,%3Csvg%20viewBox=%220%200%2014%2014%22%20fill=%22none%22%20xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cpath%20d=%22M3%208L6%2011L11%203.5%22%20stroke=%22white%22%20stroke-width=%222%22%20stroke-linecap=%22round%22%20stroke-linejoin=%22round%22/%3E%3C/svg%3E')] focus:ring-1 focus:ring-primary focus:ring-offset-0 focus:outline-none"
+              />
+              <label htmlFor="remember" className="ml-2.5 block text-[13px] text-white/90">
+                Remember me
+              </label>
             </div>
 
             <button
               type="submit"
               disabled={submitting}
-              className="btn-primary mt-2 w-full py-3"
+              className="mt-4 flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-[#111218] disabled:opacity-50"
             >
-              {submitting ? <><Spinner className="h-4 w-4" /> Signing in…</> : <><LogIn className="h-4 w-4" /> Login</>}
+              {submitting ? <Spinner className="h-5 w-5" /> : (
+                <>
+                  Login <span className="ml-2 text-lg leading-none">→</span>
+                </>
+              )}
             </button>
           </form>
+
+          <div className="mt-6 flex items-center justify-center space-x-3">
+            <div className="h-px w-full bg-white/10"></div>
+            <span className="whitespace-nowrap text-xs text-white/40">or continue with</span>
+            <div className="h-px w-full bg-white/10"></div>
           </div>
-          </div>
+
+          <button type="button" className="mt-6 flex w-full items-center justify-center gap-3 rounded-xl border border-white/10 bg-transparent px-4 py-2.5 text-[13px] font-medium text-white transition-colors hover:bg-white/5 focus:outline-none focus:ring-1 focus:ring-white/20">
+            <GoogleIcon />
+            Sign in with Google
+          </button>
+
+          <p className="mt-6 text-center text-[13px] text-white/50">
+            Don't have an account? <Link to="/contact" className="text-primary hover:underline">Contact your admin</Link>
+          </p>
         </div>
       </div>
     </div>
