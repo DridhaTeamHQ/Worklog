@@ -121,19 +121,27 @@ export function LoginPage() {
 
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-[65%]">
           <div className="absolute left-[15%] top-[5%] h-[24rem] w-[33rem] rounded-full bg-[#101724]" />
-          <img
-            src="/login-anime-worker.png"
-            alt=""
+          <div
             aria-hidden
-            className="absolute bottom-0 left-[-6.5rem] z-0 h-full w-[66rem] max-w-none object-contain object-left-bottom xl:left-[-4rem] xl:w-[73rem]"
+            className="absolute bottom-0 left-[-6.5rem] z-0 h-full w-[78rem] xl:left-[-4rem] xl:w-[86rem]"
             style={{
               WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)',
               maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)',
             }}
-          />
+          >
+            <img
+              src="/login-anime-worker.png"
+              alt=""
+              className="h-full w-full max-w-none object-contain object-left-bottom"
+              style={{
+                WebkitMaskImage: 'linear-gradient(to right, black 0%, black 58%, rgba(0,0,0,0.92) 66%, transparent 80%)',
+                maskImage: 'linear-gradient(to right, black 0%, black 58%, rgba(0,0,0,0.92) 66%, transparent 80%)',
+              }}
+            />
+          </div>
           <div
             aria-hidden
-            className="absolute bottom-0 left-[43rem] z-[1] h-full w-40 bg-gradient-to-r from-transparent via-[#070d16]/95 to-[#070d16] xl:left-[50rem] xl:w-48"
+            className="absolute bottom-0 left-[38rem] z-[1] h-screen w-72 bg-gradient-to-r from-transparent via-[#070d16]/95 to-[#070d16] xl:left-[44rem] xl:w-80"
           />
           <div className="absolute bottom-[55%] left-[30.5rem] z-[2] w-[15.25rem] rounded-xl border border-white/15 bg-[#111a28]/82 p-4 text-white shadow-2xl shadow-black/30 backdrop-blur-md xl:left-[34rem]">
             <div className="mb-3 flex items-center justify-between">
