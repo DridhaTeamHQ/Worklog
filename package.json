@@ -19,7 +19,10 @@
     "test": "npm --prefix backend run test:flow",
     "mail:test": "npm --prefix backend run mail:test --",
     "lint": "npm --prefix frontend run lint",
-    "lint:fix": "npm --prefix frontend run lint:fix"
+    "lint:fix": "npm --prefix frontend run lint:fix",
+    "jobs:tick": "npm --prefix backend run jobs:tick --",
+    "test:setup": "npm --prefix backend run test:setup",
+    "dev:mobile": "npm --prefix mobile start"
   },
   "engines": {
     "node": ">=22.5.0"

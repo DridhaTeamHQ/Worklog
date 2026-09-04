@@ -24,9 +24,11 @@ function taskFilters({ employeeId, department, from, to }) {
  * dashboard reports on their own team rather than the whole company. Left undefined —
  * an admin — nothing is narrowed.
  */
-export async function managerOverview(department, range = 'today') {
+export async function managerOverview(department, range = 'today', { today: base } = {}) {
   const db = await getDb();
-  const t = today();
+  // "Today" is the viewer's own day when the caller says so (req.today), so a manager
+  // sees the reports of the day they are actually in.
+  const t = base || today();
 
   /*
     The headline counts answer "how much in this period", so everything that is a
@@ -38,7 +40,7 @@ export async function managerOverview(department, range = 'today') {
     right now — how many people there are, how much is late — and neither is a thing
     that occurred within a window, so narrowing them to one would only ever mislead.
   */
-  const { from } = resolveRange(range);
+  const { from } = resolveRange(range, undefined, undefined, t);
   const since = from ? ' AND substr(a.created_at, 1, 10) >= ?' : '';
   const sinceParam = from ? [from] : [];
 
@@ -104,9 +106,9 @@ export async function managerOverview(department, range = 'today') {
 }
 
 /** Headline cards on the team member dashboard. */
-export async function employeeOverview(employeeId) {
+export async function employeeOverview(employeeId, { today: base } = {}) {
   const db = await getDb();
-  const t = today();
+  const t = base || today();
   const tasks = await db.get(
     `SELECT
        COUNT(*) AS total,

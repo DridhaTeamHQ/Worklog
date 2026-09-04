@@ -1,6 +1,8 @@
 import { getDb } from '../db/index.js';
 import { nowIso, today } from '../utils/dates.js';
 import { createNotification } from './notification.js';
+import { recordActivity } from './activity.js';
+import { labelsForTasks, setTaskLabels } from './label.js';
 import { nextTaskNumber } from './project.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { ROLES, isTeamMember } from '../utils/roles.js';
@@ -31,18 +33,33 @@ const SELECT_TASK = `
          t.project_id, t.task_number,
          p.name AS project_name, p.project_key,
          CASE WHEN p.project_key IS NULL OR t.task_number IS NULL
-              THEN NULL ELSE p.project_key || '-' || t.task_number END AS task_key
+              THEN NULL ELSE p.project_key || '-' || t.task_number END AS task_key,
+         (SELECT COUNT(*) FROM task_checklist_items c WHERE c.task_id = t.id) AS checklist_total,
+         (SELECT COUNT(*) FROM task_checklist_items c WHERE c.task_id = t.id AND c.is_done = 1) AS checklist_done,
+         (SELECT COUNT(*) FROM activity a WHERE a.task_id = t.id AND a.kind = 'comment') AS comment_count
     FROM assigned_tasks t
     JOIN users e ON e.id = t.employee_id
     JOIN users m ON m.id = t.manager_id
     LEFT JOIN projects p ON p.id = t.project_id`;
+
+/** Labels are fetched in one extra query rather than aggregated in SQL — no dialect branch. */
+async function withLabels(rows) {
+  const map = await labelsForTasks(rows.map((r) => r.id));
+  return rows.map((r) => ({
+    ...r,
+    checklist_total: Number(r.checklist_total || 0),
+    checklist_done: Number(r.checklist_done || 0),
+    comment_count: Number(r.comment_count || 0),
+    labels: map.get(Number(r.id)) || [],
+  }));
+}
 
 /**
  * List tasks with filters. `employeeId` is forced by the route for team members and
  * is what guarantees an employee can only ever read their own tasks.
  */
 export async function listTasks({
-  employeeId, managerId, projectId, status, priority, search, department,
+  employeeId, managerId, projectId, labelId, status, priority, search, department,
   assignedFrom, assignedTo, deadlineFrom, deadlineTo,
   sort = 'created_desc', limit = 100, offset = 0,
 } = {}) {
@@ -53,6 +70,10 @@ export async function listTasks({
 
   if (employeeId) { where.push('t.employee_id = ?'); filterParams.push(employeeId); }
   if (projectId) { where.push('t.project_id = ?'); filterParams.push(projectId); }
+  if (labelId) {
+    where.push('EXISTS (SELECT 1 FROM task_labels tl WHERE tl.task_id = t.id AND tl.label_id = ?)');
+    filterParams.push(labelId);
+  }
   if (managerId) { where.push('t.manager_id = ?'); filterParams.push(managerId); }
   if (priority) { where.push('t.priority = ?'); filterParams.push(priority); }
   if (department) { where.push('e.department = ?'); filterParams.push(department); }
@@ -101,12 +122,14 @@ export async function listTasks({
     filterParams,
   );
 
-  return { items, total: Number(countRow?.c || 0) };
+  return { items: await withLabels(items), total: Number(countRow?.c || 0) };
 }
 
 export async function getTaskById(id) {
   const db = await getDb();
-  return db.get(`${SELECT_TASK} WHERE t.id = ?`, [today(), id]);
+  const row = await db.get(`${SELECT_TASK} WHERE t.id = ?`, [today(), id]);
+  if (!row) return null;
+  return (await withLabels([row]))[0];
 }
 
 /**
@@ -115,7 +138,7 @@ export async function getTaskById(id) {
  * without the notification that tells someone about it.
  */
 export async function assignTask({
-  employeeId, managerId, projectId, title, description, notes, priority, startDate, deadline,
+  employeeId, managerId, projectId, title, description, notes, priority, startDate, deadline, labelIds,
 }) {
   const db = await getDb();
   const employee = await db.get('SELECT id, name, role, is_active FROM users WHERE id = ?', [employeeId]);
@@ -139,6 +162,13 @@ export async function assignTask({
         priority, startDate ?? null, deadline ?? null, ts, ts],
     );
     const manager = await tx.get('SELECT name FROM users WHERE id = ?', [managerId]);
+    await recordActivity({
+      taskId: id, actorId: managerId, kind: 'assigned',
+      meta: { to: employeeId, toName: employee.name, priority, deadline: deadline ?? null },
+    }, tx);
+    if (labelIds?.length) {
+      await setTaskLabels({ taskId: id, labelIds, actor: { id: managerId } }, tx);
+    }
     await createNotification({
       userId: employeeId,
       title: 'New task assigned',
@@ -180,6 +210,10 @@ export async function updateTaskStatus({ taskId, status, actor }) {
       [status, completedAt, ts, taskId],
     );
     if (task.status === status) return;
+
+    await recordActivity({
+      taskId, actorId: actor.id, kind: 'status_changed', meta: { from: task.status, to: status },
+    }, tx);
 
     if (isTeamMember(actor.role)) {
       await createNotification({
@@ -228,16 +262,30 @@ export async function updateTask({ taskId, actor, patch }) {
   }
   if (!sets.length) return getTaskById(taskId);
 
+  // Only what actually moved is worth recording; a re-save of the same values is not
+  // an edit the thread should show.
+  const changed = Object.entries(columns)
+    .filter(([col, val]) => val !== undefined && (val ?? null) !== (task[col] ?? null))
+    .map(([col]) => col);
+
   sets.push('updated_at = ?');
   params.push(nowIso(), taskId);
-  await db.run(`UPDATE assigned_tasks SET ${sets.join(', ')} WHERE id = ?`, params);
-
-  await createNotification({
-    userId: task.employee_id,
-    title: 'Task updated',
-    message: `Your task "${patch.title || task.title}" was updated by your manager.`,
-    type: 'task_updated',
-    relatedTaskId: taskId,
+  await db.transaction(async (tx) => {
+    await tx.run(`UPDATE assigned_tasks SET ${sets.join(', ')} WHERE id = ?`, params);
+    if (!changed.length) return;
+    await recordActivity({
+      taskId, actorId: actor.id, kind: 'field_changed',
+      meta: { fields: changed, ...(changed.includes('deadline') ? { deadline: patch.deadline ?? null } : {}) },
+    }, tx);
+    if (task.employee_id !== actor.id) {
+      await createNotification({
+        userId: task.employee_id,
+        title: 'Task updated',
+        message: `Your task "${patch.title || task.title}" was updated by your manager.`,
+        type: 'task_updated',
+        relatedTaskId: taskId,
+      }, tx);
+    }
   });
   return getTaskById(taskId);
 }

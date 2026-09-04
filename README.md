@@ -96,11 +96,17 @@ The driver switches automatically when `DATABASE_URL` is present.
 | `daily_task_reports` | One row per employee per day — `UNIQUE (employee_id, report_date)` is what makes "Save" and "Update" the same action. |
 | `assigned_tasks` | Tasks, linked to a project plus the employee and the manager who assigned them. `UNIQUE (project_id, task_number)` guarantees one task per key. |
 | `tickets` | Bug reports raised by a team member against a task they are working on. Keyed per project as `SHMOB-B1`. |
-| `notifications` | Per-user feed, optionally linked to the task or ticket that caused it. |
+| `notifications` | Per-user feed, optionally linked to the task, ticket or person it is about. |
 | `password_reset_tokens` | Single-use, 30-minute reset tokens, stored as SHA-256 hashes. |
+| `personal_todos` | Private notes-to-self per day. Nobody else can read them. |
+| `activity` | The thread on a task or ticket: comments, plus the changes the system recorded (status moves, edits, checklist ticks, linked reports). |
+| `report_items` | The lines of a daily report, each optionally tied to one of the writer's tasks with the minutes spent. |
+| `task_checklist_items` | Sub-steps of a task; the done/total counts ride along on every task row. |
+| `labels` / `task_labels` | Company-wide colour tags and which tasks carry them. |
+| `device_tokens` | Phones registered for push notifications (one row per Expo push token). |
 
-Foreign keys cascade on delete, so removing a user takes their reports, tasks and
-notifications with them.
+Foreign keys cascade on delete, so removing a user takes their reports, tasks,
+notifications, comments, devices and checklist items with them.
 
 **Task keys are issued per project.** A task's key is its project key plus a number that counts up within that project — `SHMOB-1`, `SHMOB-2`, `PLAT-1`. The number is allocated inside the same transaction that inserts the task, and a unique index on `(project_id, task_number)` turns any concurrent double-allocation into a loud error rather than two tasks quietly sharing a key.
 
@@ -125,15 +131,41 @@ task management/
 │       ├── routes/               HTTP layer
 │       ├── services/             business logic
 │       └── utils/                dates, errors, response helpers
-└── frontend/
+├── frontend/
+│   └── src/
+│       ├── api/                  fetch client + typed endpoints
+│       ├── components/           layout, guards, shared UI
+│       ├── context/              auth and notification state
+│       ├── lib/                  formatting helpers
+│       ├── pages/                auth · employee · manager
+│       └── types/                shared API types
+└── mobile/                       the Expo app — see mobile/README.md
     └── src/
-        ├── api/                  fetch client + typed endpoints
-        ├── components/           layout, guards, shared UI
-        ├── context/              auth and notification state
-        ├── lib/                  formatting helpers
-        ├── pages/                auth · employee · manager
-        └── types/                shared API types
+        ├── app/                  expo-router routes: (auth), (app)/(member), (app)/(manager), shared stacks
+        ├── api/ hooks/ auth/     the same endpoints, wrapped in TanStack Query
+        ├── components/ features/ the bento/glass design system and the task, ticket, report widgets
+        ├── push/                 Expo push registration, tap routing, badge sync
+        └── theme/                tokens and the light / dark theme
 ```
+
+## The mobile app
+
+`mobile/` is an Expo app (SDK 57) for iOS and Android that talks to the same API and
+database as the web app. Team members get Home, Tasks, Report, Tickets and More; managers
+and admins get Home, Tasks, Team, Tickets and More — plus task and ticket detail screens
+with the activity thread, checklist and comments, structured daily reports, projects,
+labels, the team's reports, analytics, My Day and the profile. Adding and removing
+accounts stays on the web.
+
+```bash
+PORT=4000 npm run dev:backend      # the API, in one terminal
+npm run dev:mobile                 # Metro, in another — scan the QR code with Expo Go
+```
+
+The app derives the API address from the machine Metro runs on, so a phone on the same
+Wi-Fi reaches a local backend with no configuration; set `EXPO_PUBLIC_API_URL` for
+anything else. Push notifications need an EAS project and a development build; the
+[mobile README](mobile/README.md) walks through it.
 
 **Stack:** React 18 + TypeScript + Vite + Tailwind CSS v4 + Recharts on the front;
 Node + Express + JWT + bcrypt + Zod on the back.
@@ -369,7 +401,10 @@ the password reset cycle, the onboarding email, the bug-ticket rules, and the ed
 — including that renaming a project key re-renders existing task keys without moving their
 numbers, and that deleting a task keeps the bug reports raised against it. It cleans up the tasks it creates.
 
-The API must be running. Type checking:
+The API must be running, and the suite needs an admin plus two team members to drive.
+On a fresh local database, `npm run test:setup` creates them (and three projects) from the
+seeded admin and prints the `TEST_*` variables to run the suite with. `npm run jobs:tick --
+--force` exercises the reminder job by hand. Type checking:
 
 ```bash
 npm run typecheck
@@ -387,7 +422,12 @@ Copy `backend/.env.example` to `backend/.env`. The values that matter:
 | `CORS_ORIGIN` | `http://localhost:5173` | Comma-separated allow-list |
 | `DATABASE_URL` | *(empty)* | Set to use PostgreSQL; empty means SQLite |
 | `JWT_SECRET` | *(dev fallback)* | **Required in production**, ≥32 chars |
-| `JWT_EXPIRES_IN` | `8h` | Session length |
+| `JWT_EXPIRES_IN` | `8h` | Web session length |
+| `JWT_MOBILE_EXPIRES_IN` | `30d` | Session length for the mobile app (`X-Client: mobile`) |
+| `APP_TIMEZONE` | *(server zone)* | What "today" means when neither the client nor the profile says |
+| `PUSH_ENABLED` | `true` | `false` prints pushes to the log instead of calling Expo |
+| `EXPO_ACCESS_TOKEN` | *(empty)* | Optional; raises Expo's push rate limits |
+| `CRON_SECRET` | *(empty)* | Guards `GET /api/jobs/tick`; Vercel Cron sends it automatically |
 | `BCRYPT_ROUNDS` | `10` | Raise for production |
 | `COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `SMTP_HOST` | *(empty)* | Set to enable real email; empty means log mode |
@@ -431,8 +471,9 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `POST` | `/auth/accept-invite` | — | Claim an invite by setting its password |
 | `POST` | `/auth/forgot-password` | — | Request a reset token |
 | `POST` | `/auth/reset-password` | — | Complete a reset |
-| `POST` | `/auth/change-password` | any | Change own password |
-| `GET`/`PATCH` | `/profile` | any | Read/update own profile |
+| `POST` | `/auth/change-password` | any | Change own password (signs out every other session) |
+| `POST` | `/auth/logout-all` | any | Sign out everywhere — revokes every outstanding token |
+| `GET`/`PATCH` | `/profile` | any | Read/update own profile, including `timezone` |
 | `GET` | `/dashboard` | any | Role-specific dashboard payload |
 | `GET` | `/dashboard/analytics` | manager | Productivity and activity |
 | `GET` | `/tasks` | any | List tasks, filterable by `projectId` (scoped to self for employees) |
@@ -441,9 +482,19 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `PATCH` | `/tasks/:id` | manager | Correct a task's wording, priority or dates |
 | `PATCH` | `/tasks/:id/status` | any | Update status |
 | `DELETE` | `/tasks/:id` | manager | Delete a task |
-| `GET` | `/reports` | any | List reports (scoped to self for employees) |
-| `GET` | `/reports/today` | team member | Today's own report |
-| `POST` | `/reports` | team member | Save or update today's report |
+| `GET` | `/tasks/:id/activity` | any | The task's thread: comments and recorded changes |
+| `POST` | `/tasks/:id/comments` | any | Comment, with optional `mentions` (user ids) |
+| `PATCH`/`DELETE` | `/tasks/:id/comments/:commentId` | author (delete: or admin) | Edit or remove a comment |
+| `GET`/`POST` | `/tasks/:id/checklist` | assignee, owning manager, admin | Read / add checklist items |
+| `PATCH`/`DELETE` | `/tasks/:id/checklist/:itemId` | same | Tick, rename, reorder or remove an item |
+| `PUT` | `/tasks/:id/labels` | manager | Replace the labels on a task |
+| `GET` | `/labels` | any | The label set |
+| `POST`/`PATCH` | `/labels`, `/labels/:id` | manager | Create / rename a label |
+| `DELETE` | `/labels/:id` | **admin** | Delete a label |
+| `GET` | `/reports` | any | List reports with their lines (scoped to self for employees) |
+| `GET` | `/reports/today` | team member | Today's own report; `meta.today` is the date in the caller's timezone |
+| `GET` | `/reports/suggestions` | team member | Tasks worth adding as lines to today's report |
+| `POST` | `/reports` | team member | Save or update today's report: free text and/or `items[]` |
 | `DELETE` | `/reports/:id` | team member | Delete own report |
 | `GET` | `/notifications` | any | Own notifications |
 | `GET` | `/notifications/unread-count` | any | Badge count |
@@ -459,6 +510,12 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `PATCH` | `/tickets/:id` | any | Correct the wording of an open ticket |
 | `PATCH` | `/tickets/:id/status` | any | Move a ticket's status |
 | `DELETE` | `/tickets/:id` | any | Delete a ticket |
+| `GET` | `/tickets/:id/activity` | any | The ticket's thread |
+| `POST` | `/tickets/:id/comments` | any | Comment on a ticket |
+| `PATCH`/`DELETE` | `/tickets/:id/comments/:commentId` | author (delete: or admin) | Edit or remove a comment |
+| `GET`/`POST` | `/devices` | any | List / register this phone for push (`expoPushToken`, `platform`) |
+| `DELETE` | `/devices/:token` | any | Unregister a phone (called on sign-out) |
+| `GET` | `/jobs/tick` | cron secret | The hourly reminder job; see **Reminders** |
 | `GET` | `/team` | manager | Team list with counts |
 | `POST` | `/team` | **admin** | Add a team member |
 | `GET` | `/admins` | **admin** | List everyone with manager access |
@@ -573,10 +630,42 @@ the things people actually get wrong. What cannot be edited is a task's *assigne
 rewrite who was accountable, so the honest move is to close it and assign a new one.
 Archiving a project keeps its tasks readable while blocking new ones.
 
-**Reports can only be written for today.** Back-dating would let someone quietly rewrite
-history, and the manager relies on these being a same-day record. Editing today's entry is
-unrestricted.
+**Reports can only be written for today — in the employee's own timezone.** Back-dating
+would let someone quietly rewrite history, and the manager relies on these being a
+same-day record. "Today" is judged in the zone the client sends (`X-Client-Timezone`,
+which the mobile app always does) or the one saved on the profile, falling back to
+`APP_TIMEZONE`, so a person eleven hours ahead of the server is never refused their own
+day. Editing today's entry is unrestricted. A report is free text, a list of lines each
+optionally tied to one of the writer's tasks with the minutes spent, or both; the first
+save of a day notifies the managers who have work out with that person.
 
 **Overdue is computed, not stored** — see the schema section above.
+
+**Every task and ticket has a thread.** Comments people write sit in the same ordered list
+as the changes the system records — assignment, status moves, edits, checklist ticks,
+labels, linked daily reports, tickets raised — so "what happened here" is one screen. A
+comment notifies the other party (assignee or manager, reporter or manager); `@mentions`
+arrive as user ids and notify each mentioned person who can actually open the item, and
+nobody who cannot.
+
+**Reminders are a scheduled job, not a background process.** `GET /api/jobs/tick` runs
+hourly (Vercel Cron; `npm run jobs:tick` locally) and, for each person, works out the local
+hour in their own timezone: at `REMINDER_DEADLINE_HOUR` (9) it sends "due tomorrow" and
+"overdue" for every open task and a digest to managers; at `REMINDER_REPORT_HOUR` (17)
+it nags anyone who has not filed today's report. Each reminder goes out once per task per
+day — the notifications table itself is the record, so there is nothing to drift.
+
+**Push notifications go through Expo.** The mobile app registers its push token at
+`POST /api/devices`; every notification the app creates is pushed to the recipient's
+phones after the transaction that created it commits (`db.transaction` exposes
+`afterCommit` for exactly this). Sends are bounded by a short timeout and never fail the
+request; dead tokens Expo reports are removed. With `PUSH_ENABLED=false`, or when no
+token is registered, nothing is sent and the log says so.
+
+**Mobile sessions last 30 days.** A request carrying `X-Client: mobile` gets a long-lived
+token and no cookie. That is safe because every request re-loads the account (blocking
+takes effect at once) and because tokens carry the account's `session_version`: changing
+the password, blocking access or calling `POST /api/auth/logout-all` moves it on, and every
+token issued before that moment is refused.
 #   w o r k  
  

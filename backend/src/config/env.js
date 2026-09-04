@@ -61,9 +61,34 @@ export const config = {
   auth: {
     jwtSecret: resolveJwtSecret(),
     accessTokenTtl: process.env.JWT_EXPIRES_IN || '8h',
+    // The mobile app (X-Client: mobile) keeps a session much longer; every request
+    // still re-checks the account, and logout-all revokes every token at once.
+    mobileTokenTtl: process.env.JWT_MOBILE_EXPIRES_IN || '30d',
     bcryptRounds: Number(process.env.BCRYPT_ROUNDS || 10),
     cookieName: 'worklog_token',
     cookieSecure: bool(process.env.COOKIE_SECURE, isProd),
+  },
+
+  /**
+   * Push notifications to the mobile app via Expo. PUSH_ENABLED=false switches to
+   * log mode, where messages are printed instead of sent — the default for tests.
+   */
+  push: {
+    enabled: bool(process.env.PUSH_ENABLED, process.env.NODE_ENV !== 'test'),
+    accessToken: process.env.EXPO_ACCESS_TOKEN || '',
+    // Bounded so a slow push service cannot hold a request open.
+    timeoutMs: Number(process.env.PUSH_TIMEOUT_MS || 4000),
+  },
+
+  /**
+   * The scheduled reminder job (GET /api/jobs/tick). Authenticated by a shared secret
+   * rather than a user, because there is no user — Vercel Cron calls it.
+   */
+  jobs: {
+    cronSecret: process.env.CRON_SECRET || '',
+    // Local hours at which the reminders fire for each person.
+    deadlineHour: Number(process.env.REMINDER_DEADLINE_HOUR || 9),
+    reportHour: Number(process.env.REMINDER_REPORT_HOUR || 17),
   },
 
   /**

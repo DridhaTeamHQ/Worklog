@@ -10,6 +10,9 @@
  *
  * Usage: node scripts/test-flow.js [baseUrl]
  */
+// backend/.env supplies CRON_SECRET (and API_URL); the TEST_* accounts come from the shell.
+import 'dotenv/config';
+
 const BASE = (process.argv[2] || process.env.API_URL || 'http://localhost:4000').replace(/\/$/, '');
 const API = `${BASE}/api`;
 
@@ -65,12 +68,13 @@ function step(title) {
   console.log(`\n${title}`);
 }
 
-async function api(path, { method = 'GET', token, body } = {}) {
+async function api(path, { method = 'GET', token, body, headers = {} } = {}) {
   const res = await fetch(`${API}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...headers,
     },
     body: body ? JSON.stringify(body) : undefined,
   });
@@ -85,6 +89,16 @@ const isoDay = (offset = 0) => {
   const pad = (n) => String(n).padStart(2, '0');
   return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 };
+
+/** Today's date in an IANA zone, computed the same way the server does it. */
+const dayIn = (tz) => {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date());
+  const get = (type) => parts.find((p) => p.type === type)?.value;
+  return `${get('year')}-${get('month')}-${get('day')}`;
+};
+
+/** The payload of a JWT, without verifying it — enough to read exp/iat in a test. */
+const jwtPayload = (token) => JSON.parse(Buffer.from(String(token).split('.')[1], 'base64url').toString('utf8'));
 
 async function run() {
   console.log(`Running workflow test against ${BASE}\n${'='.repeat(60)}`);
@@ -492,6 +506,57 @@ async function run() {
 
   const backdated = await api('/reports', { method: 'POST', token: employeeToken, body: { taskDescription: 'x', reportDate: isoDay(-3) } });
   check('back-dating a report is rejected (400)', backdated.status === 400, backdated.body);
+
+  /*
+   * "Today" is the employee's own day. The two zones at the ends of the world give the
+   * widest possible spread from the server clock, and each must be accepted for its
+   * own date — the report a phone user writes at 11pm must not be refused because the
+   * server is already on tomorrow.
+   */
+  const farEast = 'Pacific/Kiritimati';
+  const farWest = 'Etc/GMT+12';
+  const eastDay = dayIn(farEast);
+  const westDay = dayIn(farWest);
+  const todayMeta = await api('/reports/today', { token: employeeToken, headers: { 'X-Client-Timezone': farEast } });
+  check('GET /reports/today says which day it considers today', todayMeta.status === 200 && todayMeta.meta?.today === eastDay, todayMeta.meta);
+  check('…and echoes the timezone it used', todayMeta.meta?.timezone === farEast, todayMeta.meta);
+
+  const eastSave = await api('/reports', {
+    method: 'POST', token: employeeToken, headers: { 'X-Client-Timezone': farEast },
+    body: { taskDescription: 'Written from the far east.', reportDate: eastDay },
+  });
+  check('a report dated today-in-the-client-zone is accepted', eastSave.status === 200 && eastSave.data?.report?.report_date === eastDay, eastSave.body);
+  const westSave = await api('/reports', {
+    method: 'POST', token: employeeToken, headers: { 'X-Client-Timezone': farWest },
+    body: { taskDescription: 'Written from the far west.', reportDate: westDay },
+  });
+  check('…in either direction', westSave.status === 200 && westSave.data?.report?.report_date === westDay, westSave.body);
+  const wrongZoneDay = await api('/reports', {
+    method: 'POST', token: employeeToken, headers: { 'X-Client-Timezone': farWest },
+    body: { taskDescription: 'x', reportDate: eastDay === westDay ? isoDay(-1) : eastDay },
+  });
+  check('a date that is not today in the stated zone is still refused (400)', wrongZoneDay.status === 400, wrongZoneDay.body);
+  const badZone = await api('/reports/today', { token: employeeToken, headers: { 'X-Client-Timezone': 'Not/AZone' } });
+  check('an invalid timezone header is rejected (400)', badZone.status === 400, badZone.body);
+
+  const setZone = await api('/profile', { method: 'PATCH', token: employeeToken, body: { timezone: 'Asia/Kolkata' } });
+  check('the profile stores a timezone', setZone.status === 200 && setZone.data?.timezone === 'Asia/Kolkata', setZone.body);
+  const badProfileZone = await api('/profile', { method: 'PATCH', token: employeeToken, body: { timezone: 'Mars/Olympus' } });
+  check('an invalid profile timezone is rejected (400)', badProfileZone.status === 400, badProfileZone.body);
+  const meZone = await api('/auth/me', { token: employeeToken });
+  check('/auth/me carries the timezone', meZone.data?.user?.timezone === 'Asia/Kolkata', meZone.data?.user);
+  const profileDay = await api('/reports/today', { token: employeeToken });
+  check('without a header, today is judged in the profile timezone', profileDay.meta?.today === dayIn('Asia/Kolkata') && profileDay.meta?.timezone === 'Asia/Kolkata', profileDay.meta);
+
+  // Put the account back the way it was: zone cleared, the extra days' reports removed,
+  // and today's text restored (one of the two zones shares the server's date).
+  await api('/profile', { method: 'PATCH', token: employeeToken, body: { timezone: null } });
+  for (const r of [eastSave, westSave]) {
+    if (r.data?.report?.id && r.data.report.report_date !== isoDay(0)) {
+      await api(`/reports/${r.data.report.id}`, { method: 'DELETE', token: employeeToken });
+    }
+  }
+  await api('/reports', { method: 'POST', token: employeeToken, body: { taskDescription: edited } });
 
   const emptyReport = await api('/reports', { method: 'POST', token: employeeToken, body: { taskDescription: '   ' } });
   check('empty report text is rejected (400)', emptyReport.status === 400);
@@ -989,7 +1054,7 @@ async function run() {
   const insideId = inside.data?.employee?.id;
   const outsideId = outside.data?.employee?.id;
 
-  await api('/tasks', {
+  const outsideTask = await api('/tasks', {
     method: 'POST', token: managerToken,
     body: { employeeId: outsideId, projectId: project.id, title: `Outside work ${stamp}` },
   });
@@ -1045,6 +1110,30 @@ async function run() {
     mgrDash.data?.summary?.total_team_members === mgrRoster.data.length,
     { dashboard: mgrDash.data?.summary?.total_team_members, roster: mgrRoster.data.length });
 
+  /*
+   * Tickets are confined the same way as tasks: every route that takes a ticket id,
+   * not just reading one. A manager who guesses an id from another department must get
+   * the same 404 for moving, editing and deleting it as for viewing it.
+   */
+  await api('/auth/accept-invite', { method: 'POST', body: { email: outsideEmail, password: 'Outside@2026' } });
+  const outsideLogin = await api('/auth/login', { method: 'POST', body: { email: outsideEmail, password: 'Outside@2026' } });
+  const outsideTicket = await api('/tickets', {
+    method: 'POST', token: outsideLogin.data?.token,
+    body: { projectId: project.id, taskId: outsideTask.data?.task?.id, title: 'Outside bug', description: 'Raised outside the scoped department.', severity: 'high' },
+  });
+  check('the outside employee can raise a ticket', outsideTicket.status === 201, outsideTicket.body);
+  const outsideTicketId = outsideTicket.data?.ticket?.id;
+  const scopedRead = await api(`/tickets/${outsideTicketId}`, { token: scopedMgrToken });
+  check('a ticket outside the department is not found (404)', scopedRead.status === 404, scopedRead.body);
+  const scopedMove = await api(`/tickets/${outsideTicketId}/status`, { method: 'PATCH', token: scopedMgrToken, body: { status: 'in_progress' } });
+  check('…nor can its status be moved (404)', scopedMove.status === 404, scopedMove.body);
+  const scopedEdit = await api(`/tickets/${outsideTicketId}`, { method: 'PATCH', token: scopedMgrToken, body: { title: 'Renamed from elsewhere' } });
+  check('…nor can it be edited (404)', scopedEdit.status === 404, scopedEdit.body);
+  const scopedDelete = await api(`/tickets/${outsideTicketId}`, { method: 'DELETE', token: scopedMgrToken });
+  check('…nor deleted (404)', scopedDelete.status === 404, scopedDelete.body);
+  const ticketIntact = await api(`/tickets/${outsideTicketId}`, { token: managerToken });
+  check('the ticket is untouched', ticketIntact.status === 200 && ticketIntact.data?.status === 'open' && ticketIntact.data?.title === 'Outside bug', ticketIntact.body);
+
   // Cleanup: the admin removes what this section created.
   for (const id of [insideId, outsideId]) {
     if (id) await api(`/team/${id}`, { method: 'DELETE', token: managerToken });
@@ -1097,7 +1186,8 @@ async function run() {
   const cannotSignIn = await api('/auth/login', {
     method: 'POST', body: { email: doomedMgrEmail, password: doomedMgrPassword },
   });
-  check('the removed manager cannot sign in (401)', cannotSignIn.status === 401, cannotSignIn.body);
+  // An address nobody has added is answered 403 by design (see controllers/auth.js).
+  check('the removed manager cannot sign in (401/403)', [401, 403].includes(cannotSignIn.status), cannotSignIn.body);
 
   // The point of the whole exercise: manager_id cascades, so a plain DELETE would have
   // taken this task — and the employee's progress on it — with the account.
@@ -1156,8 +1246,251 @@ async function run() {
     check('reset token sets a new password', reset.status === 200, reset.body);
     const reuse = await api('/auth/reset-password', { method: 'POST', body: { token: forgot.data.devResetToken, password: EMPLOYEE.password } });
     check('a reset token cannot be reused (400)', reuse.status === 400, reuse.body);
+    // A password change signs the person out everywhere: the old token is dead.
+    const staleAfterReset = await api('/auth/me', { token: employeeToken });
+    check('sessions issued before a password reset are revoked (401)', staleAfterReset.status === 401, staleAfterReset.body);
     const reLogin = await api('/auth/login', { method: 'POST', body: EMPLOYEE });
     check('employee can still sign in after the reset', reLogin.status === 200);
+  }
+
+  /* ------------------------------------------------------------ mobile sessions */
+  step('15. Mobile sessions');
+  const webLogin = await api('/auth/login', { method: 'POST', body: EMPLOYEE });
+  const mobileLogin = await api('/auth/login', { method: 'POST', body: EMPLOYEE, headers: { 'X-Client': 'mobile' } });
+  check('the mobile app can sign in', mobileLogin.status === 200 && !!mobileLogin.data?.token, mobileLogin.body);
+  const webClaims = jwtPayload(webLogin.data?.token);
+  const mobileClaims = jwtPayload(mobileLogin.data?.token);
+  check('a web session lasts hours', webClaims.exp - webClaims.iat <= 24 * 3600, webClaims);
+  check('a mobile session lasts days', mobileClaims.exp - mobileClaims.iat > 24 * 3600, mobileClaims);
+  check('the mobile token is marked as such', mobileClaims.client === 'mobile', mobileClaims);
+  const mobileToken = mobileLogin.data?.token;
+  const mobileMe = await api('/auth/me', { token: mobileToken });
+  check('the mobile token is accepted as a bearer token', mobileMe.status === 200 && mobileMe.data?.user?.email === EMPLOYEE.email, mobileMe.body);
+
+  const everywhere = await api('/auth/logout-all', { method: 'POST', token: webLogin.data?.token });
+  check('sign out everywhere responds', everywhere.status === 200, everywhere.body);
+  const deadWeb = await api('/auth/me', { token: webLogin.data?.token });
+  const deadMobile = await api('/auth/me', { token: mobileToken });
+  check('…and every earlier token is refused (401)', deadWeb.status === 401 && deadMobile.status === 401, { web: deadWeb.status, mobile: deadMobile.status });
+  const afterLogoutAll = await api('/auth/login', { method: 'POST', body: EMPLOYEE, headers: { 'X-Client': 'mobile' } });
+  check('a fresh sign-in works afterwards', afterLogoutAll.status === 200 && !!afterLogoutAll.data?.token, afterLogoutAll.body);
+  const freshMobileToken = afterLogoutAll.data?.token;
+
+  /* ------------------------------------------------------------ devices + push */
+  step('16. Devices and push');
+  const pushToken = `ExponentPushToken[testflow${Date.now()}]`;
+  const registered = await api('/devices', { method: 'POST', token: freshMobileToken, body: { expoPushToken: pushToken, platform: 'android', appVersion: '1.0.0' } });
+  check('a phone can register for push', registered.status === 200 && registered.data?.expo_push_token === pushToken, registered.body);
+  const again = await api('/devices', { method: 'POST', token: freshMobileToken, body: { expoPushToken: pushToken, platform: 'android', appVersion: '1.0.1' } });
+  const mine = await api('/devices', { token: freshMobileToken });
+  check('registering the same token again is an update, not a duplicate', again.status === 200 && mine.data?.filter((d) => d.expo_push_token === pushToken).length === 1, mine.data);
+  check('the update is recorded', mine.data?.find((d) => d.expo_push_token === pushToken)?.app_version === '1.0.1', mine.data);
+  const malformed = await api('/devices', { method: 'POST', token: freshMobileToken, body: { expoPushToken: 'not-a-token', platform: 'android' } });
+  check('a malformed token is rejected (400)', malformed.status === 400, malformed.body);
+  const anon = await api('/devices', { method: 'POST', body: { expoPushToken: pushToken, platform: 'android' } });
+  check('registration requires a session (401)', anon.status === 401);
+
+  // A push is attempted for the notification that a new assignment creates; in log
+  // mode it is printed rather than sent, and either way the request must succeed.
+  const pushedTask = await api('/tasks', { method: 'POST', token: managerToken, body: { employeeId: employee.id, projectId: project.id, title: `Push probe ${Date.now()}` } });
+  check('assigning a task still succeeds with a device registered', pushedTask.status === 201, pushedTask.body);
+  if (pushedTask.data?.task?.id) await api(`/tasks/${pushedTask.data.task.id}`, { method: 'DELETE', token: managerToken });
+
+  // The same token signed in by somebody else moves to them: a phone belongs to
+  // whoever is signed in on it right now.
+  const otherLogin = await api('/auth/login', { method: 'POST', body: { email: OTHER_EMPLOYEE_EMAIL, password: EMPLOYEE.password }, headers: { 'X-Client': 'mobile' } });
+  const repointed = await api('/devices', { method: 'POST', token: otherLogin.data?.token, body: { expoPushToken: pushToken, platform: 'android' } });
+  const mineAfter = await api('/devices', { token: freshMobileToken });
+  check('a token re-registered by another user moves to them', repointed.status === 200 && !mineAfter.data?.some((d) => d.expo_push_token === pushToken), mineAfter.data);
+  const wrongOwner = await api(`/devices/${encodeURIComponent(pushToken)}`, { method: 'DELETE', token: freshMobileToken });
+  check('a user cannot unregister someone else\'s phone (404)', wrongOwner.status === 404, wrongOwner.body);
+  const unregistered = await api(`/devices/${encodeURIComponent(pushToken)}`, { method: 'DELETE', token: otherLogin.data?.token });
+  check('the owner can unregister it', unregistered.status === 200, unregistered.body);
+  const gone = await api(`/devices/${encodeURIComponent(pushToken)}`, { method: 'DELETE', token: otherLogin.data?.token });
+  check('unregistering twice is a 404', gone.status === 404, gone.body);
+
+  { // Feature steps 17-20 keep their own scope so names cannot clash with earlier steps.
+  // From here on the employee acts through the mobile session (the web one was
+  // revoked by the password reset above) and the other employee through theirs.
+  const empToken = freshMobileToken;
+  const otherEmpToken = otherLogin.data?.token;
+  const managerId = mLogin.data?.user?.id;
+  const otherEmployee = team.data.find((m) => m.email === OTHER_EMPLOYEE_EMAIL);
+  const featureStamp = Date.now();
+
+  /* ---------------------------------------------------------- labels + checklist */
+  step('17. Labels and checklists');
+  const mkLabel = await api('/labels', { method: 'POST', token: managerToken, body: { name: `urgent-${featureStamp}`, color: '#E5484D' } });
+  check('a manager can create a label', mkLabel.status === 201 && mkLabel.data?.color === '#e5484d', mkLabel.body);
+  const labelId = mkLabel.data?.id;
+  const dupLabel = await api('/labels', { method: 'POST', token: managerToken, body: { name: `URGENT-${featureStamp}` } });
+  check('label names are unique, case-insensitively (409)', dupLabel.status === 409, dupLabel.body);
+  const badColor = await api('/labels', { method: 'POST', token: managerToken, body: { name: `x-${featureStamp}`, color: 'red' } });
+  check('a label colour must be a hex value (400)', badColor.status === 400, badColor.body);
+  const empLabel = await api('/labels', { method: 'POST', token: empToken, body: { name: `emp-${featureStamp}` } });
+  check('a team member cannot create labels (403)', empLabel.status === 403, empLabel.body);
+  const labelList = await api('/labels', { token: empToken });
+  check('everyone can list labels', labelList.status === 200 && labelList.data.some((l) => l.id === labelId), labelList.body);
+
+  const labelled = await api('/tasks', {
+    method: 'POST', token: managerToken,
+    body: { employeeId: employee.id, projectId: project.id, title: `Labelled work ${featureStamp}`, labelIds: [labelId] },
+  });
+  check('a task can be assigned with labels', labelled.status === 201 && labelled.data?.task?.labels?.some((l) => l.id === labelId), labelled.data?.task?.labels);
+  const labelledId = labelled.data?.task?.id;
+  const byLabel = await api(`/tasks?labelId=${labelId}`, { token: managerToken });
+  check('the task list filters by label', byLabel.status === 200 && byLabel.data.some((t) => t.id === labelledId) && byLabel.data.every((t) => t.labels.some((l) => l.id === labelId)), byLabel.data?.map((t) => t.id));
+  const clearLabels = await api(`/tasks/${labelledId}/labels`, { method: 'PUT', token: managerToken, body: { labelIds: [] } });
+  check('labels on a task can be replaced', clearLabels.status === 200 && clearLabels.data.length === 0, clearLabels.body);
+  const unknownLabel = await api(`/tasks/${labelledId}/labels`, { method: 'PUT', token: managerToken, body: { labelIds: [999999] } });
+  check('an unknown label is refused (400)', unknownLabel.status === 400, unknownLabel.body);
+  await api(`/tasks/${labelledId}/labels`, { method: 'PUT', token: managerToken, body: { labelIds: [labelId] } });
+  const empSetsLabels = await api(`/tasks/${labelledId}/labels`, { method: 'PUT', token: empToken, body: { labelIds: [] } });
+  check('a team member cannot change labels (403)', empSetsLabels.status === 403, empSetsLabels.body);
+
+  const addItem = await api(`/tasks/${labelledId}/checklist`, { method: 'POST', token: empToken, body: { title: 'Write the tests' } });
+  check('the assignee can add a checklist item', addItem.status === 201 && addItem.data?.is_done === false, addItem.body);
+  const itemId = addItem.data?.id;
+  const otherAdds = await api(`/tasks/${labelledId}/checklist`, { method: 'POST', token: otherEmpToken, body: { title: 'Not my task' } });
+  check('somebody else cannot (403)', otherAdds.status === 403, otherAdds.body);
+  const tickItem = await api(`/tasks/${labelledId}/checklist/${itemId}`, { method: 'PATCH', token: empToken, body: { isDone: true } });
+  check('an item can be ticked', tickItem.status === 200 && tickItem.data?.is_done === true && !!tickItem.data?.done_at, tickItem.body);
+  const taskWithCounts = await api(`/tasks/${labelledId}`, { token: empToken });
+  check('the task carries checklist counts', taskWithCounts.data?.checklist_total === 1 && taskWithCounts.data?.checklist_done === 1, taskWithCounts.data);
+  const listItems = await api(`/tasks/${labelledId}/checklist`, { token: managerToken });
+  check('the manager sees the checklist', listItems.status === 200 && listItems.data.length === 1 && listItems.meta?.done === 1, listItems.body);
+  const missingItem = await api(`/tasks/${labelledId}/checklist/999999`, { method: 'PATCH', token: empToken, body: { isDone: false } });
+  check('a missing item is a 404', missingItem.status === 404, missingItem.body);
+
+  /* ------------------------------------------------------------ activity thread */
+  step('18. Activity thread and comments');
+  const movedLabelled = await api(`/tasks/${labelledId}/status`, { method: 'PATCH', token: empToken, body: { status: 'in_progress' } });
+  check('status can still be moved', movedLabelled.status === 200, movedLabelled.body);
+  const taskThread = await api(`/tasks/${labelledId}/activity`, { token: empToken });
+  const threadKinds = taskThread.data?.map((a) => a.kind) || [];
+  check('the thread records the assignment', threadKinds.includes('assigned'), threadKinds);
+  check('…the label changes', threadKinds.includes('labels_changed'), threadKinds);
+  check('…the checklist tick', threadKinds.includes('checklist'), threadKinds);
+  const statusRow = taskThread.data?.find((a) => a.kind === 'status_changed');
+  check('…and the status move, with before and after', statusRow?.meta?.from === 'pending' && statusRow?.meta?.to === 'in_progress', statusRow);
+  check('rows carry who did it', taskThread.data?.every((a) => typeof a.actor_name === 'string' || a.actor_id === null), taskThread.data?.[0]);
+
+  const mgrUnreadBefore = (await api('/notifications/unread-count', { token: managerToken })).data?.unread ?? 0;
+  const commented = await api(`/tasks/${labelledId}/comments`, { method: 'POST', token: empToken, body: { body: 'Blocked on API keys — can you help?', mentions: [managerId] } });
+  check('the assignee can comment and mention the manager', commented.status === 201 && commented.data?.kind === 'comment', commented.body);
+  const commentId = commented.data?.id;
+  const mgrNotes = await api('/notifications?unreadOnly=true', { token: managerToken });
+  const mention = mgrNotes.data?.find((n) => n.type === 'mentioned' && n.related_task_id === labelledId);
+  check('the manager is notified of the mention', !!mention && mention.related_user_id === employee.id, mgrNotes.data?.slice(0, 3));
+  check('…exactly once (no duplicate for being the other party)', mgrNotes.data?.filter((n) => n.related_task_id === labelledId && ['mentioned', 'task_commented'].includes(n.type)).length === 1, mgrNotes.data?.filter((n) => n.related_task_id === labelledId));
+  check('the unread count moved', ((await api('/notifications/unread-count', { token: managerToken })).data?.unread ?? 0) > mgrUnreadBefore);
+
+  const mgrReply = await api(`/tasks/${labelledId}/comments`, { method: 'POST', token: managerToken, body: { body: 'On it.' } });
+  check('the manager can reply', mgrReply.status === 201, mgrReply.body);
+  const empNotes = await api('/notifications?unreadOnly=true', { token: empToken });
+  check('the assignee is told about the reply', empNotes.data?.some((n) => n.type === 'task_commented' && n.related_task_id === labelledId), empNotes.data?.slice(0, 3));
+
+  const outsiderThread = await api(`/tasks/${labelledId}/activity`, { token: otherEmpToken });
+  check('someone else cannot read the thread (403)', outsiderThread.status === 403, outsiderThread.body);
+  const outsiderComment = await api(`/tasks/${labelledId}/comments`, { method: 'POST', token: otherEmpToken, body: { body: 'hi' } });
+  check('…or comment on it (403)', outsiderComment.status === 403, outsiderComment.body);
+  const mentionOutsider = await api(`/tasks/${labelledId}/comments`, { method: 'POST', token: empToken, body: { body: 'cc', mentions: [otherEmployee.id] } });
+  const outsiderNotes = await api('/notifications?unreadOnly=true', { token: otherEmpToken });
+  check('mentioning someone who cannot see the task is dropped, not delivered', mentionOutsider.status === 201 && !outsiderNotes.data?.some((n) => n.type === 'mentioned' && n.related_task_id === labelledId), outsiderNotes.data?.slice(0, 2));
+
+  const edited2 = await api(`/tasks/${labelledId}/comments/${commentId}`, { method: 'PATCH', token: empToken, body: { body: 'Blocked on API keys — resolved now.' } });
+  check('the author can edit their comment', edited2.status === 200 && edited2.data?.body?.includes('resolved') && !!edited2.data?.edited_at, edited2.body);
+  const mgrEdits = await api(`/tasks/${labelledId}/comments/${commentId}`, { method: 'PATCH', token: managerToken, body: { body: 'rewritten' } });
+  check('nobody else can edit it, not even an admin (403)', mgrEdits.status === 403, mgrEdits.body);
+  const mgrDeletes = await api(`/tasks/${labelledId}/comments/${commentId}`, { method: 'DELETE', token: managerToken });
+  check('an admin can delete a comment', mgrDeletes.status === 200, mgrDeletes.body);
+  const editSystemRow = await api(`/tasks/${labelledId}/comments/${statusRow?.id}`, { method: 'PATCH', token: empToken, body: { body: 'x' } });
+  check('system rows are not editable (404)', editSystemRow.status === 404, editSystemRow.body);
+
+  const bugOnTask = await api('/tickets', { method: 'POST', token: empToken, body: { projectId: project.id, taskId: labelledId, title: 'Crash on save', description: 'Steps: save twice.', severity: 'high' } });
+  check('a ticket can be raised on the task', bugOnTask.status === 201, bugOnTask.body);
+  const bugId = bugOnTask.data?.ticket?.id;
+  const ticketThread = await api(`/tickets/${bugId}/activity`, { token: empToken });
+  check('the ticket has its own thread, starting with being raised', ticketThread.data?.[0]?.kind === 'ticket_raised', ticketThread.data);
+  const taskThreadAfterBug = await api(`/tasks/${labelledId}/activity`, { token: managerToken });
+  check('the task thread notes the ticket', taskThreadAfterBug.data?.some((a) => a.kind === 'ticket_raised' && a.meta?.ticketId === bugId), taskThreadAfterBug.data?.map((a) => a.kind));
+  const ticketReply = await api(`/tickets/${bugId}/comments`, { method: 'POST', token: managerToken, body: { body: 'Reproduced, fixing.' } });
+  const empNotes2 = await api('/notifications?unreadOnly=true', { token: empToken });
+  check('a manager comment on the ticket notifies the reporter', ticketReply.status === 201 && empNotes2.data?.some((n) => n.type === 'ticket_commented' && n.related_ticket_id === bugId), empNotes2.data?.slice(0, 3));
+  const resolvedBug = await api(`/tickets/${bugId}/status`, { method: 'PATCH', token: managerToken, body: { status: 'resolved', resolutionNote: 'Fixed the double save.' } });
+  const ticketThread2 = await api(`/tickets/${bugId}/activity`, { token: managerToken });
+  check('resolving is recorded on the ticket thread with the note', resolvedBug.status === 200 && ticketThread2.data?.some((a) => a.kind === 'status_changed' && a.meta?.to === 'resolved' && a.meta?.resolutionNote), ticketThread2.data?.map((a) => a.kind));
+
+  /* ------------------------------------------------------ structured reports */
+  step('19. Structured daily reports');
+  const otherTask = await api('/tasks', { method: 'POST', token: managerToken, body: { employeeId: otherEmployee.id, projectId: project.id, title: `Report probe ${featureStamp}` } });
+  const otherTaskId = otherTask.data?.task?.id;
+  await api(`/tasks/${otherTaskId}/status`, { method: 'PATCH', token: otherEmpToken, body: { status: 'in_progress' } });
+  const suggest = await api('/reports/suggestions', { token: otherEmpToken });
+  check('in-progress work is suggested for the report', suggest.status === 200 && suggest.data.some((t) => t.id === otherTaskId), suggest.data);
+  const mgrSubmittedBefore = (await api('/notifications?limit=100', { token: managerToken })).data?.filter((n) => n.type === 'report_submitted' && n.related_user_id === otherEmployee.id).length ?? 0;
+
+  const structured = await api('/reports', {
+    method: 'POST', token: otherEmpToken,
+    body: { items: [{ taskId: otherTaskId, text: 'Built the export screen', minutes: 90 }, { text: 'Stand-up and planning', minutes: 30 }] },
+  });
+  check('a report can be saved as lines with no free text', structured.status === 200 && structured.data?.report?.items?.length === 2, structured.body);
+  check('lines linked to a task carry its key', structured.data?.report?.items?.[0]?.task_key === `${project.project_key}-${otherTask.data?.task?.task_number}`, structured.data?.report?.items?.[0]);
+  check('minutes are totalled', structured.data?.report?.total_minutes === 120, structured.data?.report?.total_minutes);
+  const wasNew = structured.data?.createdNew === true;
+  const mgrSubmittedAfter = (await api('/notifications?limit=100', { token: managerToken })).data?.filter((n) => n.type === 'report_submitted' && n.related_user_id === otherEmployee.id).length ?? 0;
+  if (wasNew) {
+    check('the first save of the day tells the manager', mgrSubmittedAfter === mgrSubmittedBefore + 1, { before: mgrSubmittedBefore, after: mgrSubmittedAfter });
+  } else {
+    check('an update stays silent', mgrSubmittedAfter === mgrSubmittedBefore, { before: mgrSubmittedBefore, after: mgrSubmittedAfter });
+  }
+  const again2 = await api('/reports', { method: 'POST', token: otherEmpToken, body: { taskDescription: 'Also reviewed PRs', items: [{ taskId: otherTaskId, text: 'Built the export screen', minutes: 100 }] } });
+  const mgrSubmittedFinal = (await api('/notifications?limit=100', { token: managerToken })).data?.filter((n) => n.type === 'report_submitted' && n.related_user_id === otherEmployee.id).length ?? 0;
+  check('re-saving replaces the lines and stays silent', again2.status === 200 && again2.data?.createdNew === false && again2.data?.report?.items?.length === 1 && mgrSubmittedFinal === mgrSubmittedAfter, again2.data);
+  const suggestAfter = await api('/reports/suggestions', { token: otherEmpToken });
+  check('a task already on the report is no longer suggested', !suggestAfter.data.some((t) => t.id === otherTaskId), suggestAfter.data);
+  const foreignLine = await api('/reports', { method: 'POST', token: otherEmpToken, body: { items: [{ taskId: labelledId, text: 'Not mine' }] } });
+  check("a line cannot point at someone else's task (400)", foreignLine.status === 400, foreignLine.body);
+  const emptyStructured = await api('/reports', { method: 'POST', token: otherEmpToken, body: { taskDescription: '', items: [] } });
+  check('an empty report is refused (400)', emptyStructured.status === 400, emptyStructured.body);
+  const otherTaskThread = await api(`/tasks/${otherTaskId}/activity`, { token: managerToken });
+  check('the task thread shows the report that mentioned it', otherTaskThread.data?.some((a) => a.kind === 'report_linked'), otherTaskThread.data?.map((a) => a.kind));
+  const mgrReadsReport = await api(`/team/${otherEmployee.id}/reports?range=today`, { token: managerToken });
+  check('the manager reads the lines with the report', mgrReadsReport.status === 200 && mgrReadsReport.data?.[0]?.items?.length === 1, mgrReadsReport.data?.[0]);
+  if (wasNew && structured.data?.report?.id) await api(`/reports/${structured.data.report.id}`, { method: 'DELETE', token: otherEmpToken });
+
+  /* -------------------------------------------------------------- reminders */
+  step('20. Reminder job');
+  const noSecret = await api('/jobs/tick');
+  check('the job refuses calls without the cron secret (401)', noSecret.status === 401, noSecret.body);
+  const wrongSecret = await api('/jobs/tick', { headers: { Authorization: 'Bearer nope' } });
+  check('…and with the wrong one (401)', wrongSecret.status === 401, wrongSecret.body);
+  const cronSecret = process.env.CRON_SECRET;
+  if (cronSecret) {
+    const overdueId = overdueTask.data?.task?.id;
+    const ran = await api('/jobs/tick?force=deadlines', { headers: { Authorization: `Bearer ${cronSecret}` } });
+    check('the job runs with the secret', ran.status === 200 && typeof ran.data?.sent?.overdue === 'number', ran.body);
+    const empReminders = await api('/notifications?limit=100', { token: empToken });
+    const overdueNotes = empReminders.data?.filter((n) => n.type === 'overdue' && n.related_task_id === overdueId) || [];
+    check('an overdue task produces one reminder', overdueNotes.length === 1, overdueNotes);
+    const ranAgain = await api('/jobs/tick?force=deadlines', { headers: { Authorization: `Bearer ${cronSecret}` } });
+    const empReminders2 = await api('/notifications?limit=100', { token: empToken });
+    check('running the job again does not repeat it', ranAgain.status === 200 && empReminders2.data?.filter((n) => n.type === 'overdue' && n.related_task_id === overdueId).length === 1);
+    const mgrDigest = await api('/notifications?limit=100', { token: managerToken });
+    check('the manager gets one overdue digest', mgrDigest.data?.filter((n) => n.type === 'team_overdue_digest').length === 1, mgrDigest.data?.filter((n) => n.type === 'team_overdue_digest'));
+    const reportsRun = await api('/jobs/tick?force=reports', { headers: { Authorization: `Bearer ${cronSecret}` } });
+    const empMissing = await api('/notifications?limit=100', { token: empToken });
+    check('someone who filed today is not nagged', reportsRun.status === 200 && !empMissing.data?.some((n) => n.type === 'report_missing'), empMissing.data?.filter((n) => n.type === 'report_missing'));
+    check('someone who has not is', reportsRun.data?.sent?.report_missing >= 1, reportsRun.data);
+  } else {
+    console.log('  SKIP  CRON_SECRET not set — reminder job not exercised');
+  }
+
+  // Cleanup for the feature steps.
+  await api(`/tickets/${bugId}`, { method: 'DELETE', token: managerToken });
+  await api(`/tasks/${labelledId}`, { method: 'DELETE', token: managerToken });
+  await api(`/tasks/${otherTaskId}`, { method: 'DELETE', token: managerToken });
+  await api(`/labels/${labelId}`, { method: 'DELETE', token: managerToken });
   }
 
   /* ------------------------------------------------------------------ cleanup */

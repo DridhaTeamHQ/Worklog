@@ -1,13 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { getDb } from '../db/index.js';
 import config from '../config/env.js';
-import { nowIso, today } from '../utils/dates.js';
+import { nowIso, todayIn, DEFAULT_TIMEZONE } from '../utils/dates.js';
 import { conflict, notFound } from '../utils/errors.js';
 import { taskCountsByEmployee } from './task.js';
 import { MANAGER_ROLES } from '../utils/roles.js';
 
 /** Columns that are safe to return to a client — never includes password_hash. */
-const PUBLIC_COLUMNS = `id, name, email, role, department, job_title, phone, profile_image, is_active, created_at, updated_at`;
+const PUBLIC_COLUMNS = `id, name, email, role, department, job_title, phone, profile_image, timezone, is_active, created_at, updated_at`;
 
 /**
  * Whether the account is still waiting to be claimed, derived in SQL so the hash it
@@ -113,7 +113,8 @@ export async function setInitialPassword(email, password) {
 export async function findAuthUser(id) {
   const db = await getDb();
   const user = await db.get(
-    `SELECT id, name, email, role, department, job_title, phone, profile_image, is_active
+    `SELECT id, name, email, role, department, job_title, phone, profile_image, timezone,
+            session_version, is_active
        FROM users WHERE id = ?`,
     [id],
   );
@@ -128,6 +129,7 @@ export async function updateProfile(userId, patch) {
     job_title: patch.jobTitle,
     phone: patch.phone,
     profile_image: patch.profileImage,
+    timezone: patch.timezone,
   };
   const sets = [];
   const params = [];
@@ -175,17 +177,36 @@ export async function updateTeamMember(employeeId, patch) {
     if (val !== undefined) { sets.push(`${col} = ?`); params.push(val); }
   }
   if (!sets.length) return findById(employeeId);
+  // Blocking access also invalidates every session the person still holds, so a
+  // phone that stays signed in does not keep working until its token expires.
+  if (patch.isActive === false) sets.push('session_version = session_version + 1');
   sets.push('updated_at = ?');
   params.push(nowIso(), employeeId);
   await db.run(`UPDATE users SET ${sets.join(', ')} WHERE id = ?`, params);
   return findById(employeeId);
 }
 
+/**
+ * Sets a new password and signs the person out everywhere else: the session version
+ * moves on, so every token issued before this moment is refused from the next request.
+ */
 export async function changePassword(userId, newPassword) {
   const db = await getDb();
-  const res = await db.run('UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?', [
-    await hashPassword(newPassword), nowIso(), userId,
-  ]);
+  const res = await db.run(
+    'UPDATE users SET password_hash = ?, session_version = session_version + 1, updated_at = ? WHERE id = ?',
+    [await hashPassword(newPassword), nowIso(), userId],
+  );
+  if (!res.changes) throw notFound('Account not found.');
+  return true;
+}
+
+/** "Sign out everywhere": revokes every outstanding session for the account. */
+export async function revokeAllSessions(userId) {
+  const db = await getDb();
+  const res = await db.run(
+    'UPDATE users SET session_version = session_version + 1, updated_at = ? WHERE id = ?',
+    [nowIso(), userId],
+  );
   if (!res.changes) throw notFound('Account not found.');
   return true;
 }
@@ -209,7 +230,7 @@ export async function listDepartments() {
  * The manager's Team Members list: every employee with their task counts and a
  * "current status" summarising what they are working on right now.
  */
-export async function listTeamMembers({ search, department, status } = {}) {
+export async function listTeamMembers({ search, department, status, viewerTimezone } = {}) {
   const db = await getDb();
   const where = ["role = 'team_member'"];
   const params = [];
@@ -225,7 +246,10 @@ export async function listTeamMembers({ search, department, status } = {}) {
     params,
   );
   const counts = await taskCountsByEmployee();
-  const t = today();
+  // "Submitted today" is judged in each person's own zone, falling back to the
+  // viewer's: a colleague twelve hours ahead has a different today from the manager.
+  const fallbackZone = viewerTimezone || DEFAULT_TIMEZONE;
+  const todayFor = (row) => todayIn(row.timezone || fallbackZone);
 
   const reportRows = await db.query(
     `SELECT employee_id, MAX(report_date) AS last_report_date FROM daily_task_reports GROUP BY employee_id`,
@@ -245,7 +269,7 @@ export async function listTeamMembers({ search, department, status } = {}) {
       counts: c,
       current_status: currentStatus,
       last_report_date: lastReport.get(Number(row.id)) || null,
-      submitted_today: lastReport.get(Number(row.id)) === t,
+      submitted_today: lastReport.get(Number(row.id)) === todayFor(row),
     };
   });
 }
@@ -408,8 +432,9 @@ export async function setManagerAccess(accountId, isActive) {
   );
   if (!existing) throw notFound('That account could not be found.');
 
+  // Blocking also revokes every session the person holds; restoring does not need to.
   await db.run(
-    'UPDATE users SET is_active = ?, updated_at = ? WHERE id = ?',
+    `UPDATE users SET is_active = ?, updated_at = ?${isActive ? '' : ', session_version = session_version + 1'} WHERE id = ?`,
     [isActive ? 1 : 0, nowIso(), accountId],
   );
   return findById(accountId);

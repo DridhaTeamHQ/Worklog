@@ -4,3 +4,14 @@ dist/
 backend/data/
 *.log
 *.tsbuildinfo
+# Expo
+mobile/.expo/
+mobile/expo-env.d.ts
+mobile/google-services.json
+mobile/ios/
+mobile/android/
+mobile/.env
+
+# Local assistant tooling
+.claude/
+mobile/.claude/

@@ -1,6 +1,7 @@
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
 import { createNotification } from './notification.js';
+import { recordActivity } from './activity.js';
 import { notFound, forbidden, badRequest } from '../utils/errors.js';
 import { isTeamMember } from '../utils/roles.js';
 import { SEVERITIES, TICKET_STATUSES } from '../utils/constants.js';
@@ -142,6 +143,12 @@ export async function createTicket({ reporterId, projectId, taskId, title, descr
     );
 
     const reporter = await tx.get('SELECT name FROM users WHERE id = ?', [reporterId]);
+    const key = `${project.project_key}-B${ticketNumber}`;
+    // The ticket's own thread starts here, and the task's thread notes the bug too.
+    await recordActivity({ ticketId: id, actorId: reporterId, kind: 'ticket_raised', meta: { key, severity } }, tx);
+    await recordActivity({
+      taskId: task.id, actorId: reporterId, kind: 'ticket_raised', meta: { ticketId: id, key, severity, title },
+    }, tx);
     // The manager who assigned the task is the person who needs to know about it.
     await createNotification({
       userId: task.manager_id,
@@ -186,6 +193,11 @@ export async function updateTicketStatus({ ticketId, status, resolutionNote, act
       [status, resolvedAt, resolutionNote ?? null, ts, ticketId],
     );
     if (ticket.status === status) return;
+
+    await recordActivity({
+      ticketId, actorId: actor.id, kind: 'status_changed',
+      meta: { from: ticket.status, to: status, ...(resolutionNote ? { resolutionNote } : {}) },
+    }, tx);
 
     const project = await tx.get('SELECT project_key FROM projects WHERE id = ?', [ticket.project_id]);
     const key = `${project?.project_key}-B${ticket.ticket_number}`;
@@ -238,9 +250,18 @@ export async function updateTicket({ ticketId, actor, patch }) {
   }
   if (!sets.length) return getTicketById(ticketId);
 
+  const changed = Object.entries(columns)
+    .filter(([col, val]) => val !== undefined && val !== ticket[col])
+    .map(([col]) => col);
+
   sets.push('updated_at = ?');
   params.push(nowIso(), ticketId);
-  await db.run(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`, params);
+  await db.transaction(async (tx) => {
+    await tx.run(`UPDATE tickets SET ${sets.join(', ')} WHERE id = ?`, params);
+    if (changed.length) {
+      await recordActivity({ ticketId, actorId: actor.id, kind: 'field_changed', meta: { fields: changed } }, tx);
+    }
+  });
   return getTicketById(ticketId);
 }
 

@@ -16,6 +16,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Ordered child-first so foreign keys never block a --fresh rebuild.
 const TABLES = [
+  'task_labels',
+  'labels',
+  'task_checklist_items',
+  'report_items',
+  'activity',
+  'device_tokens',
   'personal_todos',
   'password_reset_tokens',
   'notifications',
@@ -156,8 +162,8 @@ async function ensurePasswordHashNullable(db) {
   try {
     await db.exec(rebuilt.replace(/CREATE TABLE\s+(IF NOT EXISTS\s+)?users/i, 'CREATE TABLE users_pwfix'));
     await db.exec(`INSERT INTO users_pwfix
-      (id, name, email, password_hash, role, department, job_title, phone, profile_image, is_active, created_at, updated_at)
-      SELECT id, name, email, password_hash, role, department, job_title, phone, profile_image, is_active, created_at, updated_at
+      (id, name, email, password_hash, role, department, job_title, phone, profile_image, timezone, session_version, is_active, created_at, updated_at)
+      SELECT id, name, email, password_hash, role, department, job_title, phone, profile_image, timezone, session_version, is_active, created_at, updated_at
       FROM users`);
     await db.exec('DROP TABLE users');
     await db.exec('ALTER TABLE users_pwfix RENAME TO users');
@@ -255,6 +261,17 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'personal_todos', 'task_id', 'INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL')) {
     added.push('personal_todos.task_id');
+  }
+  // The mobile app: a per-person timezone, revocable sessions, and notifications that
+  // point at a person rather than a task or ticket.
+  if (await ensureColumn(db, 'users', 'timezone', 'TEXT')) {
+    added.push('users.timezone');
+  }
+  if (await ensureColumn(db, 'users', 'session_version', 'INTEGER NOT NULL DEFAULT 0')) {
+    added.push('users.session_version');
+  }
+  if (await ensureColumn(db, 'notifications', 'related_user_id', 'INTEGER REFERENCES users (id) ON DELETE CASCADE')) {
+    added.push('notifications.related_user_id');
   }
 
   // Databases created before the admin role existed still reject role = 'admin'.

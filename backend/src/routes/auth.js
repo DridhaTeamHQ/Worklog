@@ -5,7 +5,7 @@ import config from '../config/env.js';
 import { requireAuth } from '../middleware/auth.js';
 import { validate, safeText } from '../middleware/validate.js';
 import {
-  login, logout, me, forgotPassword, resetPassword, changeOwnPassword,
+  login, logout, logoutAll, me, forgotPassword, resetPassword, changeOwnPassword,
   inviteStatus, acceptInvite,
 } from '../controllers/auth.js';
 
@@ -73,6 +73,7 @@ router.post('/login', loginLimiter, validate(loginSchema), login);
 router.post('/invite-status', inviteLimiter, validate(inviteStatusSchema), inviteStatus);
 router.post('/accept-invite', inviteLimiter, validate(acceptInviteSchema), acceptInvite);
 router.post('/logout', logout);
+router.post('/logout-all', requireAuth, logoutAll);
 router.get('/me', requireAuth, me);
 router.post('/forgot-password', forgotLimiter, validate(forgotSchema), forgotPassword);
 router.post('/reset-password', validate(resetSchema), resetPassword);

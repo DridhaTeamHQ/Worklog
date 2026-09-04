@@ -15,6 +15,12 @@ CREATE TABLE IF NOT EXISTS users (
   job_title      TEXT,
   phone          TEXT,
   profile_image  TEXT,
+  -- IANA zone the person lives in, e.g. Asia/Kolkata. Decides what "today" means for
+  -- their daily report, to-dos and roster status. NULL means the deployment default.
+  timezone       TEXT,
+  -- Bumped on password change and "sign out everywhere" — a token whose ver claim
+  -- does not match is refused, which is how every outstanding session is revoked.
+  session_version INTEGER NOT NULL DEFAULT 0,
   is_active      INTEGER NOT NULL DEFAULT 1,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
@@ -104,6 +110,8 @@ CREATE TABLE IF NOT EXISTS notifications (
   type             TEXT NOT NULL DEFAULT 'general',
   related_task_id  INTEGER REFERENCES assigned_tasks (id) ON DELETE CASCADE,
   related_ticket_id INTEGER REFERENCES tickets (id) ON DELETE CASCADE,
+  -- The person the notification is about (a submitted report, a mention).
+  related_user_id  INTEGER REFERENCES users (id) ON DELETE CASCADE,
   is_read          INTEGER NOT NULL DEFAULT 0,
   created_at       TEXT NOT NULL
 );
@@ -140,3 +148,78 @@ CREATE TABLE IF NOT EXISTS personal_todos (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_personal_todos_owner_day ON personal_todos (user_id, todo_date, id);
+
+-- Phones registered for push notifications. One row per Expo push token — the token
+-- identifies an app install, so it is re-pointed when a different person signs in.
+CREATE TABLE IF NOT EXISTS device_tokens (
+  id              INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_id         INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  expo_push_token TEXT NOT NULL UNIQUE,
+  platform        TEXT NOT NULL CHECK (platform IN ('ios', 'android', 'web')),
+  app_version     TEXT,
+  last_seen_at    TEXT NOT NULL,
+  created_at      TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_device_tokens_user ON device_tokens (user_id);
+
+-- What happened on a task or ticket, in order: comments people wrote and the changes
+-- the system recorded (status moves, edits, checklist ticks, linked reports). Exactly
+-- one of task_id / ticket_id is set. meta is a small JSON object describing a change.
+CREATE TABLE IF NOT EXISTS activity (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id     INTEGER REFERENCES assigned_tasks (id) ON DELETE CASCADE,
+  ticket_id   INTEGER REFERENCES tickets (id) ON DELETE CASCADE,
+  actor_id    INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  kind        TEXT NOT NULL CHECK (kind IN ('comment', 'status_changed', 'field_changed', 'assigned',
+                                          'checklist', 'attachment', 'report_linked', 'labels_changed', 'ticket_raised')),
+  body        TEXT,
+  meta        TEXT,
+  edited_at   TEXT,
+  created_at  TEXT NOT NULL,
+  CHECK ((task_id IS NULL) <> (ticket_id IS NULL))
+);
+CREATE INDEX IF NOT EXISTS idx_activity_task ON activity (task_id, id);
+CREATE INDEX IF NOT EXISTS idx_activity_ticket ON activity (ticket_id, id);
+
+-- The lines of a daily report, each optionally tied to one of the tasks the person
+-- worked on, with the minutes they spent if they chose to say. The free-text
+-- task_description on the report itself stays for anything that fits no task.
+CREATE TABLE IF NOT EXISTS report_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  report_id  INTEGER NOT NULL REFERENCES daily_task_reports (id) ON DELETE CASCADE,
+  task_id    INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL,
+  text       TEXT NOT NULL,
+  minutes    INTEGER,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_report_items_report ON report_items (report_id, position);
+CREATE INDEX IF NOT EXISTS idx_report_items_task ON report_items (task_id);
+
+-- Sub-steps of a task. Ticked by the assignee or the manager — the counts show on cards.
+CREATE TABLE IF NOT EXISTS task_checklist_items (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  task_id    INTEGER NOT NULL REFERENCES assigned_tasks (id) ON DELETE CASCADE,
+  title      TEXT NOT NULL,
+  is_done    INTEGER NOT NULL DEFAULT 0,
+  done_at    TEXT,
+  position   INTEGER NOT NULL DEFAULT 0,
+  created_by INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_checklist_task ON task_checklist_items (task_id, position, id);
+
+-- Labels cut across projects ("backend", "customer-facing", "blocked"). Company-wide.
+CREATE TABLE IF NOT EXISTS labels (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL UNIQUE,
+  color      TEXT NOT NULL DEFAULT '#64748b',
+  created_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS task_labels (
+  task_id  INTEGER NOT NULL REFERENCES assigned_tasks (id) ON DELETE CASCADE,
+  label_id INTEGER NOT NULL REFERENCES labels (id) ON DELETE CASCADE,
+  PRIMARY KEY (task_id, label_id)
+);
+CREATE INDEX IF NOT EXISTS idx_task_labels_label ON task_labels (label_id);

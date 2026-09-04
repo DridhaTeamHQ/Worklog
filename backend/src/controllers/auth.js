@@ -4,12 +4,12 @@
  * Sign-in, sign-out, session lookup, and the password reset / change flows.
  */
 import config from '../config/env.js';
-import { signToken } from '../middleware/auth.js';
+import { signToken, isMobileClient } from '../middleware/auth.js';
 import { ok } from '../utils/http.js';
 import { asyncHandler, unauthorized, badRequest, forbidden } from '../utils/errors.js';
 import {
   findByEmail, findById, verifyPassword, toPublicUser, changePassword,
-  findInvitedByEmail, setInitialPassword,
+  findInvitedByEmail, setInitialPassword, revokeAllSessions,
 } from '../models/user.js';
 import {
   createResetToken, findResetToken, isResetTokenUsable, consumeResetToken,
@@ -62,10 +62,23 @@ export const login = asyncHandler(async (req, res) => {
     throw unauthorized('Incorrect email or password.');
   }
 
-  const token = signToken(user);
-  setAuthCookie(res, token);
-  return ok(res, { token, user: toPublicUser(user) });
+  return issueSession(req, res, user);
 });
+
+/**
+ * Issues the session for a freshly authenticated user.
+ *
+ * The web gets the token in the body *and* an httpOnly cookie. The mobile app
+ * (X-Client: mobile) gets a longer-lived token in the body only — a cookie would be
+ * dead weight on a phone, and the long expiry is what makes the app usable; see
+ * `signToken` for why that is safe.
+ */
+function issueSession(req, res, user) {
+  const client = isMobileClient(req) ? 'mobile' : 'web';
+  const token = signToken(user, { client });
+  if (client === 'web') setAuthCookie(res, token);
+  return ok(res, { token, user: toPublicUser(user) });
+}
 
 /**
  * POST /api/auth/invite-status — has this email been added by a manager but never
@@ -104,15 +117,26 @@ export const acceptInvite = asyncHandler(async (req, res) => {
     throw badRequest('That invitation is no longer available. If you have already set a password, sign in — or use "Forgot password?".');
   }
 
-  const token = signToken(user);
-  setAuthCookie(res, token);
-  return ok(res, { token, user: toPublicUser(user) });
+  return issueSession(req, res, user);
 });
 
 export const logout = (req, res) => {
   res.clearCookie(config.auth.cookieName);
   return ok(res, { message: 'Signed out.' });
 };
+
+/**
+ * POST /api/auth/logout-all — sign out everywhere.
+ *
+ * A bearer token cannot be recalled once issued, so this bumps the account's session
+ * version instead: every token issued before now, on every device, is refused from
+ * the next request. The one that made this call included.
+ */
+export const logoutAll = asyncHandler(async (req, res) => {
+  await revokeAllSessions(req.user.id);
+  res.clearCookie(config.auth.cookieName);
+  return ok(res, { message: 'Signed out on every device.' });
+});
 
 export const me = asyncHandler(async (req, res) => ok(res, { user: await findById(req.user.id) }));
 

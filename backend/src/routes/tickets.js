@@ -4,6 +4,7 @@ import { requireAuth } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { SEVERITIES, TICKET_STATUSES } from '../utils/constants.js';
 import { list, getOne, create, setStatus, update, remove } from '../controllers/tickets.js';
+import * as activity from '../controllers/activity.js';
 
 const router = Router();
 router.use(requireAuth);
@@ -39,11 +40,22 @@ const patchSchema = z.object({
   severity: z.enum(SEVERITIES).optional(),
 });
 
+const commentSchema = z.object({
+  body: safeText(4000, 'Comment'),
+  mentions: z.array(z.coerce.number().int().positive()).max(10).default([]),
+});
+
 router.get('/', validate(listQuery, 'query'), list);
 router.get('/:id', getOne);
 router.post('/', validate(createSchema), create);
 router.patch('/:id/status', validate(statusSchema), setStatus);
 router.patch('/:id', validate(patchSchema), update);
 router.delete('/:id', remove);
+
+// The activity thread: system events plus comments.
+router.get('/:id/activity', activity.listThread('ticket'));
+router.post('/:id/comments', validate(commentSchema), activity.comment('ticket'));
+router.patch('/:id/comments/:commentId', validate(commentSchema.pick({ body: true })), activity.edit('ticket'));
+router.delete('/:id/comments/:commentId', activity.remove('ticket'));
 
 export default router;

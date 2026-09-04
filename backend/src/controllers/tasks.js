@@ -44,7 +44,7 @@ export const list = asyncHandler(async (req, res) => {
  * else's report is reported as missing rather than refused — which id belongs to which
  * department is not something to leak through the difference between 403 and 404.
  */
-async function getTaskInScope(req, taskId) {
+export async function getTaskInScope(req, taskId) {
   const task = await getTaskById(taskId);
   if (!task) throw notFound('That task no longer exists.');
   if (isManagerLevel(req.user.role)

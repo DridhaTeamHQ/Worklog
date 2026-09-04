@@ -9,3 +9,6 @@ backend/scripts/
 # Local configuration. Real values come from the Vercel project's environment
 # variables, never from a file in the repo.
 backend/.env
+
+# The Expo app is built by EAS, not Vercel.
+mobile/

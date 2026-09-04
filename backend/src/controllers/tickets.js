@@ -20,6 +20,26 @@ const parseId = (raw) => {
   return id;
 };
 
+/**
+ * The ticket, if this caller is allowed to touch it.
+ *
+ * A ticket belongs to the department of whoever raised it, and a manager is confined
+ * to their own — so one from elsewhere is reported as missing rather than refused,
+ * exactly like `getTaskInScope`: which ids exist in another department is not
+ * something to leak through the difference between 403 and 404. Every handler that
+ * takes a ticket id goes through here, so reading, moving, editing and deleting are
+ * all governed by the same answer.
+ */
+export async function getTicketInScope(req, ticketId) {
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) throw notFound('That ticket no longer exists.');
+  if (isManagerLevel(req.user.role)
+      && !withinScope(departmentScope(req.user), ticket.reporter_department)) {
+    throw notFound('That ticket no longer exists.');
+  }
+  return ticket;
+}
+
 export const list = asyncHandler(async (req, res) => {
   const q = req.validatedQuery;
 
@@ -49,14 +69,7 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 export const getOne = asyncHandler(async (req, res) => {
-  const ticket = await getTicketById(parseId(req.params.id));
-  if (!ticket) throw notFound('That ticket no longer exists.');
-  // Same wording as a missing ticket: whether an id exists in another department is
-  // not something a manager should be able to establish.
-  if (isManagerLevel(req.user.role)
-      && !withinScope(departmentScope(req.user), ticket.reporter_department)) {
-    throw notFound('That ticket no longer exists.');
-  }
+  const ticket = await getTicketInScope(req, parseId(req.params.id));
   if (isTeamMember(req.user.role) && ticket.reporter_id !== req.user.id) {
     throw forbidden('You can only view tickets you raised.');
   }
@@ -81,8 +94,10 @@ export const create = asyncHandler(async (req, res) => {
 });
 
 export const setStatus = asyncHandler(async (req, res) => {
+  const ticketId = parseId(req.params.id);
+  await getTicketInScope(req, ticketId);
   const ticket = await updateTicketStatus({
-    ticketId: parseId(req.params.id),
+    ticketId,
     status: req.body.status,
     resolutionNote: req.body.resolutionNote,
     actor: req.user,
@@ -91,15 +106,15 @@ export const setStatus = asyncHandler(async (req, res) => {
 });
 
 export const update = asyncHandler(async (req, res) => {
-  const ticket = await updateTicket({
-    ticketId: parseId(req.params.id),
-    actor: req.user,
-    patch: req.body,
-  });
+  const ticketId = parseId(req.params.id);
+  await getTicketInScope(req, ticketId);
+  const ticket = await updateTicket({ ticketId, actor: req.user, patch: req.body });
   return ok(res, ticket);
 });
 
 export const remove = asyncHandler(async (req, res) => {
-  await deleteTicket({ ticketId: parseId(req.params.id), actor: req.user });
+  const ticketId = parseId(req.params.id);
+  await getTicketInScope(req, ticketId);
+  await deleteTicket({ ticketId, actor: req.user });
   return ok(res, { message: 'Ticket deleted.' });
 });

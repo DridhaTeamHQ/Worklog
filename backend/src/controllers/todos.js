@@ -5,10 +5,12 @@
  * there is no parameter a caller could set to reach someone else's list. The routes
  * are authenticated but carry no role gate: a private list is private to whoever owns
  * it, and every role has one.
+ *
+ * "Today" is `req.today` — the date in the caller's own timezone, resolved by
+ * requireAuth — so a list opened late at night lands on the right day.
  */
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest } from '../utils/errors.js';
-import { today } from '../utils/dates.js';
 import { listTodos, createTodo, updateTodo, deleteTodo } from '../models/todo.js';
 
 const parseId = (raw) => {
@@ -18,7 +20,7 @@ const parseId = (raw) => {
 };
 
 export const list = asyncHandler(async (req, res) => {
-  const date = req.validatedQuery.date || today();
+  const date = req.validatedQuery.date || req.today;
   const todos = await listTodos(req.user.id, date);
   return ok(res, todos, { date, total: todos.length });
 });
@@ -26,7 +28,7 @@ export const list = asyncHandler(async (req, res) => {
 export const create = asyncHandler(async (req, res) => {
   const todo = await createTodo(req.user.id, {
     title: req.body.title,
-    todoDate: req.body.date || today(),
+    todoDate: req.body.date || req.today,
     projectId: req.body.projectId,
     taskId: req.body.taskId,
   });

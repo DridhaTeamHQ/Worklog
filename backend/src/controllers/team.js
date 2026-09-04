@@ -33,7 +33,7 @@ export const list = asyncHandler(async (req, res) => {
 
   const q = req.validatedQuery;
   const department = scopedDepartment(scope, q.department);
-  const members = await listTeamMembers({ ...q, department });
+  const members = await listTeamMembers({ ...q, department, viewerTimezone: req.timezone });
   return ok(res, members, {
     total: members.length,
     scope: scope.restricted ? scope.department : null,
@@ -125,7 +125,7 @@ export const memberReports = asyncHandler(async (req, res) => {
   const employeeId = parseId(req.params.id);
   await getMemberInScope(req, employeeId);
   const q = req.validatedQuery;
-  const { from, to } = resolveRange(q.range, q.from, q.to);
+  const { from, to } = resolveRange(q.range, q.from, q.to, req.today);
   const { items, total } = await listReports({
     employeeId, from, to, search: q.search, limit: q.limit, offset: q.offset,
   });

@@ -34,6 +34,25 @@ function toPgPlaceholders(sql) {
   return out;
 }
 
+/**
+ * Runs the hooks a transaction queued with `tx.afterCommit(fn)`, once its COMMIT has
+ * succeeded. A hook is for work that must see the committed rows but must not be able
+ * to roll them back — sending a push notification is the case that exists today.
+ *
+ * Hooks are awaited, not fired and forgotten: on a serverless host the function is
+ * frozen the moment the response is sent, so anything still in flight would be lost.
+ * Each hook is bounded by its own timeout (see services/push.js) and a rejection is
+ * logged rather than thrown — the transaction already succeeded, and the caller must
+ * hear that it did.
+ */
+async function runAfterCommit(hooks) {
+  if (!hooks.length) return;
+  const results = await Promise.allSettled(hooks.map((hook) => Promise.resolve().then(hook)));
+  for (const r of results) {
+    if (r.status === 'rejected') console.error('[db] afterCommit hook failed:', r.reason?.message || r.reason);
+  }
+}
+
 /* ------------------------------------------------------------------ sqlite */
 
 function createSqliteDriver() {
@@ -72,15 +91,21 @@ function createSqliteDriver() {
       handle.exec(sql);
     },
     async transaction(fn) {
+      const hooks = [];
+      // The same API plus `afterCommit`; the shared object is never mutated, so two
+      // overlapping transactions cannot see each other's hooks.
+      const tx = { ...api, afterCommit: (hook) => hooks.push(hook) };
       handle.exec('BEGIN');
+      let result;
       try {
-        const result = await fn(api);
+        result = await fn(tx);
         handle.exec('COMMIT');
-        return result;
       } catch (err) {
         try { handle.exec('ROLLBACK'); } catch { /* already rolled back */ }
         throw err;
       }
+      await runAfterCommit(hooks);
+      return result;
     },
     async close() { handle.close(); },
   };
@@ -155,17 +180,22 @@ async function createPostgresDriver() {
     },
     async transaction(fn) {
       const client = await pool.connect();
+      const hooks = [];
+      const tx = wrap(client);
+      tx.afterCommit = (hook) => hooks.push(hook);
+      let result;
       try {
         await client.query('BEGIN');
-        const result = await fn(wrap(client));
+        result = await fn(tx);
         await client.query('COMMIT');
-        return result;
       } catch (err) {
         await client.query('ROLLBACK').catch(() => {});
         throw err;
       } finally {
         client.release();
       }
+      await runAfterCommit(hooks);
+      return result;
     },
     async close() { await pool.end(); },
   });

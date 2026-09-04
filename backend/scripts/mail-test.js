@@ -8,7 +8,7 @@
  */
 import nodemailer from 'nodemailer';
 import config from '../src/config/env.js';
-import { sendWelcomeEmail } from '../src/services/mail.js';
+import { sendInviteEmail } from '../src/services/mail.js';
 
 const recipient = process.argv[2];
 
@@ -134,11 +134,11 @@ async function main() {
     return;
   }
 
-  process.stdout.write(`Sending a test welcome email to ${recipient}... `);
-  const result = await sendWelcomeEmail({
+  process.stdout.write(`Sending a test invite email to ${recipient}... `);
+  const result = await sendInviteEmail({
     name: 'Test Recipient',
     email: recipient,
-    password: 'TempPass@123',
+    role: 'team_member',
     managerName: 'Taskr Setup Check',
   });
 

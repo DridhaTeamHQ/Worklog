@@ -8,7 +8,6 @@ import { ok } from '../utils/http.js';
 import { asyncHandler } from '../utils/errors.js';
 import { isManagerLevel } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment } from '../utils/scope.js';
-import { today } from '../utils/dates.js';
 import {
   managerOverview, employeeOverview, productivityByEmployee,
   dailyActivity, weeklyActivity, statusBreakdown,
@@ -40,7 +39,7 @@ export const overview = asyncHandler(async (req, res) => {
     }
 
     const [summary, recentTasks, recentReports, breakdown, activity, openTickets] = await Promise.all([
-      managerOverview(department, range),
+      managerOverview(department, range, { today: req.today }),
       listTasks({ sort: 'created_desc', limit: 8, department }),
       listReports({ limit: 6, department }),
       statusBreakdown({ department }),
@@ -60,13 +59,13 @@ export const overview = asyncHandler(async (req, res) => {
   }
 
   const [summary, tasks, reports, todayReport, myTickets] = await Promise.all([
-    employeeOverview(req.user.id),
+    employeeOverview(req.user.id, { today: req.today }),
     // The schedule strip on the dashboard plots six weeks of start dates, deadlines
     // and completions, so it needs the employee's whole set rather than the handful a
     // preview list used to want — a task missing from the fetch is a day left blank.
     listTasks({ employeeId: req.user.id, sort: 'deadline_asc', limit: 100 }),
     listReports({ employeeId: req.user.id, limit: 5 }),
-    getReportForDate(req.user.id, today()),
+    getReportForDate(req.user.id, req.today),
     listTickets({ reporterId: req.user.id, sort: 'created_desc', limit: 5 }),
   ]);
   return ok(res, {
