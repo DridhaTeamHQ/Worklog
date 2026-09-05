@@ -13,7 +13,7 @@ import { PlusJakartaSans_500Medium } from '@expo-google-fonts/plus-jakarta-sans/
 import { PlusJakartaSans_600SemiBold } from '@expo-google-fonts/plus-jakarta-sans/600SemiBold';
 import { PlusJakartaSans_700Bold } from '@expo-google-fonts/plus-jakarta-sans/700Bold';
 import { PlusJakartaSans_800ExtraBold } from '@expo-google-fonts/plus-jakarta-sans/800ExtraBold';
-import { ThemeProvider, initMotionPrefs, useTheme } from '@/theme';
+import { ThemeProvider, initMotionPrefs, useReducedMotion, useTheme } from '@/theme';
 import { ToastProvider } from '@/components/Toast';
 import { queryClient, wireAppLifecycle } from '@/lib/queryClient';
 import { useAuthStore } from '@/auth/store';
@@ -70,13 +70,14 @@ export default function RootLayout() {
 
 function Blank() {
   const t = useTheme();
-  return <View style={{ flex: 1, backgroundColor: t.colors.hero }} />;
+  return <View style={{ flex: 1, backgroundColor: t.colors.ground }} />;
 }
 
 function RootStack({ status }: { status: 'signedOut' | 'signedIn' | 'booting' }) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.ground }, animation: 'fade' }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.ground }, animation: reduced ? 'none' : 'fade' }}>
       <Stack.Protected guard={status === 'signedOut'}>
         <Stack.Screen name="(auth)" />
       </Stack.Protected>

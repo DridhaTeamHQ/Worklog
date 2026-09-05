@@ -55,8 +55,8 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
     <Field label={label} hint={hint} error={error} required={required} style={containerStyle}>
       <View style={{
         flexDirection: 'row', alignItems: multiline ? 'flex-start' : 'center', gap: 10,
-        backgroundColor: t.colors.cardAlt, borderRadius: t.radius.md, borderWidth: 1,
-        borderColor: focused || error ? borderColor : 'transparent',
+        backgroundColor: t.isDark ? t.colors.ground : t.colors.cardAlt, borderRadius: t.radius.md, borderWidth: 1,
+        borderColor: focused || error ? borderColor : t.colors.hairline,
         paddingHorizontal: 14, minHeight: multiline ? 112 : 50, paddingVertical: multiline ? 12 : 0,
       }}
       >
@@ -64,6 +64,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
         <TextInput
           maxFontSizeMultiplier={1.15}
           ref={ref}
+          accessibilityLabel={label}
           {...rest}
           multiline={multiline}
           secureTextEntry={hidden}
@@ -77,7 +78,7 @@ export const TextField = forwardRef<TextInput, TextFieldProps>(function TextFiel
           ]}
         />
         {password ? (
-          <Pressable onPress={() => setHidden((h) => !h)} hitSlop={8} accessibilityLabel={hidden ? 'Show password' : 'Hide password'}>
+          <Pressable onPress={() => setHidden((h) => !h)} accessibilityRole="button" hitSlop={8} accessibilityLabel={hidden ? 'Show password' : 'Hide password'}>
             {hidden ? <Eye size={18} color={t.colors.inkFaint} /> : <EyeOff size={18} color={t.colors.inkFaint} />}
           </Pressable>
         ) : null}
@@ -111,7 +112,7 @@ export function PickerField({ label, hint, error, required, value, placeholder =
         style={({ pressed }) => ({
           flexDirection: 'row', alignItems: 'center', gap: 10,
           backgroundColor: pressed ? t.colors.neutralSoft : t.colors.cardAlt, borderRadius: t.radius.md,
-          borderWidth: 1, borderColor: error ? t.colors.danger : 'transparent',
+          borderWidth: 1, borderColor: error ? t.colors.danger : t.colors.hairline,
           paddingHorizontal: 14, height: 50, opacity: disabled ? 0.55 : 1,
         })}
       >

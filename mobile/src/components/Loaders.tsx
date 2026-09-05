@@ -1,6 +1,7 @@
 import { View } from 'react-native';
 import Svg, { Circle, Path } from 'react-native-svg';
 import { MotiView } from 'moti';
+import { Easing } from 'react-native-reanimated';
 import { Check } from 'lucide-react-native';
 import { useReducedMotion, useTheme } from '@/theme';
 import { Text } from './Text';
@@ -31,7 +32,7 @@ export function Spinner({ size = 22, color, track = true, stroke }: { size?: num
     <MotiView
       from={{ rotate: '0deg' }}
       animate={{ rotate: '360deg' }}
-      transition={{ type: 'timing', duration: 900, loop: true, repeatReverse: false }}
+      transition={{ type: 'timing', duration: 900, easing: Easing.linear, loop: true, repeatReverse: false }}
       style={{ width: size, height: size }}
     >
       {ring}
@@ -49,9 +50,9 @@ export function PulseDots({ color, size = 6 }: { color?: string; size?: number }
       {[0, 1, 2].map((i) => (
         <MotiView
           key={i}
-          from={{ opacity: 0.25, scale: 0.8 }}
+          from={reduced ? { opacity: 0.6, scale: 1 } : { opacity: 0.25, scale: 0.8 }}
           animate={reduced ? { opacity: 0.6, scale: 1 } : { opacity: 1, scale: 1 }}
-          transition={{ type: 'timing', duration: 520, delay: i * 160, loop: !reduced, repeatReverse: true }}
+          transition={{ type: 'timing', duration: reduced ? 0 : 520, delay: reduced ? 0 : i * 160, loop: !reduced, repeatReverse: true }}
           style={{ width: size, height: size, borderRadius: size / 2, backgroundColor: c }}
         />
       ))}

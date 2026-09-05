@@ -4,7 +4,8 @@ import { Link, useRouter } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { AnimatePresence, MotiView } from 'moti';
-import { Asterisk, KeyRound, Mail, Sparkles } from 'lucide-react-native';
+import { ArrowRight, Asterisk, KeyRound, Mail, Sparkles } from 'lucide-react-native';
+import { AuroraSurface } from '@/components/AuroraCard';
 import { useTheme } from '@/theme';
 import { authApi } from '@/api/endpoints';
 import { ApiError, errorMessage } from '@/api/client';
@@ -52,20 +53,21 @@ export default function Login() {
       <StatusBar style={t.isDark ? 'light' : 'dark'} />
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ flexGrow: 1, paddingTop: insets.top + 24, paddingBottom: insets.bottom + 24, paddingHorizontal: t.spacing.screen }} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          <View style={{ gap: 16, marginBottom: 36 }}>
+          <View style={{ gap: 12, marginBottom: 28, padding: 24, borderRadius: 30, overflow: 'hidden', borderWidth: 1, borderColor: t.colors.glassBorder }}>
+            <AuroraSurface tone="sage" />
             <Reveal>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: t.colors.hero, alignItems: 'center', justifyContent: 'center' }}>
-                  <Asterisk size={24} color="#FFFFFF" strokeWidth={2.6} />
+                <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: '#E5EDCE', alignItems: 'center', justifyContent: 'center' }}>
+                  <Asterisk size={23} color="#172018" strokeWidth={1.8} />
                 </View>
-                <Text variant="h3">Taskr</Text>
+                <Text variant="h3" color="#FFFFFF">taskr</Text>
               </View>
             </Reveal>
             <Reveal delay={80}>
-              <Text variant="display" style={{ marginTop: 24 }}>Welcome{'\n'}back.</Text>
+              <Text variant="display" color="#FFFFFF" style={{ marginTop: 22 }}>Welcome{'\n'}back.</Text>
             </Reveal>
             <Reveal delay={160}>
-              <Text variant="body" color="inkMuted">Sign in with your work email.</Text>
+              <Text variant="small" color="#F1F4E9">A little clarity for your workday.</Text>
             </Reveal>
           </View>
 
@@ -124,7 +126,7 @@ export default function Login() {
               <View style={{ alignItems: 'flex-end' }}>
                 <Link href="/(auth)/forgot-password" asChild><TextButton label="Forgot password?" /></Link>
               </View>
-              <PillButton label="Sign in" variant="hero" size="lg" block onPress={submit} loading={busy} haptic="medium" />
+              <PillButton label="Sign in" variant="accent" iconRight={ArrowRight} size="lg" block onPress={submit} loading={busy} haptic="medium" />
               <Text variant="small" color="inkFaint" align="center" style={{ marginTop: 8 }}>
                 No account? Ask an admin to add you — you will get an invite to set your own password.
               </Text>

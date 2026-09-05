@@ -36,7 +36,7 @@ export default function Analytics() {
 
   return (
     <Screen refreshing={analytics.isRefetching} onRefresh={() => analytics.refetch()}>
-      <ScreenHeader big={false} title="Analytics" subtitle="The last 30 days." />
+      <ScreenHeader tone="iris" title="Analytics" subtitle="The last 30 days." />
       {analytics.isPending ? <SkeletonList count={3} /> : analytics.isError || !d ? <ErrorState error={analytics.error} onRetry={() => analytics.refetch()} /> : (
         <>
           <Reveal>

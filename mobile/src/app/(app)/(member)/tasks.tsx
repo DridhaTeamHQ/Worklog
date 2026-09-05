@@ -1,3 +1,5 @@
+import { TaskBoard, TaskViewSwitch, type TaskView } from '@/features/TaskBoard';
+import { PageIntro } from '@/components/ScreenHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -38,19 +40,21 @@ export default function MemberTasks() {
   const insets = useSafeAreaInsets();
   const bottom = useTabBarInset();
   const barScroll = useAutoHideTabBar();
-  const params = useLocalSearchParams<{ status?: string; projectId?: string }>();
+  const params = useLocalSearchParams<{ status?: string; projectId?: string; view?: string }>();
   const [status, setStatus] = useState<StatusTab>('all');
   const [projectId, setProjectId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  const [taskView, setTaskView] = useState<TaskView>('list');
   const [sort, setSort] = useState('deadline_asc');
   const [moving, setMoving] = useState<Task | null>(null);
   const sortSheet = useSheet();
   const statusSheet = useSheet();
 
   useEffect(() => {
+    if (params.view === 'board' || params.view === 'list') setTaskView(params.view);
     if (params.status && STATUS_TABS.some((s) => s.key === params.status)) setStatus(params.status as StatusTab);
     if (params.projectId) setProjectId(Number(params.projectId) || null);
-  }, [params.status, params.projectId]);
+  }, [params.status, params.projectId, params.view]);
 
   // The chips are derived from the member's own tasks, as the web does.
   const all = useTasks({ limit: 200, sort: 'created_desc' });
@@ -78,14 +82,8 @@ export default function MemberTasks() {
   const overdue = items.filter((x) => x.effective_status === 'overdue').length;
 
   const header = (
-    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h1">My tasks</Text>
-          <Text variant="small" color="inkMuted">{list.data ? `${list.data.total} ${list.data.total === 1 ? 'task' : 'tasks'}${overdue ? ` · ${overdue} overdue` : ''}` : ' '}</Text>
-        </View>
-        <IconPillButton icon={ArrowDownUp} tone="soft" onPress={sortSheet.open} accessibilityLabel="Sort" />
-      </View>
+    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 16 }}>
+      <PageIntro compact={taskView === 'board'} title="My tasks" tone="sage" eyebrow="MAKE ROOM FOR FOCUS" subtitle={list.data ? `${list.data.total} ${list.data.total === 1 ? 'task' : 'tasks'}${overdue ? ` · ${overdue} overdue` : ''}` : ' '} right={<><IconPillButton icon={ArrowDownUp} tone="glass" onPress={sortSheet.open} accessibilityLabel="Sort" /></>} />
       {projects.length > 1 ? (
         <SegmentedTabs
           scroll
@@ -94,15 +92,16 @@ export default function MemberTasks() {
           onChange={(k) => setProjectId(k === 'all' ? null : Number(k))}
         />
       ) : null}
-      <SegmentedTabs items={STATUS_TABS} value={status} onChange={setStatus} />
+      <SegmentedTabs scroll iconic={false} items={STATUS_TABS} value={status} onChange={setStatus} />
       <SearchField value={search} onChange={setSearch} placeholder="Search tasks or keys" loading={list.isFetching && !!search} />
+      <TaskViewSwitch value={taskView} onChange={setTaskView} />
     </View>
   );
 
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.ground }}>
       <FlatList
-        data={list.isPending ? [] : items}
+        data={list.isPending || taskView === 'board' ? [] : items}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item, index }) => (
           <Reveal index={index} style={{ marginBottom: 16 }}>
@@ -110,7 +109,7 @@ export default function MemberTasks() {
           </Reveal>
         )}
         ListHeaderComponent={header}
-        ListEmptyComponent={list.isPending ? <SkeletonList count={4} /> : list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : (
+        ListEmptyComponent={taskView === 'board' && !list.isPending && !list.isError && (list.data?.items.length ?? 0) > 0 ? <TaskBoard tasks={list.data!.items} total={list.data!.total}  /> : list.isPending ? <SkeletonList count={4} /> : list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : (
           <EmptyState icon={ListChecks} title={search || status !== 'all' ? 'Nothing matches' : 'No tasks yet'} body={search || status !== 'all' ? 'Try another filter or clear the search.' : 'When a manager assigns you work, it shows up here.'} action={search || status !== 'all' ? { label: 'Clear filters', onPress: () => { setSearch(''); setStatus('all'); setProjectId(null); } } : undefined} />
         )}
         contentContainerStyle={{ paddingHorizontal: t.spacing.screen, paddingBottom: bottom }}

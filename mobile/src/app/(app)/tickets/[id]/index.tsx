@@ -1,7 +1,8 @@
+import { TicketWorkflow } from '@/features/TicketWorkflow';
 import { useState } from 'react';
 import { Alert, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Circle, CircleCheck, CircleDot, CircleX, MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
+import { MoreHorizontal, Pencil, Trash2 } from 'lucide-react-native';
 import { useTheme } from '@/theme';
 import { useUser } from '@/auth/store';
 import { useDeleteTicket, useTicket, useUpdateTicketStatus } from '@/hooks/useTickets';
@@ -10,13 +11,10 @@ import { formatDateTime } from '@/lib/format';
 import { isManagerLevel, type TicketStatus } from '@/types';
 import {
   BentoCard, CheckRow, ErrorState, IconPillButton, KeyChip, ListGroup, PersonRow, PillButton, Reveal, Screen, ScreenHeader,
-  SectionTitle, SegmentedTabs, SeverityChip, Sheet, LoadingState, SkeletonList, Text, TextField, TicketStatusChip, TitleBlock, ValueRow,
+  SectionTitle, SeverityChip, Sheet, LoadingState, Text, TextField, TicketStatusChip, TitleBlock, ValueRow,
   TICKET_STATUS_LABEL, useSheet, useToast,
 } from '@/components';
 import { ActivityThread } from '@/features/ActivityThread';
-
-const ALL: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
-const STATUS_ICON: Record<TicketStatus, typeof Circle> = { open: Circle, in_progress: CircleDot, resolved: CircleCheck, closed: CircleX };
 
 /**
  * A ticket in full. The reporter may edit its wording while it is open and close or
@@ -33,7 +31,7 @@ export default function TicketDetail() {
   const move = useUpdateTicketStatus();
   const remove = useDeleteTicket();
   const menu = useSheet();
-  const resolve = useSheet();
+  const [resolving, setResolving] = useState(false);
   const [note, setNote] = useState('');
 
   const manager = isManagerLevel(user?.role);
@@ -44,7 +42,7 @@ export default function TicketDetail() {
   const setStatus = (status: TicketStatus, resolutionNote?: string) => {
     if (!data || data.status === status) return;
     move.mutate({ id: data.id, status, resolutionNote }, {
-      onSuccess: () => { toast.success(`Ticket ${TICKET_STATUS_LABEL[status].toLowerCase()}`); resolve.close(); },
+      onSuccess: () => { toast.success(`Ticket ${TICKET_STATUS_LABEL[status].toLowerCase()}`); setResolving(false); },
       onError: (err) => toast.error('Could not update', errorMessage(err)),
     });
   };
@@ -58,27 +56,37 @@ export default function TicketDetail() {
     ]);
   };
 
-  if (ticket.isError) return <Screen><ScreenHeader title="Ticket" /><ErrorState error={ticket.error} onRetry={() => ticket.refetch()} /></Screen>;
+  if (ticket.isError) return <Screen><ScreenHeader tone="clay" title="Ticket" /><ErrorState error={ticket.error} onRetry={() => ticket.refetch()} /></Screen>;
 
   return (
     <Screen refreshing={ticket.isRefetching} onRefresh={() => ticket.refetch()}>
-      <ScreenHeader big={false} right={data && (manager || reporter) ? <IconPillButton icon={MoreHorizontal} tone="plain" onPress={menu.open} accessibilityLabel="More actions" /> : undefined} />
+      <ScreenHeader tone="clay" big={false} right={data && (manager || reporter) ? <IconPillButton icon={MoreHorizontal} tone="plain" onPress={menu.open} accessibilityLabel="More actions" /> : undefined} />
 
       {ticket.isPending || !data ? <LoadingState /> : (
         <>
           <Reveal>
-            <TitleBlock
+            <TitleBlock tone="clay"
               eyebrow={<><KeyChip value={data.ticket_key} /><Text variant="caption" color="inkFaint">·</Text><Text variant="caption" color="inkMuted">{data.project_name}</Text></>}
               title={data.title}
               meta={<><SeverityChip severity={data.severity} /><TicketStatusChip status={data.status} /><Text variant="small" color="inkMuted">{formatDateTime(data.created_at)}</Text></>}
             />
           </Reveal>
 
-          {manager ? (
-            <Reveal index={1}>
-              <SegmentedTabs items={ALL.map((s) => ({ key: s, label: TICKET_STATUS_LABEL[s], icon: STATUS_ICON[s] }))} value={data.status} onChange={(s) => (s === 'resolved' ? resolve.open() : setStatus(s))} />
-            </Reveal>
-          ) : reporter ? (
+          <Reveal index={1}>
+            <TicketWorkflow value={data.status} busy={move.isPending} onChange={manager ? (status) => status === 'resolved' ? setResolving(true) : setStatus(status) : undefined} />
+          </Reveal>
+          {resolving && manager ? <Reveal><BentoCard>
+            <View style={{ gap: 16 }}>
+              <Text variant="h3">Close the loop.</Text>
+              <Text variant="small" color="inkMuted">Leave a note about the fix so the reporter knows what changed.</Text>
+              <TextField label="Resolution note" value={note} onChangeText={setNote} multiline placeholder="What did you change?" maxLength={2000} />
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ flex: 1 }}><PillButton label="Resolve ticket" block onPress={() => setStatus('resolved', note.trim() || undefined)} loading={move.isPending} haptic="success" /></View>
+                <PillButton label="Cancel" size="md" variant="soft" disabled={move.isPending} onPress={() => setResolving(false)} />
+              </View>
+            </View>
+          </BentoCard></Reveal> : null}
+          {!manager && reporter ? (
             <Reveal index={1}>
               <BentoCard padding={t.spacing.lg}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
@@ -93,7 +101,7 @@ export default function TicketDetail() {
           ) : null}
 
           <Reveal index={2}>
-            <Text variant="body" style={{ paddingHorizontal: 4 }}>{data.description}</Text>
+            <BentoCard><Text variant="caption" color="inkMuted" style={{ letterSpacing: 1.5, marginBottom: 12 }}>WHAT HAPPENED</Text><Text variant="body">{data.description}</Text></BentoCard>
           </Reveal>
 
           {data.resolution_note ? (
@@ -130,13 +138,7 @@ export default function TicketDetail() {
           <CheckRow checked={false} label="Delete ticket" strike={false} onPressLabel={confirmDelete} right={<Trash2 size={18} color={t.colors.danger} />} />
         </View>
       </Sheet>
-      <Sheet ref={resolve.ref} title="Mark as resolved">
-        <View style={{ gap: 14 }}>
-          <Text variant="small" color="inkMuted">What was done? The reporter sees this note.</Text>
-          <TextField value={note} onChangeText={setNote} multiline placeholder="Fixed the double save on…" maxLength={2000} />
-          <PillButton label="Resolve" block onPress={() => setStatus('resolved', note.trim() || undefined)} loading={move.isPending} haptic="success" />
-        </View>
-      </Sheet>
+
     </Screen>
   );
 }

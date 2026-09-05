@@ -48,7 +48,7 @@ export function ReportCard({ report, showEmployee, onPress, onLongPress, maxLine
             </View>
           ) : null}
         </View>
-        <View style={{ gap: 8 }}>
+        <View style={{ gap: 12, paddingTop: 16, borderTopWidth: 1, borderTopColor: t.colors.hairline }}>
           {shown.map((row) => (
             <View key={row.key} style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10 }}>
               <CheckCircle2 size={16} color={t.colors.success} strokeWidth={2} style={{ marginTop: 3 }} />

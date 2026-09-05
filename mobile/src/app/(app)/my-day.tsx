@@ -1,108 +1,103 @@
-import { useMemo, useState } from 'react';
-import { Alert, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { KeyboardAvoidingView, Platform, Pressable, View } from 'react-native';
 import { useRouter } from 'expo-router';
-import { ChevronLeft, ChevronRight, Link2, NotebookPen, Plus, Trash2 } from 'lucide-react-native';
+import { Check, ChevronLeft, ChevronRight, Link2, LockKeyhole, NotebookPen, Plus, Trash2 } from 'lucide-react-native';
 import { useTheme } from '@/theme';
-import { useUser } from '@/auth/store';
 import { useCreateTodo, useDeleteTodo, useTodos, useToggleTodo } from '@/hooks/useTodos';
 import { useTasks } from '@/hooks/useTasks';
 import { errorMessage } from '@/api/client';
 import { addDaysIso, formatDate, taskLabel, todayIso } from '@/lib/format';
-import { isManagerLevel } from '@/types';
-import { BentoCard, BigNumber, CheckRow, EmptyState, ErrorState, IconPillButton, KeyChip, PickerSheet, Reveal, Screen, ScreenHeader, SkeletonList, Text, TextButton, useSheet, useToast, Chip } from '@/components';
-import { Pressable } from 'react-native';
+import type { PersonalTodo, Task } from '@/types';
+import { AuroraCard } from '@/components/AuroraCard';
+import { BentoCard, CheckRow, EmptyState, ErrorState, IconPillButton, PillButton, ProgressBar, Reveal, Screen, ScreenHeader, SearchField, SegmentedTabs, Sheet, SkeletonList, Text, TextButton, TextField, useSheet, useToast } from '@/components';
+import { DotNumber } from '@/components/DotNumber';
+import { useAnimatedNumber } from '@/hooks/useAnimatedNumber';
 
-/** Private notes-to-self for a day. Nothing here reaches a manager, a report or a chart. */
+/** Private daily intentions; progress here never changes project metrics. */
 export default function MyDay() {
   const t = useTheme();
   const router = useRouter();
   const toast = useToast();
-  const user = useUser();
   const [date, setDate] = useState(todayIso());
   const [draft, setDraft] = useState('');
-  const [linkedTask, setLinkedTask] = useState<{ id: number; label: string; key: string | null; projectId: number | null } | null>(null);
+  const [filter, setFilter] = useState<'all' | 'remaining' | 'done'>('all');
+  const [linkedTask, setLinkedTask] = useState<Task | null>(null);
+  const [taskSearch, setTaskSearch] = useState('');
+  const [linkOpen, setLinkOpen] = useState(false);
+  const [removing, setRemoving] = useState<PersonalTodo | null>(null);
   const linkSheet = useSheet();
+  const removeSheet = useSheet();
   const todos = useTodos(date);
   const create = useCreateTodo(date);
   const toggle = useToggleTodo(date);
   const remove = useDeleteTodo(date);
-  const tasks = useTasks({ limit: 200, sort: 'created_desc' });
+  const tasks = useTasks({ search: taskSearch || undefined, limit: 20, sort: 'created_desc' }, { enabled: linkOpen });
+  const busy = create.isPending || toggle.isPending || remove.isPending;
+  const ready = !!todos.data && !todos.isPlaceholderData && !todos.isError;
+  const notes = ready ? todos.data! : [];
+  const done = notes.filter((x) => x.is_done).length;
+  const shown = useAnimatedNumber(done);
+  const visible = notes.filter((x) => filter === 'all' || (filter === 'done' ? x.is_done : !x.is_done));
   const isToday = date === todayIso();
-  const manager = isManagerLevel(user?.role);
-
-  const options = useMemo(() => (tasks.data?.items ?? []).map((x) => ({ value: x.id, label: taskLabel(x), hint: [x.task_key, manager ? x.employee_name : null].filter(Boolean).join(' · ') })), [tasks.data, manager]);
-  const done = (todos.data ?? []).filter((x) => x.is_done).length;
+  const complete = notes.length > 0 && done === notes.length;
+  const changeDate = (next: string) => { if (busy) return; setDate(next); setFilter('all'); };
 
   const add = () => {
     const title = draft.trim();
-    if (!title) return;
-    create.mutate({ title, context: linkedTask ? { taskId: linkedTask.id, projectId: linkedTask.projectId ?? undefined } : undefined }, {
-      onSuccess: () => setDraft(''),
+    if (!title || busy) return;
+    create.mutate({ title, context: linkedTask ? { taskId: linkedTask.id, projectId: linkedTask.project_id ?? undefined } : undefined }, {
+      onSuccess: () => { setDraft(''); setLinkedTask(null); setFilter('all'); toast.success('Note added', formatDate(date)); },
       onError: (err) => toast.error('Could not add', errorMessage(err)),
     });
   };
 
-  return (
-    <Screen refreshing={todos.isRefetching} onRefresh={() => todos.refetch()}>
-      <ScreenHeader big={false} title="My Day" subtitle="Private. Only you can see this." right={(
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <IconPillButton icon={ChevronLeft} size={36} tone="soft" onPress={() => setDate((d) => addDaysIso(d, -1))} accessibilityLabel="Previous day" />
-          <IconPillButton icon={ChevronRight} size={36} tone="soft" onPress={() => setDate((d) => addDaysIso(d, 1))} accessibilityLabel="Next day" />
+  return <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Screen refreshing={todos.isRefetching} onRefresh={() => todos.refetch()} keyboardDismissMode="on-drag">
+      <ScreenHeader big={false} title="My Day" />
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+        <IconPillButton icon={ChevronLeft} tone="soft" disabled={busy} onPress={() => changeDate(addDaysIso(date, -1))} accessibilityLabel="Previous day" />
+        <View style={{ flex: 1, alignItems: 'center', gap: 3 }}><Text variant="smallStrong">{formatDate(date)}</Text><Text variant="caption" color="inkMuted">{isToday ? 'TODAY' : 'YOUR DAILY SPACE'}</Text></View>
+        <IconPillButton icon={ChevronRight} tone="soft" disabled={busy} onPress={() => changeDate(addDaysIso(date, 1))} accessibilityLabel="Next day" />
+      </View>
+      {!isToday ? <TextButton label="Back to today" onPress={() => changeDate(todayIso())} /> : null}
+      <Reveal><AuroraCard tone={complete ? 'sage' : 'rose'} style={{ minHeight: 192 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><LockKeyhole size={15} color="#E0E9D8" /><Text variant="caption" color="#E0E9D8" style={{ letterSpacing: 1.8 }}>ONLY FOR YOU</Text></View>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 20, marginVertical: 24 }}>
+          {ready ? <DotNumber value={shown} height={42} color="#FFFFFF" /> : <Text variant="stat" color="#FFFFFF">–</Text>}
+          <View style={{ flex: 1, gap: 5 }}><Text variant="h3" color="#FFFFFF">{complete ? 'A day well spent.' : 'Small steps count.'}</Text><Text variant="small" color="#E0E9D8">{ready ? notes.length ? `${done} of ${notes.length} intentions complete` : 'Start with one thing on your mind.' : todos.isError ? 'Your intentions could not load.' : 'Loading your intentions…'}</Text></View>
+          {complete ? <Check size={24} color="#E5EDCE" /> : null}
         </View>
-      )} />
-      <Reveal>
-        <BigNumber size="md" icon={NotebookPen} value={todos.data ? done : '–'} unit={todos.data ? `of ${todos.data.length} done` : ''} verdict={isToday ? `Today, ${formatDate(date)}.` : formatDate(date)} />
-        {!isToday ? <View style={{ alignItems: 'flex-start', marginTop: 6 }}><TextButton label="Back to today" onPress={() => setDate(todayIso())} /></View> : null}
-      </Reveal>
-
-      <Reveal index={1}>
-        <BentoCard>
-          <Text variant="smallStrong" color="inkMuted" style={{ marginBottom: 8 }}>Add a note</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <View style={{ flex: 1, backgroundColor: t.colors.cardAlt, borderRadius: t.radius.pill, paddingHorizontal: 14, height: 44, justifyContent: 'center' }}>
-              <TextInput value={draft} onChangeText={setDraft} placeholder="Call the vendor back…" placeholderTextColor={t.colors.inkFaint} onSubmitEditing={add} returnKeyType="done" blurOnSubmit={false} maxLength={200} style={{ color: t.colors.ink, fontFamily: t.fonts.medium, fontSize: 15, paddingVertical: 0 }} />
-            </View>
-            <IconPillButton icon={Plus} size={44} onPress={add} disabled={!draft.trim() || create.isPending} accessibilityLabel="Add note" />
+        <ProgressBar value={notes.length ? done / notes.length : 0} color="#E5EDCE" track="rgba(255,255,255,0.18)" />
+      </AuroraCard></Reveal>
+      <Reveal index={1}><BentoCard>
+        <View style={{ gap: 14 }}>
+          <TextField label="Your next small step" value={draft} onChangeText={setDraft} placeholder="What would make today feel good?" maxLength={200} editable={!create.isPending} onSubmitEditing={add} returnKeyType="done" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <View style={{ flex: 1 }}><TextButton label={linkedTask ? linkedTask.task_key ?? 'Task linked' : 'Link a task'} icon={Link2} onPress={() => { if (busy) return; setTaskSearch(''); setLinkOpen(true); linkSheet.open(); }} /></View>
+            <PillButton label="Add note" icon={Plus} size="sm" onPress={add} disabled={!draft.trim() || busy} loading={create.isPending} />
           </View>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 10 }}>
-            <Pressable onPress={linkSheet.open} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Link2 size={14} color={t.colors.hero} />
-              <Text variant="small" color="hero">{linkedTask ? `Linked to ${linkedTask.key ?? linkedTask.label}` : 'Link to a task (optional)'}</Text>
-            </Pressable>
-            {linkedTask ? <TextButton label="Unlink" color="inkMuted" onPress={() => setLinkedTask(null)} /> : null}
-          </View>
-        </BentoCard>
-      </Reveal>
-
-      {todos.isPending ? <SkeletonList count={2} lines={1} /> : todos.isError ? <ErrorState error={todos.error} onRetry={() => todos.refetch()} /> : (todos.data?.length ?? 0) === 0 ? (
-        <EmptyState icon={NotebookPen} title={isToday ? 'Nothing planned yet' : 'Nothing on this day'} body={isToday ? 'Jot down what you mean to get to. Only you see it.' : 'Notes you wrote for this day would show here.'} compact />
-      ) : (
-        <Reveal index={2}>
-          <BentoCard>
-            {todos.data!.map((todo) => (
-              <CheckRow
-                key={todo.id}
-                checked={todo.is_done}
-                label={todo.title}
-                meta={todo.task_key ? `${todo.task_key}${todo.task_title ? ` · ${todo.task_title}` : ''}` : todo.project_key ? todo.project_key : null}
-                onToggle={(next) => toggle.mutate({ id: todo.id, isDone: next })}
-                right={(
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-                    {todo.task_id ? <Pressable onPress={() => router.push(`/tasks/${todo.task_id}`)} hitSlop={6}><KeyChip value={todo.task_key} /></Pressable> : null}
-                    <Pressable onPress={() => Alert.alert('Remove note?', todo.title, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(todo.id) }])} hitSlop={8} accessibilityLabel="Remove note">
-                      <Trash2 size={16} color={t.colors.inkFaint} />
-                    </Pressable>
-                  </View>
-                )}
-              />
-            ))}
-          </BentoCard>
-        </Reveal>
-      )}
-
-      <Text variant="small" color="inkFaint" align="center" style={{ paddingHorizontal: t.spacing.lg }}>Nothing on this page is visible to anyone else, and none of it counts towards tasks, reports or analytics.</Text>
-      <PickerSheet ref={linkSheet.ref} title="Link to a task" options={options} value={linkedTask?.id} onSelect={(id) => { const x = (tasks.data?.items ?? []).find((y) => y.id === id); if (x) setLinkedTask({ id: x.id, label: taskLabel(x), key: x.task_key, projectId: x.project_id }); }} searchable clearLabel="No task" onClear={() => setLinkedTask(null)} empty="No tasks to link." />
-      <View style={{ display: 'none' }}><Chip label="" /></View>
+          {linkedTask ? <Text variant="caption" color="inkMuted" numberOfLines={2}>{taskLabel(linkedTask)}</Text> : null}
+        </View>
+      </BentoCard></Reveal>
+      <SegmentedTabs items={[{ key: 'all', label: 'All' }, { key: 'remaining', label: 'Remaining' }, { key: 'done', label: 'Done' }]} value={filter} onChange={setFilter} />
+      {todos.isPending || todos.isPlaceholderData ? <SkeletonList count={2} lines={1} /> : todos.isError ? <ErrorState error={todos.error} onRetry={() => todos.refetch()} /> : visible.length === 0 ? <EmptyState icon={filter === 'remaining' && complete ? Check : NotebookPen} title={filter === 'done' ? 'Your wins go here' : filter === 'remaining' && complete ? 'Everything, taken care of.' : notes.length ? 'Nothing here yet' : 'A fresh page'} body={filter === 'done' ? 'Check off an intention to see it here.' : filter === 'remaining' && complete ? 'Take a breath. You finished what you planned.' : 'Add an intention above. It can be as small as making that call.'} compact /> : <View style={{ gap: 10 }}>
+        {visible.map((todo, i) => <Reveal key={todo.id} index={Math.min(i, 3)}><BentoCard padding={16}>
+          <CheckRow checked={todo.is_done} label={todo.title} disabled={busy} onToggle={(isDone) => toggle.mutate({ id: todo.id, isDone }, { onError: (err) => toast.error('Could not update note', errorMessage(err)) })} right={<IconPillButton icon={Trash2} size={36} tone="plain" disabled={busy} accessibilityLabel={`Remove note: ${todo.title}`} onPress={() => { setRemoving(todo); removeSheet.open(); }} />} />
+          {todo.task_id ? <Pressable accessibilityRole="button" accessibilityLabel={`Open linked task ${todo.task_key ?? todo.task_title ?? ''}`} onPress={() => router.push(`/tasks/${todo.task_id}`)} style={{ flexDirection: 'row', alignItems: 'center', gap: 8, paddingTop: 8, paddingBottom: 4, borderTopWidth: 1, borderTopColor: t.colors.hairline }}><Link2 size={13} color={t.colors.hero} /><Text variant="caption" color="hero" numberOfLines={1} style={{ flex: 1 }}>{todo.task_key} · {todo.task_title}</Text></Pressable> : null}
+        </BentoCard></Reveal>)}
+      </View>}
+      <Text variant="caption" color="inkFaint" align="center">Private notes. Separate from team tasks and reports.</Text>
+      <Sheet ref={removeSheet.ref} title="Let this one go?" onDismiss={() => setRemoving(null)}>
+        <View style={{ gap: 18 }}><Text variant="body">{removing?.title}</Text><Text variant="small" color="inkMuted">This removes the note from your day. Linked team tasks stay as they are.</Text><PillButton label="Remove note" variant="danger" block loading={remove.isPending} disabled={!removing} onPress={() => { if (removing) remove.mutate(removing.id, { onSuccess: () => { removeSheet.close(); toast.success('Note removed'); }, onError: (err) => toast.error('Could not remove note', errorMessage(err)) }); }} /><PillButton label="Keep it" variant="soft" block disabled={remove.isPending} onPress={removeSheet.close} /></View>
+      </Sheet>
+      <Sheet ref={linkSheet.ref} title="Keep the context." size="tall" scroll onDismiss={() => setLinkOpen(false)}>
+        <View style={{ gap: 14 }}>
+          <SearchField value={taskSearch} onChange={setTaskSearch} placeholder="Search tasks to link" loading={tasks.isFetching} />
+          <TextButton label="No linked task" onPress={() => { setLinkedTask(null); linkSheet.close(); }} />
+          {tasks.isPending || tasks.isPlaceholderData ? <SkeletonList count={2} /> : tasks.isError ? <ErrorState error={tasks.error} onRetry={() => tasks.refetch()} /> : tasks.data.items.length ? tasks.data.items.map((task) => <BentoCard key={task.id} padding={14} onPress={() => { setLinkedTask(task); linkSheet.close(); }} accessibilityLabel={`Link ${task.task_key ?? 'task'}: ${taskLabel(task)}`}><Text variant="caption" color="inkMuted">{task.task_key}</Text><Text variant="bodyStrong" style={{ marginTop: 6 }}>{taskLabel(task)}</Text></BentoCard>) : <Text variant="small" color="inkMuted">No matching tasks.</Text>}
+          {tasks.data && tasks.data.total > tasks.data.items.length ? <Text variant="caption" color="inkMuted">Showing {tasks.data.items.length} of {tasks.data.total}. Search by title or key to find another task.</Text> : null}
+        </View>
+      </Sheet>
     </Screen>
-  );
+  </KeyboardAvoidingView>;
 }

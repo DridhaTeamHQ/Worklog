@@ -73,7 +73,7 @@ export function FloatingTabBar({ state, navigation, tabs, badges = {} }: TabBarP
         style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: fadeHeight }}
       />
       <View pointerEvents="box-none" style={{ marginHorizontal: TAB_BAR_INSET, marginBottom: bottom }}>
-        <View style={[{ borderRadius: TAB_BAR_HEIGHT / 2, overflow: 'hidden', borderWidth: 1, borderColor: t.colors.glassBorder }, t.isDark ? null : t.shadow.float]}>
+        <View style={[{ borderRadius: 28, overflow: 'hidden', borderWidth: 1, borderColor: t.colors.glassBorder }, t.shadow.float]}>
           <BlurView intensity={canBlur ? (t.isDark ? 40 : 80) : 0} tint={t.isDark ? 'dark' : 'light'} style={{ backgroundColor: mist }}>
             <View style={{ flexDirection: 'row', height: TAB_BAR_HEIGHT, paddingHorizontal: 8, alignItems: 'center' }}>
               {state.routes.map((route, index) => {
@@ -94,6 +94,7 @@ export function FloatingTabBar({ state, navigation, tabs, badges = {} }: TabBarP
                     }}
                     accessibilityRole="tab"
                     accessibilityState={{ selected: focused }}
+                    aria-selected={focused}
                     accessibilityLabel={spec.label}
                     style={{ flex: 1, alignItems: 'center', justifyContent: 'center', height: TAB_BAR_HEIGHT }}
                   >
@@ -104,17 +105,18 @@ export function FloatingTabBar({ state, navigation, tabs, badges = {} }: TabBarP
                       }}
                       transition={{ type: 'spring', damping: 18, stiffness: 200 }}
                       style={[
-                        { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+                        { width: 48, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center' },
                         reduced ? { backgroundColor: focused ? t.colors.pill : 'transparent' } : null,
                       ]}
                     >
-                      <Icon size={22} color={focused ? t.colors.onPill : t.colors.inkMuted} strokeWidth={focused ? 2.4 : 2} />
+                      <Icon size={20} color={focused ? t.colors.onPill : t.colors.inkMuted} strokeWidth={focused ? 2 : 1.6} />
                       {badge ? (
                         <View style={{ position: 'absolute', top: 4, right: 4, minWidth: 18, height: 18, paddingHorizontal: 4, borderRadius: 9, backgroundColor: t.colors.danger, alignItems: 'center', justifyContent: 'center', borderWidth: 2, borderColor: focused ? t.colors.pill : t.colors.card }}>
-                          <Text variant="caption" color="#FFFFFF" style={{ letterSpacing: 0, fontSize: 10 }}>{badge > 99 ? '99+' : badge}</Text>
+                          <Text variant="caption" color={t.isDark ? t.colors.onAccent : '#FFFFFF'} style={{ letterSpacing: 0, fontSize: 10 }}>{badge > 99 ? '99+' : badge}</Text>
                         </View>
                       ) : null}
                     </Bubble>
+                    <Text variant="caption" color={focused ? 'ink' : 'inkMuted'} style={{ fontSize: 10, lineHeight: 14, marginTop: 3 }}>{spec.label}</Text>
                   </Pressable>
                 );
               })}

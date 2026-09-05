@@ -93,7 +93,7 @@ export function InsightCard({ eyebrow = 'Suggestion', title, detail, icon: Icon,
             </View>
             {onPress ? (
               <View style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: t.colors.hero, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' }}>
-                <ArrowUpRight size={22} color="#FFFFFF" strokeWidth={2.4} />
+                <ArrowUpRight size={22} color={t.colors.onHero} strokeWidth={2} />
               </View>
             ) : null}
           </View>

@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { UserRound } from 'lucide-react-native';
@@ -51,6 +52,7 @@ export function ProjectForm({ initial, submitLabel, busy, errors = {}, editing, 
 
   return (
     <View style={{ gap: 16 }}>
+      <FormSection title="Project identity">
       <TextField
         label="Name" required value={values.name}
         onChangeText={(name) => setValues((v) => ({ ...v, name, key: keyTouched ? v.key : suggestKey(name) }))}
@@ -62,8 +64,11 @@ export function ProjectForm({ initial, submitLabel, busy, errors = {}, editing, 
         placeholder="SHMOB" autoCapitalize="characters" autoCorrect={false} maxLength={10} error={errors.key}
         hint={editing ? 'Changing the key renames every task in this project (SHMOB-4 becomes NEW-4).' : `Tasks will be keyed ${values.key || 'KEY'}-1, ${values.key || 'KEY'}-2, …`}
       />
+      </FormSection>
+      <FormSection title="Context & ownership">
       <TextField label="Description" value={values.description} onChangeText={(description) => setValues((v) => ({ ...v, description }))} placeholder="What this project is for" multiline maxLength={1000} error={errors.description} />
       <PickerField label="Lead" icon={UserRound} value={leads.find((l) => l.value === values.leadId)?.label ?? null} placeholder="Nobody yet" onPress={leadSheet.open} />
+      </FormSection>
       <PillButton label={submitLabel} size="lg" block loading={busy} onPress={() => onSubmit(values)} haptic="success" />
       <PickerSheet ref={leadSheet.ref} title="Project lead" options={leads} value={values.leadId} onSelect={(v) => setValues((s) => ({ ...s, leadId: v }))} searchable clearLabel="Nobody" onClear={() => setValues((s) => ({ ...s, leadId: null }))} />
       <Text variant="small" color="inkFaint" align="center">Keys are 2–10 letters and digits, starting with a letter.</Text>

@@ -38,7 +38,7 @@ export default function EditTask() {
 
   return (
     <Screen>
-      <ScreenHeader title="Edit task" subtitle={task.data?.task_key ?? undefined} />
+      <ScreenHeader tone="sage" title="Edit task" subtitle={task.data?.task_key ?? undefined} />
       {task.isPending ? <SkeletonList count={3} /> : task.isError || !task.data ? <ErrorState error={task.error} onRetry={() => task.refetch()} /> : (
         <>
           <TaskForm

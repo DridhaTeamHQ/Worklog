@@ -1,31 +1,10 @@
-import { useEffect, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
-import { useReducedMotion, useTheme } from '@/theme';
+import { useTheme } from '@/theme';
 import { BentoCard, type CardTone } from './BentoCard';
 import { Text } from './Text';
 import { Sparkline, MiniBars } from './Charts';
-
-/** Counts up to the value rather than appearing; the numbers feel alive without shouting. */
-function useCountUp(target: number, duration = 600) {
-  const reduced = useReducedMotion();
-  const [shown, setShown] = useState(reduced ? target : 0);
-  useEffect(() => {
-    if (reduced) { setShown(target); return undefined; }
-    let raf = 0;
-    const start = Date.now();
-    const from = shown;
-    const tick = () => {
-      const p = Math.min(1, (Date.now() - start) / duration);
-      const eased = 1 - Math.pow(1 - p, 3);
-      setShown(Math.round(from + (target - from) * eased));
-      if (p < 1) raf = requestAnimationFrame(tick);
-    };
-    raf = requestAnimationFrame(tick);
-    return () => cancelAnimationFrame(raf);
-  }, [target, reduced]); // eslint-disable-line react-hooks/exhaustive-deps
-  return shown;
-}
+import { useAnimatedNumber } from '@/hooks/useAnimatedNumber';
 
 interface TileProps {
   icon?: LucideIcon;
@@ -51,7 +30,7 @@ export function StatTile({ icon: Icon, label, value, unit, badge, trend, bars, t
   const t = useTheme();
   const onDark = tone === 'hero';
   const numeric = typeof value === 'number';
-  const counted = useCountUp(numeric ? value : 0);
+  const counted = useAnimatedNumber(numeric ? value : 0);
   const fg = onDark ? '#FFFFFF' : 'ink';
   const muted = onDark ? 'onHeroMuted' : 'inkMuted';
   const accent = color ?? (onDark ? '#FFFFFF' : t.colors.hero);

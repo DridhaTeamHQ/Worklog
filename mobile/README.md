@@ -51,14 +51,26 @@ src/
 
 ## Design
 
-The look follows the reference: a periwinkle hero with thin white orbit line-art, white
-rounded bento cards on a lavender ground, a pale-yellow accent, ink pill buttons and a
-floating frosted-glass tab bar. Motion is deliberately calm — staggered fade-ups, spring
-press-scale, a sliding segmented pill, count-up numbers — and every toggle has a light
-haptic. Status, priority and severity colours mean the same thing as on the web.
+The interface pairs a near-black ground with soft sage, rose, iris, and clay gradient
+cards. Large regular-weight numbers, lime actions, generous rounded corners, and a
+labeled floating tab bar keep the task-heavy screens calm and readable. Member and
+manager dashboards use live completion and work counts; upcoming tasks and the full
+calendar remain connected to the existing API.
 
-Tokens live in `src/theme/tokens.ts`; components read them through `useTheme()`. Dark
-mode is a per-device choice (More › Appearance) that can disagree with the OS.
+Tokens live in `src/theme/tokens.ts`; `AuroraCard` owns the native gradient material,
+and `features/Dashboard.tsx` supplies shared dashboard components. Gradients use the
+already-installed Expo LinearGradient and React Native SVG packages, with no remote
+image assets or extra dependencies. New installs start in dark mode. Saved light,
+dark, and system preferences are respected (More > Appearance).
+
+## Motion
+
+Cards and buttons use spring press feedback; tabs crossfade, completion rings ease
+to updated values, and checklist rows animate their insertion and removal. Numeric
+metrics ease from the current value and cancel animation when the screen loses
+focus. The system reduced-motion preference applies live to the controls, sheets,
+loading placeholders, and navigation. On web, `?nomotion=1` also disables motion for
+visual checks. Changing the preference preserves form input.
 
 ## Push notifications
 
@@ -91,3 +103,18 @@ npx tsc --noEmit        # types
 npx expo-doctor         # dependency compatibility
 node scripts/make-icons.mjs   # regenerate the icon set
 ```
+
+
+## Inner-screen design
+
+Secondary screens share `PageIntro` mineral headers and `TitleBlock` detail panels.
+Sage identifies work and account screens, clay tickets, iris projects and analytics,
+and rose reports and private notes. `IdentityCard` unifies profile, team, and settings;
+`FormSection` groups related fields without changing form state or API contracts.
+See `design-qa.md` for tested flows and remaining device checks.
+
+
+The dashboard now prioritizes an interactive focus queue before its live metrics.
+The + button opens role-specific shortcuts. Both task lists have List/Board controls;
+board cards can be moved with a status picker, including keyboard/screen-reader
+access. These additions use the existing API and follow reduced-motion preferences.

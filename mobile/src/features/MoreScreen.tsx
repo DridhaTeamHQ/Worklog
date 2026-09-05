@@ -1,6 +1,10 @@
+import { AppearancePicker } from './AppearancePicker';
+import { WorkspaceShortcuts } from './WorkspaceShortcuts';
+import { Sheet } from '@/components/Sheet';
+import { IdentityCard, SectionTitle, PageIntro } from '@/components';
 import { Alert, View } from 'react-native';
 import {
-  BarChart3, Bell, ClipboardList, FolderKanban, KeyRound, LogOut, Moon, NotebookPen, Sun, SmartphoneNfc, Tags, UserRound,
+  Bell, KeyRound, LogOut, Moon, Search, Sun, SmartphoneNfc, Tags, UserRound,
 } from 'lucide-react-native';
 import { useTheme, useThemeMode } from '@/theme';
 import { useAuthStore } from '@/auth/store';
@@ -31,34 +35,29 @@ export function MoreScreen({ user, unread, onOpen }: Props) {
 
   return (
     <Screen tabBar>
+      <View style={{ gap: 6, paddingHorizontal: 4, paddingVertical: 8 }}>
+        <Text variant="caption" color="inkMuted" style={{ letterSpacing: 2 }}>YOUR SPACE</Text>
+        <Text variant="h1">Make it yours.</Text>
+      </View>
       <Reveal>
-        <BentoCard onPress={() => onOpen('/profile')}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-            <Avatar name={user?.name ?? ''} src={user?.profile_image} size="lg" />
-            <View style={{ flex: 1, gap: 2 }}>
-              <Text variant="h3" numberOfLines={1}>{user?.name}</Text>
-              <Text variant="small" color="inkMuted" numberOfLines={1}>{user?.email}</Text>
-              <Text variant="caption" color="inkFaint">{roleLabel(user?.role)}{user?.department ? ` · ${user.department}` : ''}</Text>
-            </View>
-          </View>
-        </BentoCard>
+        <IdentityCard compact name={user?.name ?? 'Your profile'} image={user?.profile_image} subtitle={user?.email} detail={`${roleLabel(user?.role)}${user?.department ? ` · ${user.department}` : ''}`} onPress={() => onOpen('/profile')} />
       </Reveal>
+      <SectionTitle title="Workspace" />
 
-      <Reveal index={1}>
+      <Reveal index={1}><WorkspaceShortcuts manager={manager} onOpen={onOpen} /></Reveal>
+      <Reveal index={2}>
         <ListGroup>
-          <ListRow icon={Bell} label="Notifications" hint={unread ? `${unread} unread` : undefined} badge={unread} onPress={() => onOpen('/notifications')} />
-          <ListRow icon={NotebookPen} label="My Day" hint="Private notes to yourself" onPress={() => onOpen('/my-day')} divider />
+          <ListRow icon={Search} label="Search workspace" hint="Tasks, tickets & projects" onPress={() => onOpen('/search')} />
+          <ListRow icon={Bell} label="Notifications" hint={unread ? `${unread} unread` : undefined} badge={unread} onPress={() => onOpen('/notifications')} divider />
           {manager ? (
             <>
-              <ListRow icon={ClipboardList} label="Task reports" hint="The whole team, by day" onPress={() => onOpen('/reports')} divider />
-              <ListRow icon={FolderKanban} label="Projects" onPress={() => onOpen('/projects')} divider />
               <ListRow icon={Tags} label="Labels" onPress={() => onOpen('/labels')} divider />
-              <ListRow icon={BarChart3} label="Analytics" onPress={() => onOpen('/analytics')} divider />
             </>
           ) : null}
         </ListGroup>
       </Reveal>
 
+      <SectionTitle title="Preferences & account" />
       <Reveal index={2}>
         <ListGroup>
           <ListRow icon={UserRound} label="Profile" onPress={() => onOpen('/profile')} />
@@ -74,19 +73,11 @@ export function MoreScreen({ user, unread, onOpen }: Props) {
         </ListGroup>
       </Reveal>
 
-      <Text variant="caption" color="inkFaint" align="center" style={{ marginTop: t.spacing.sm }}>Taskr · same data as the web app</Text>
+      <Text variant="caption" color="inkFaint" align="center" style={{ marginTop: t.spacing.sm }}>taskr · a little more clarity</Text>
 
-      <PickerSheet
-        ref={themeSheet.ref}
-        title="Appearance"
-        options={[
-          { value: 'system', label: 'Follow the phone', hint: 'Light or dark, whatever the system says' },
-          { value: 'light', label: 'Light' },
-          { value: 'dark', label: 'Dark', hint: 'True black' },
-        ]}
-        value={mode}
-        onSelect={(v) => setMode(v)}
-      />
+      <Sheet ref={themeSheet.ref} title="Choose your atmosphere.">
+        <AppearancePicker value={mode} onChange={(next) => { setMode(next); themeSheet.close(); }} />
+      </Sheet>
     </Screen>
   );
 }

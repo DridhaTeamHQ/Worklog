@@ -1,3 +1,4 @@
+import { PageIntro } from '@/components/ScreenHeader';
 import { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -29,14 +30,8 @@ export default function ManagerTeam() {
   const submitted = useMemo(() => (team.data ?? []).filter((m) => m.submitted_today).length, [team.data]);
 
   const header = (
-    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h1">Team</Text>
-          <Text variant="small" color="inkMuted">{team.data ? `${team.data.length} people · ${submitted} reported today` : ' '}</Text>
-        </View>
-        {admin ? <IconPillButton icon={Building2} tone={department ? 'ink' : 'soft'} onPress={deptSheet.open} accessibilityLabel="Filter by department" /> : null}
-      </View>
+    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 16 }}>
+      <PageIntro title="Team" tone="iris" eyebrow="BETTER TOGETHER" subtitle={team.data ? `${team.data.length} people · ${submitted} reported today` : ' '} right={<>{admin ? <IconPillButton icon={Building2} tone="glass" onPress={deptSheet.open} accessibilityLabel="Filter by department" /> : null}</>} />
       <SearchField value={search} onChange={setSearch} placeholder="Search by name, email or department" loading={team.isFetching && !!search} />
     </View>
   );

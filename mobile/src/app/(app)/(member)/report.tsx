@@ -81,7 +81,7 @@ export default function MemberReport() {
 
   return (
     <Screen tabBar refreshing={today.isRefetching} onRefresh={() => { void today.refetch(); void suggestions.refetch(); void history.refetch(); }}>
-      <Text variant="h2">Daily report</Text>
+      <ScreenHeader back={false} tone="rose" eyebrow="A DAY WELL SPENT" title="Daily report" subtitle="Capture the work behind the progress." />
       {today.isPending ? null : (
         <Reveal>
           <BigNumber

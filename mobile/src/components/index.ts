@@ -24,3 +24,5 @@ export * from './Tile';
 export * from './ScreenHeader';
 export * from './Headline';
 export * from './Loaders';
+
+export * from './IdentityCard';

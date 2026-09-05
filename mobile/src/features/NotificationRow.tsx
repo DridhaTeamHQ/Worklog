@@ -46,11 +46,11 @@ export function NotificationRow({ notification: n, onPress }: Props) {
       accessibilityRole="button"
       style={({ pressed }) => [
         // Unread is a dot and full-strength ink, not a tinted slab — thirteen orange cards is noise.
-        { flexDirection: 'row', gap: 12, padding: t.spacing.md, borderRadius: t.radius.lg, backgroundColor: t.colors.card, borderWidth: 1, borderColor: t.colors.hairline, opacity: n.is_read ? 0.72 : 1 },
+        { flexDirection: 'row', gap: 14, padding: t.spacing.xl, borderRadius: t.radius.lg, backgroundColor: t.colors.card, borderWidth: 1, borderColor: n.is_read ? t.colors.hairline : alpha(color, 0.3) },
         pressed ? { opacity: 0.85 } : null,
       ]}
     >
-      <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: alpha(color, t.isDark ? 0.22 : 0.13), alignItems: 'center', justifyContent: 'center' }}>
+      <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: alpha(color, t.isDark ? 0.22 : 0.13), alignItems: 'center', justifyContent: 'center' }}>
         <Icon size={18} color={color} strokeWidth={2.3} />
       </View>
       <View style={{ flex: 1, gap: 2 }}>

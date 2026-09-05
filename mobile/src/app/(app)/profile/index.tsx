@@ -1,3 +1,4 @@
+import { IdentityCard, SectionTitle } from '@/components';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { KeyRound, Pencil } from 'lucide-react-native';
@@ -15,18 +16,13 @@ export default function Profile() {
 
   return (
     <Screen refreshing={profile.isRefetching} onRefresh={() => profile.refetch()}>
-      <ScreenHeader big={false} right={<IconPillButton icon={Pencil} tone="plain" onPress={() => router.push('/profile/edit')} accessibilityLabel="Edit profile" />} />
+      <ScreenHeader tone="sage" big={false} right={<IconPillButton icon={Pencil} tone="plain" onPress={() => router.push('/profile/edit')} accessibilityLabel="Edit profile" />} />
       {profile.isError && !u ? <ErrorState error={profile.error} onRetry={() => profile.refetch()} /> : !u ? <LoadingState /> : (
         <>
           <Reveal>
-            <View style={{ alignItems: 'center', gap: 12, paddingVertical: 8 }}>
-              <Avatar name={u.name} src={u.profile_image} size="xl" />
-              <View style={{ alignItems: 'center', gap: 2 }}>
-                <Text variant="h2" align="center">{u.name}</Text>
-                <Text variant="body" color="inkMuted" align="center">{roleLabel(u.role)}{u.department ? ` · ${u.department}` : ''}</Text>
-              </View>
-            </View>
+            <IdentityCard name={u.name} image={u.profile_image} subtitle={`${roleLabel(u.role)}${u.department ? ` · ${u.department}` : ''}`} detail={u.email} />
           </Reveal>
+          <SectionTitle title="About you" />
           <Reveal index={1}>
             <ListGroup>
               <ValueRow label="Email" value={u.email} />
@@ -37,6 +33,7 @@ export default function Profile() {
               <ValueRow label="Joined" value={formatDateShort(u.created_at)} divider />
             </ListGroup>
           </Reveal>
+          <SectionTitle title="Account" />
           <Reveal index={2}>
             <ListGroup>
               <ListRow icon={Pencil} label="Edit details" onPress={() => router.push('/profile/edit')} />

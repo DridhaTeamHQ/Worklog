@@ -36,13 +36,12 @@ export function TaskCard({ task, onPress, onLongPress, showAssignee, compact }: 
   const dueColor = due.tone === 'danger' ? t.colors.danger : due.tone === 'warn' ? t.colors.warning : t.colors.inkMuted;
   const elapsed = elapsedFraction(task);
   const done = task.effective_status === 'completed';
-  const hasMeta = task.effective_status !== 'pending' || task.priority === 'high' || task.priority === 'urgent'
-    || (task.labels?.length ?? 0) > 0 || task.checklist_total > 0 || task.comment_count > 0 || showAssignee;
 
   return (
-    <BentoCard onPress={onPress} onLongPress={onLongPress} padding={t.spacing.xl}>
-      <View style={{ gap: 10 }}>
+    <BentoCard onPress={onPress} onLongPress={onLongPress} padding={t.spacing.xl} accessibilityLabel={`${task.task_key ?? 'Task'}: ${task.title}. ${due.text}`}>
+      <View style={{ gap: 14 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ width: 7, height: 7, borderRadius: 3, backgroundColor: t.tone('status', task.effective_status).color }} />
           <KeyChip value={task.task_key} />
           <View style={{ flex: 1 }} />
           <Text variant="caption" color={dueColor} style={{ fontFamily: due.tone === 'normal' ? t.fonts.medium : t.fonts.semibold }}>{due.text}</Text>
@@ -51,32 +50,30 @@ export function TaskCard({ task, onPress, onLongPress, showAssignee, compact }: 
           {taskLabel(task)}
         </Text>
         {!compact && task.description ? <Text variant="small" color="inkMuted" numberOfLines={2}>{task.description}</Text> : null}
-        {hasMeta ? (
-          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2 }}>
-            {task.effective_status !== 'pending' ? <StatusChip status={task.effective_status} size="sm" /> : null}
-            <PriorityChip priority={task.priority} size="sm" />
-            <LabelRow labels={task.labels} max={compact ? 1 : 2} />
-            <View style={{ flex: 1 }} />
-            {showAssignee ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                <Avatar name={task.employee_name} src={task.employee_profile_image} size="sm" />
-                <Text variant="small" color="inkMuted" numberOfLines={1} style={{ maxWidth: 120 }}>{task.employee_name.split(' ')[0]}</Text>
-              </View>
-            ) : null}
-            {task.checklist_total ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <CheckSquare size={13} color={t.colors.inkFaint} />
-                <Text variant="small" color="inkMuted">{task.checklist_done}/{task.checklist_total}</Text>
-              </View>
-            ) : null}
-            {task.comment_count ? (
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <MessageCircle size={13} color={t.colors.inkFaint} />
-                <Text variant="small" color="inkMuted">{task.comment_count}</Text>
-              </View>
-            ) : null}
-          </View>
-        ) : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2, paddingTop: 12, borderTopWidth: 1, borderTopColor: t.colors.hairline }}>
+          <StatusChip status={task.effective_status} size="sm" />
+          <PriorityChip priority={task.priority} size="sm" />
+          <LabelRow labels={task.labels} max={compact ? 1 : 2} />
+          <View style={{ flex: 1 }} />
+          {showAssignee ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Avatar name={task.employee_name} src={task.employee_profile_image} size="sm" />
+              <Text variant="small" color="inkMuted" numberOfLines={1} style={{ maxWidth: 120 }}>{task.employee_name.split(' ')[0]}</Text>
+            </View>
+          ) : null}
+          {task.checklist_total ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <CheckSquare size={13} color={t.colors.inkFaint} />
+              <Text variant="small" color="inkMuted">{task.checklist_done}/{task.checklist_total}</Text>
+            </View>
+          ) : null}
+          {task.comment_count ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
+              <MessageCircle size={13} color={t.colors.inkFaint} />
+              <Text variant="small" color="inkMuted">{task.comment_count}</Text>
+            </View>
+          ) : null}
+        </View>
         {elapsed !== null ? <ProgressBar value={elapsed} color={t.colors.hero} height={3} /> : null}
       </View>
     </BentoCard>

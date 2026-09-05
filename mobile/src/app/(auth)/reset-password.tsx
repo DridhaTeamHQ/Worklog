@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -40,12 +41,14 @@ export default function ResetPassword() {
 
   return (
     <Screen statusBar={t.isDark ? 'light' : 'dark'}>
-      <ScreenHeader title="Reset password" subtitle="Choose a new password." />
+      <ScreenHeader tone="sage" title="Reset password" subtitle="Choose a new password." />
       <View style={{ gap: 16 }}>
-        <TextField label="Reset code" icon={Ticket} value={token} onChangeText={setToken} autoCapitalize="none" autoCorrect={false} placeholder="From the email" />
+        <FormSection title="Your new password">
+<TextField label="Reset code" icon={Ticket} value={token} onChangeText={setToken} autoCapitalize="none" autoCorrect={false} placeholder="From the email" />
         <TextField label="New password" icon={KeyRound} value={password} onChangeText={setPassword} password placeholder="At least 8 characters" textContentType="newPassword" />
         <TextField label="Confirm password" icon={KeyRound} value={confirm} onChangeText={setConfirm} password placeholder="Type it again" error={error} onSubmitEditing={submit} returnKeyType="go" />
-        <PillButton label="Update password" size="lg" block onPress={submit} loading={busy} haptic="success" />
+        </FormSection>
+          <PillButton label="Update password" size="lg" block onPress={submit} loading={busy} haptic="success" />
       </View>
     </Screen>
   );

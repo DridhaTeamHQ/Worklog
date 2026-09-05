@@ -1,6 +1,7 @@
 import { View, type DimensionValue } from 'react-native';
 import { MotiView } from 'moti';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
+import { useIsFocused } from 'expo-router';
 
 interface Props {
   width?: DimensionValue;
@@ -12,12 +13,16 @@ interface Props {
 /** A soft pulsing placeholder in the shape of the thing that is loading. */
 export function Skeleton({ width = '100%', height = 16, radius, style }: Props) {
   const t = useTheme();
+  const reduced = useReducedMotion();
+  const focused = useIsFocused();
+  const shape = [{ width, height, borderRadius: radius ?? t.radius.sm, backgroundColor: t.colors.neutralSoft }, style];
+  if (reduced || !focused) return <View style={shape} />;
   return (
     <MotiView
       from={{ opacity: 0.45 }}
       animate={{ opacity: 1 }}
       transition={{ type: 'timing', duration: 900, loop: true, repeatReverse: true }}
-      style={[{ width, height, borderRadius: radius ?? t.radius.sm, backgroundColor: t.colors.neutralSoft }, style]}
+      style={shape}
     />
   );
 }

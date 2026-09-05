@@ -42,11 +42,11 @@ const config: ExpoConfig = {
     'expo-font',
     [
       'expo-splash-screen',
-      { backgroundColor: '#5B7FE8', image: './assets/images/splash-icon.png', imageWidth: 120 },
+      { backgroundColor: '#080A09', image: './assets/images/splash-icon.png', imageWidth: 120 },
     ],
     [
       'expo-notifications',
-      { icon: './assets/images/notification-icon.png', color: '#5B7FE8', defaultChannel: 'default' },
+      { icon: './assets/images/notification-icon.png', color: '#466451', defaultChannel: 'default' },
     ],
     ['expo-build-properties', { android: { usesCleartextTraffic: IS_DEV } }],
   ],

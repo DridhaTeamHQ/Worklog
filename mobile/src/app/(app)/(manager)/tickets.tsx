@@ -1,3 +1,4 @@
+import { PageIntro } from '@/components/ScreenHeader';
 import { useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -61,15 +62,9 @@ export default function ManagerTickets() {
   const reporterOptions = useMemo(() => (team.data ?? []).map((m) => ({ value: m.id, label: m.name, hint: m.department ?? undefined })), [team.data]);
 
   const header = (
-    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h1">Tickets</Text>
-          <Text variant="small" color="inkMuted">{counts ? `${counts.unresolved} need attention${counts.critical_open ? ` · ${counts.critical_open} critical` : ''}` : ' '}</Text>
-        </View>
-        <IconPillButton icon={SlidersHorizontal} tone="soft" badge={activeFilters || undefined} onPress={filterSheet.open} accessibilityLabel="Filters" />
-      </View>
-      <SegmentedTabs
+    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 16 }}>
+      <PageIntro title="Tickets" tone="clay" eyebrow="CLEAR THE WAY" subtitle={counts ? `${counts.unresolved} need attention${counts.critical_open ? ` · ${counts.critical_open} critical` : ''}` : ' '} right={<><IconPillButton icon={SlidersHorizontal} tone="glass" badge={activeFilters || undefined} onPress={filterSheet.open} accessibilityLabel="Filters" /></>} />
+      <SegmentedTabs scroll iconic={false}
         items={[
           { key: 'unresolved', label: 'Attention', icon: CircleAlert, count: counts?.unresolved },
           { key: 'open', label: 'Open', icon: Circle, count: counts?.open },

@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { View, type ViewStyle } from 'react-native';
+import type { ViewStyle } from 'react-native';
 import { MotiView } from 'moti';
 import { useReducedMotion, useTheme } from '@/theme';
 
@@ -21,12 +21,11 @@ export function Reveal({ children, index = 0, delay = 0, from = 'up', style }: P
   const t = useTheme();
   const reduced = useReducedMotion();
   const offset = from === 'none' ? 0 : from === 'up' ? 14 : -14;
-  if (reduced) return <View style={style}>{children}</View>;
   return (
     <MotiView
-      from={{ opacity: 0, translateY: offset }}
+      from={{ opacity: reduced ? 1 : 0, translateY: reduced ? 0 : offset }}
       animate={{ opacity: 1, translateY: 0 }}
-      transition={{ type: 'timing', duration: t.motion.slow, delay: delay + Math.min(index, 8) * 45 }}
+      transition={{ type: 'timing', duration: reduced ? 0 : t.motion.slow, delay: reduced ? 0 : delay + Math.min(index, 8) * 45 }}
       style={style}
     >
       {children}

@@ -86,6 +86,9 @@ export interface Project {
   counts: TaskCounts;
 }
 
+/** Single-project and write responses omit the aggregates supplied by the list. */
+export type ProjectDetails = Omit<Project, 'counts'>;
+
 export interface Task {
   id: number;
   employee_id: number;

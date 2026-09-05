@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { AlertOctagon, ArrowDown, ArrowUp, Minus, FolderKanban, UserRound } from 'lucide-react-native';
@@ -65,13 +66,16 @@ export function TaskForm({ initial, lockAssignment, submitLabel, busy, errors = 
   return (
     <View style={{ gap: 16 }}>
       {!lockAssignment ? (
-        <>
+        <FormSection title="People & project" detail="Give this work a home and an owner.">
           <PickerField label="Assign to" required icon={UserRound} value={employeeOptions.find((o) => o.value === values.employeeId)?.label ?? null} placeholder="Choose a team member" onPress={employeeSheet.open} error={errors.employeeId} />
           <PickerField label="Project" required icon={FolderKanban} value={projectOptions.find((o) => o.value === values.projectId)?.label ?? null} placeholder="Choose a project" onPress={projectSheet.open} error={errors.projectId} hint={values.projectId ? undefined : 'The task key is issued from the project.'} />
-        </>
+        </FormSection>
       ) : null}
+      <FormSection title="The work">
       <TextField label="Title" value={values.title} onChangeText={(v) => set('title', v)} placeholder="What needs doing" maxLength={160} error={errors.title} />
       <TextField label="Description" value={values.description} onChangeText={(v) => set('description', v)} placeholder="Context, links, what done looks like" multiline maxLength={4000} error={errors.description} />
+      </FormSection>
+      <FormSection title="Plan & priority">
       <Field label="Priority">
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {PRIORITIES.map((p) => {
@@ -79,9 +83,9 @@ export function TaskForm({ initial, lockAssignment, submitLabel, busy, errors = 
             const color = t.tone('priority', p.value).color;
             const Icon = p.icon;
             return (
-              <Pressable key={p.value} onPress={() => set('priority', p.value)} style={{ flex: 1, borderRadius: t.radius.md, padding: 10, borderWidth: 1.5, borderColor: selected ? color : t.colors.border, backgroundColor: selected ? alpha(color, t.isDark ? 0.22 : 0.1) : t.colors.cardAlt, alignItems: 'center', gap: 4 }}>
+              <Pressable key={p.value} accessibilityRole="radio" accessibilityState={{ checked: selected }} aria-checked={selected} onPress={() => set('priority', p.value)} style={{ flex: 1, borderRadius: t.radius.md, padding: 10, borderWidth: 1.5, borderColor: selected ? color : t.colors.border, backgroundColor: selected ? alpha(color, t.isDark ? 0.22 : 0.1) : t.colors.cardAlt, alignItems: 'center', gap: 4 }}>
                 <Icon size={16} color={selected ? color : t.colors.inkFaint} strokeWidth={2.6} />
-                <Text variant="smallStrong" color={selected ? color : 'inkMuted'}>{p.label}</Text>
+                <Text variant="smallStrong" numberOfLines={1} adjustsFontSizeToFit color={selected ? color : 'inkMuted'}>{p.label}</Text>
               </Pressable>
             );
           })}
@@ -91,6 +95,8 @@ export function TaskForm({ initial, lockAssignment, submitLabel, busy, errors = 
         <View style={{ flex: 1 }}><DateField label="Starts" value={values.startDate} onChange={(v) => set('startDate', v)} /></View>
         <View style={{ flex: 1 }}><DateField label="Deadline" value={values.deadline} onChange={(v) => set('deadline', v)} min={values.startDate} error={errors.deadline} /></View>
       </View>
+      </FormSection>
+      <FormSection title="Extra context">
       {(labels.data?.length ?? 0) > 0 ? (
         <Field label="Labels">
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -106,6 +112,7 @@ export function TaskForm({ initial, lockAssignment, submitLabel, busy, errors = 
         </Field>
       ) : null}
       <TextField label="Notes" value={values.notes} onChangeText={(v) => set('notes', v)} placeholder="Anything the assignee should know" multiline maxLength={2000} error={errors.notes} />
+      </FormSection>
       <PillButton label={submitLabel} size="lg" block loading={busy} onPress={() => onSubmit(values)} haptic="success" />
 
       <PickerSheet ref={employeeSheet.ref} title="Assign to" options={employeeOptions} value={values.employeeId} onSelect={(v) => set('employeeId', v)} searchable empty="No team members in your department yet." />

@@ -1,10 +1,12 @@
+import { MotiView } from 'moti';
+import * as Haptics from 'expo-haptics';
 import { useMemo, useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { Bug, ChevronLeft, ChevronRight } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 import { addDaysIso, formatDate, todayIso } from '@/lib/format';
 import type { Task, Ticket } from '@/types';
-import { BentoCard, IconPillButton, Text, TextButton } from '@/components';
+import { BentoCard, IconPillButton, SegmentedTabs, Text, TextButton } from '@/components';
 
 const WEEKDAYS = ['M', 'T', 'W', 'T', 'F', 'S', 'S'];
 
@@ -31,15 +33,17 @@ interface Props {
 }
 
 /**
- * A month at a glance: a dot under every day that has something on it — a task
+ * A week or month at a glance: a dot under every day that has something on it — a task
  * starting, due, overdue or finished, a ticket raised — and, under the grid, the
  * things on the day you pick. Tap one to open it.
  */
 export function CalendarCard({ tasks, tickets = [], onPressTask, onPressTicket, showAssignee }: Props) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const today = todayIso();
   const [month, setMonth] = useState(monthStart(today));
   const [selected, setSelected] = useState(today);
+  const [view, setView] = useState<'week' | 'month'>('week');
 
   const byDay = useMemo(() => {
     const map = new Map<string, Entry[]>();
@@ -70,18 +74,27 @@ export function CalendarCard({ tasks, tickets = [], onPressTask, onPressTicket, 
     return Array.from({ length: 42 }, (_, i) => addDaysIso(start, i));
   }, [month]);
 
+  const weekStart = addDaysIso(selected, -mondayIndex(selected));
+  const visibleCells = view === 'week' ? Array.from({ length: 7 }, (_, i) => addDaysIso(weekStart, i)) : cells;
+  const navigate = (direction: number) => {
+    if (view === 'month') setMonth((m) => shiftMonth(m, direction));
+    else { const next = addDaysIso(selected, direction * 7); setSelected(next); setMonth(monthStart(next)); }
+  };
   const entries = byDay.get(selected) ?? [];
   const inMonth = (day: string) => day.slice(0, 7) === month.slice(0, 7);
   const goToday = () => { setMonth(monthStart(today)); setSelected(today); };
 
   return (
     <BentoCard padding={t.spacing.lg}>
-      <View style={{ gap: 12 }}>
+      <View style={{ gap: 16 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+          <Text variant="caption" color="inkMuted" style={{ flex: 1, letterSpacing: 1.3 }}>YOUR RHYTHM</Text>
+          <View style={{ width: 146 }}><SegmentedTabs items={[{ key: 'week', label: 'Week' }, { key: 'month', label: 'Month' }]} value={view} onChange={(next) => { setView(next); setMonth(monthStart(selected)); }} /></View>
+        </View>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <Text variant="h3" style={{ flex: 1 }}>{monthTitle(month)}</Text>
-          {month !== monthStart(today) ? <TextButton label="Today" onPress={goToday} /> : null}
-          <IconPillButton icon={ChevronLeft} size={32} tone="soft" onPress={() => setMonth((m) => shiftMonth(m, -1))} accessibilityLabel="Previous month" />
-          <IconPillButton icon={ChevronRight} size={32} tone="soft" onPress={() => setMonth((m) => shiftMonth(m, 1))} accessibilityLabel="Next month" />
+          <Text variant="h3" style={{ flex: 1 }}>{monthTitle(view === 'week' ? selected : month)}</Text>
+          <IconPillButton icon={ChevronLeft} size={32} tone="soft" onPress={() => navigate(-1)} accessibilityLabel={view === 'week' ? 'Previous week' : 'Previous month'} />
+          <IconPillButton icon={ChevronRight} size={32} tone="soft" onPress={() => navigate(1)} accessibilityLabel={view === 'week' ? 'Next week' : 'Next month'} />
         </View>
 
         <View style={{ flexDirection: 'row' }}>
@@ -92,17 +105,17 @@ export function CalendarCard({ tasks, tickets = [], onPressTask, onPressTicket, 
           ))}
         </View>
 
-        <View style={{ gap: 4 }}>
-          {Array.from({ length: 6 }, (_, row) => (
+        <MotiView key={`${view}-${view === 'week' ? weekStart : month}`} from={{ opacity: reduced ? 1 : 0, translateY: reduced ? 0 : 5 }} animate={{ opacity: 1, translateY: 0 }} transition={{ type: 'timing', duration: reduced ? 0 : 180 }} style={{ gap: 4 }}>
+          {Array.from({ length: view === 'week' ? 1 : 6 }, (_, row) => (
             <View key={row} style={{ flexDirection: 'row' }}>
-              {cells.slice(row * 7, row * 7 + 7).map((day) => {
+              {visibleCells.slice(row * 7, row * 7 + 7).map((day) => {
                 const dayEntries = byDay.get(day);
                 const isToday = day === today;
                 const isSelected = day === selected;
-                const muted = !inMonth(day);
+                const muted = view === 'month' && !inMonth(day);
                 const dots = [...new Set((dayEntries ?? []).map((e) => e.kind))].slice(0, 3);
                 return (
-                  <Pressable key={day} onPress={() => setSelected(day)} accessibilityRole="button" accessibilityLabel={formatDate(day)} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
+                  <Pressable key={day} onPress={() => { Haptics.selectionAsync().catch(() => {}); setSelected(day); }} accessibilityRole="button" accessibilityState={{ selected: isSelected }} aria-pressed={isSelected} accessibilityLabel={formatDate(day)} style={{ flex: 1, alignItems: 'center', paddingVertical: 2 }}>
                     <View style={{
                       width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center',
                       backgroundColor: isSelected ? t.colors.pill : 'transparent',
@@ -119,10 +132,10 @@ export function CalendarCard({ tasks, tickets = [], onPressTask, onPressTicket, 
               })}
             </View>
           ))}
-        </View>
+        </MotiView>
 
         <View style={{ gap: 10, borderTopWidth: 1, borderTopColor: t.colors.hairline, paddingTop: 12 }}>
-          <Text variant="caption" color="inkMuted">{selected === today ? `Today · ${formatDate(selected)}` : formatDate(selected)}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}><Text variant="caption" color="inkMuted" style={{ flex: 1 }}>{selected === today ? `Today · ${formatDate(selected)}` : formatDate(selected)}</Text>{selected !== today || month !== monthStart(today) ? <TextButton label="Today" onPress={goToday} /> : null}</View>
           {entries.length === 0 ? <Text variant="small" color="inkFaint">Nothing on this day.</Text> : null}
           {entries.map((e) => (
             <Pressable

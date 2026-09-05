@@ -1,3 +1,4 @@
+import type { ProjectDetails } from '@/types';
 import { api } from './client';
 import type {
   ActivityEntry, AnalyticsPayload, AppNotification, ChecklistItem, DailyReport, DashboardRange,
@@ -213,13 +214,13 @@ export const adminApi = {
 export const projectApi = {
   list: (params: { includeArchived?: boolean } = {}, signal?: AbortSignal) =>
     api.get<Project[]>('/projects', { includeArchived: params.includeArchived ? 'true' : undefined }, signal),
-  get: (id: number, signal?: AbortSignal) => api.get<Project>(`/projects/${id}`, undefined, signal),
+  get: (id: number, signal?: AbortSignal) => api.get<ProjectDetails>(`/projects/${id}`, undefined, signal),
   create: (input: { name: string; key: string; description?: string; leadId?: number | null }) =>
-    api.post<{ project: Project; message: string }>('/projects', input),
+    api.post<{ project: ProjectDetails; message: string }>('/projects', input),
   update: (
     id: number,
     patch: { name?: string; key?: string; description?: string | null; leadId?: number | null; isArchived?: boolean },
-  ) => api.patch<Project>(`/projects/${id}`, patch),
+  ) => api.patch<ProjectDetails>(`/projects/${id}`, patch),
 };
 
 /* ------------------------------------------------------------------ tickets */

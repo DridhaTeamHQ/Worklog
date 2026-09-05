@@ -1,7 +1,7 @@
 import { View } from 'react-native';
 import { useTheme } from '@/theme';
 import type { TeamMember } from '@/types';
-import { Avatar, BentoCard, Chip, Text } from '@/components';
+import { Avatar, BentoCard, Chip, Text, ProgressBar } from '@/components';
 
 interface Props {
   member: TeamMember;
@@ -27,13 +27,14 @@ export function MemberRow({ member, onPress }: Props) {
             {[member.department, member.job_title].filter(Boolean).join(' · ') || member.email}
           </Text>
         </View>
-        <View style={{ alignItems: 'flex-end', gap: 4 }}>
-          <Text variant="smallStrong">{open} open</Text>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: member.submitted_today ? t.colors.success : t.colors.inkFaint }} />
-            <Text variant="caption" color={member.submitted_today ? 'success' : 'inkFaint'}>{member.submitted_today ? 'Reported' : 'No report'}</Text>
-          </View>
+
+      </View>
+      <View style={{ gap: 10, marginTop: 20, paddingTop: 16, borderTopWidth: 1, borderTopColor: t.colors.hairline }}>
+        <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 8 }}>
+          <Text variant="small" color="inkMuted">{open} open · {c.completed} done</Text>
+          <Text variant="caption" color={member.submitted_today ? 'success' : 'inkFaint'}>{member.submitted_today ? 'Reported today' : 'No report today'}</Text>
         </View>
+        <ProgressBar value={c.total ? c.completed / c.total : 0} height={3} />
       </View>
     </BentoCard>
   );

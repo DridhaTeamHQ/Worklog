@@ -1,3 +1,6 @@
+import { AuroraSurface } from '@/components/AuroraCard';
+import { ProgressBar } from '@/components';
+import { ArrowUpRight } from 'lucide-react-native';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -16,7 +19,7 @@ export default function Projects() {
 
   return (
     <Screen refreshing={projects.isRefetching} onRefresh={() => projects.refetch()}>
-      <ScreenHeader title="Projects" subtitle="Tasks live inside projects; each issues its own keys." right={<IconPillButton icon={Plus} tone="ink" onPress={() => router.push('/projects/new')} accessibilityLabel="New project" />} />
+      <ScreenHeader tone="iris" title="Projects" subtitle="The big picture, one project at a time." right={<IconPillButton icon={Plus} tone="ink" onPress={() => router.push('/projects/new')} accessibilityLabel="New project" />} />
       <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
         <TextButton label={showArchived ? 'Hide archived' : 'Show archived'} icon={Archive} color="inkMuted" onPress={() => setShowArchived((v) => !v)} />
       </View>
@@ -24,18 +27,23 @@ export default function Projects() {
         <EmptyState icon={FolderKanban} title="No projects yet" body="Create the first one and tasks can start being assigned." action={{ label: 'New project', onPress: () => router.push('/projects/new') }} />
       ) : list.map((p, i) => (
         <Reveal key={p.id} index={i}>
-          <BentoCard onPress={() => router.push(`/projects/${p.id}`)} style={p.is_archived ? { opacity: 0.7 } : undefined}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1, gap: 6 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <KeyChip value={p.project_key} size="md" />
-                  {p.is_archived ? <Text variant="caption" color="inkFaint">Archived</Text> : null}
-                </View>
-                <Text variant="h3">{p.name}</Text>
-                {p.description ? <Text variant="small" color="inkMuted" numberOfLines={2}>{p.description}</Text> : null}
-                <Text variant="small" color="inkFaint">{p.counts.total} tasks · {p.counts.completed} done{p.counts.overdue ? ` · ${p.counts.overdue} overdue` : ''}{p.lead_name ? ` · Lead ${p.lead_name}` : ''}</Text>
+          <BentoCard padding={0} onPress={() => router.push(`/projects/${p.id}`)} style={{ overflow: 'hidden', opacity: p.is_archived ? 0.7 : 1 }}>
+            <View style={{ padding: 22, minHeight: 144, gap: 20 }}>
+              <AuroraSurface tone={(['iris', 'sage', 'rose', 'clay'] as const)[i % 4]} />
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+                <KeyChip value={p.project_key} onHero />
+                <ArrowUpRight size={20} color="#E0E4DC" />
               </View>
-              <MiniBars data={[{ value: p.counts.pending }, { value: p.counts.in_progress }, { value: p.counts.completed }, { value: p.counts.overdue, highlight: true }]} color={t.colors.hero} height={40} barWidth={8} />
+              <Text variant="h2" color="#F8F8F1">{p.name}</Text>
+            </View>
+            <View style={{ padding: 20, gap: 14 }}>
+              {p.description ? <Text variant="small" color="inkMuted" numberOfLines={2}>{p.description}</Text> : null}
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <Text variant="small">{p.counts.completed} / {p.counts.total} tasks done</Text>
+                <Text variant="smallStrong" color={p.counts.overdue ? 'danger' : 'hero'}>{p.counts.overdue ? `${p.counts.overdue} overdue` : `${p.counts.total ? Math.round(p.counts.completed / p.counts.total * 100) : 0}%`}</Text>
+              </View>
+              <ProgressBar value={p.counts.total ? p.counts.completed / p.counts.total : 0} height={4} />
+              <Text variant="caption" color="inkMuted">{p.is_archived ? 'Archived' : p.lead_name ? `Led by ${p.lead_name}` : 'No lead assigned'}</Text>
             </View>
           </BentoCard>
         </Reveal>

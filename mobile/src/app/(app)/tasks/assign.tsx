@@ -38,7 +38,7 @@ export default function AssignTask() {
 
   return (
     <Screen>
-      <ScreenHeader title="Assign a task" subtitle="Only who and which project are required." />
+      <ScreenHeader tone="sage" title="Assign a task" subtitle="Only who and which project are required." />
       <TaskForm
         initial={{ employeeId: Number(params.employeeId) || null, projectId: Number(params.projectId) || null }}
         submitLabel="Assign task"

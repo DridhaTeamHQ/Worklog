@@ -37,7 +37,8 @@ export function Screen({
 }: Props) {
   const t = useTheme();
   const insets = useSafeAreaInsets();
-  const bottom = tabBar ? useTabBarInset() : insets.bottom + t.spacing.xl;
+  const tabInset = useTabBarInset();
+  const bottom = tabBar ? tabInset : insets.bottom + t.spacing.xl;
   const bar = statusBar === 'auto' ? (hero ? 'light' : (t.isDark ? 'light' : 'dark')) : statusBar;
   const autoHide = useAutoHideTabBar();
 

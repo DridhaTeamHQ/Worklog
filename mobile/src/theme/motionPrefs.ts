@@ -7,7 +7,7 @@ import { create } from 'zustand';
  * Off when the phone's accessibility settings ask for reduced motion, and — on the
  * web preview only — when the page is opened with `?nomotion=1`, which is how the
  * screens are checked in environments that do not render animation frames.
- * Press feedback and layout transitions are quick and functional, so they stay.
+ * Reduced motion removes spatial movement and looping effects; controls stay usable.
  */
 interface MotionPrefs {
   reduced: boolean;
@@ -26,13 +26,25 @@ export function initMotionPrefs() {
         useMotionPrefs.getState().setReduced(true);
         return () => {};
       }
+      if (typeof window !== 'undefined' && window.matchMedia) {
+        const media = window.matchMedia('(prefers-reduced-motion: reduce)');
+        const update = () => useMotionPrefs.getState().setReduced(media.matches);
+        update();
+        media.addEventListener('change', update);
+        return () => media.removeEventListener('change', update);
+      }
     } catch { /* not a browser */ }
   }
+  let disposed = false;
+  let changed = false;
   AccessibilityInfo.isReduceMotionEnabled()
-    .then((v) => useMotionPrefs.getState().setReduced(Boolean(v)))
+    .then((v) => { if (!disposed && !changed) useMotionPrefs.getState().setReduced(Boolean(v)); })
     .catch(() => {});
-  const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => useMotionPrefs.getState().setReduced(Boolean(v)));
-  return () => sub.remove();
+  const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', (v) => {
+    changed = true;
+    useMotionPrefs.getState().setReduced(Boolean(v));
+  });
+  return () => { disposed = true; sub.remove(); };
 }
 
 export const useReducedMotion = () => useMotionPrefs((s) => s.reduced);

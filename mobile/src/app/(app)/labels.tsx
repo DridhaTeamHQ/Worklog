@@ -35,7 +35,7 @@ export default function Labels() {
 
   return (
     <Screen refreshing={labels.isRefetching} onRefresh={() => labels.refetch()}>
-      <ScreenHeader title="Labels" subtitle="Tags that cut across projects." />
+      <ScreenHeader tone="sage" title="Labels" subtitle="Tags that cut across projects." />
       <Reveal>
         <BentoCard>
           <View style={{ gap: 12 }}>

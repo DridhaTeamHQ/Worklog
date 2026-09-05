@@ -76,11 +76,11 @@ export default function TaskDetail() {
     ]);
   };
 
-  if (task.isError) return <Screen><ScreenHeader title="Task" /><ErrorState error={task.error} onRetry={() => task.refetch()} /></Screen>;
+  if (task.isError) return <Screen><ScreenHeader tone="sage" title="Task" /><ErrorState error={task.error} onRetry={() => task.refetch()} /></Screen>;
 
   return (
     <Screen refreshing={task.isRefetching} onRefresh={() => { void task.refetch(); void tickets.refetch(); }}>
-      <ScreenHeader big={false} right={manager && data ? <IconPillButton icon={MoreHorizontal} tone="plain" onPress={menu.open} accessibilityLabel="More actions" /> : undefined} />
+      <ScreenHeader tone="sage" big={false} right={manager && data ? <IconPillButton icon={MoreHorizontal} tone="plain" onPress={menu.open} accessibilityLabel="More actions" /> : undefined} />
 
       {task.isPending || !data ? <LoadingState /> : (
         <>
@@ -99,15 +99,16 @@ export default function TaskDetail() {
           </Reveal>
 
           <Reveal index={1}>
-            <SegmentedTabs items={STATUS_ITEMS} value={data.status} onChange={changeStatus} />
+            <SegmentedTabs iconic={false} items={STATUS_ITEMS} value={data.status} onChange={changeStatus} />
           </Reveal>
 
           {data.description ? (
             <Reveal index={2}>
-              <Text variant="body" style={{ paddingHorizontal: 4 }}>{data.description}</Text>
+              <BentoCard><Text variant="caption" color="inkMuted" style={{ letterSpacing: 1.5, marginBottom: 10 }}>THE BRIEF</Text><Text variant="body">{data.description}</Text></BentoCard>
             </Reveal>
           ) : null}
 
+          <SectionTitle title="Details & ownership" />
           <Reveal index={3}>
             <ListGroup>
               <ValueRow label="Starts" value={data.start_date ? formatDateShort(data.start_date) : '—'} />

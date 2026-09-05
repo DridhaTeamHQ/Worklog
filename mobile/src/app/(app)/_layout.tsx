@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 import { Stack, useRouter } from 'expo-router';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 import { useAuthStore } from '@/auth/store';
 import { usePushNotifications } from '@/push/usePushNotifications';
 import { isManagerLevel } from '@/types';
@@ -13,6 +13,7 @@ import { isManagerLevel } from '@/types';
  */
 export default function AppLayout() {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const router = useRouter();
   const user = useAuthStore((s) => s.user);
   const pendingUrl = useAuthStore((s) => s.pendingUrl);
@@ -31,21 +32,22 @@ export default function AppLayout() {
   }, [pendingUrl, router, setPendingUrl]);
 
   return (
-    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.ground }, animation: 'slide_from_right' }}>
+    <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: t.colors.ground }, animation: reduced ? 'none' : 'slide_from_right' }}>
       <Stack.Protected guard={manager}>
-        <Stack.Screen name="(manager)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(manager)" options={{ animation: reduced ? 'none' : 'fade' }} />
       </Stack.Protected>
       <Stack.Protected guard={!manager}>
-        <Stack.Screen name="(member)" options={{ animation: 'fade' }} />
+        <Stack.Screen name="(member)" options={{ animation: reduced ? 'none' : 'fade' }} />
       </Stack.Protected>
-      <Stack.Screen name="tasks/assign" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="tasks/[id]/edit" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="tickets/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="tickets/[id]/edit" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="projects/new" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="projects/[id]" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="profile/edit" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
-      <Stack.Screen name="profile/password" options={{ presentation: 'modal', animation: 'slide_from_bottom' }} />
+      <Stack.Screen name="tasks/assign" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="tasks/[id]/edit" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="tickets/new" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="tickets/[id]/edit" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="projects/new" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="projects/[id]" />
+      <Stack.Screen name="projects/edit/[id]" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="profile/edit" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="profile/password" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
     </Stack>
   );
 }

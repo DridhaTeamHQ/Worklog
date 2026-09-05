@@ -4,10 +4,11 @@ import {
   BottomSheetBackdrop, BottomSheetModal, BottomSheetScrollView, BottomSheetView,
   type BottomSheetBackdropProps,
 } from '@gorhom/bottom-sheet';
-import { Check, Search } from 'lucide-react-native';
+import { Check, Search, X } from 'lucide-react-native';
 import { BottomSheetTextInput } from '@gorhom/bottom-sheet';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
+import { ReduceMotion } from 'react-native-reanimated';
 import { Text } from './Text';
 
 export interface SheetHandle {
@@ -30,6 +31,7 @@ interface SheetProps {
  */
 export const Sheet = forwardRef<SheetHandle, SheetProps>(function Sheet({ title, children, size = 'auto', scroll, onDismiss }, ref) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const modal = useRef<BottomSheetModal>(null);
   const snapPoints = useMemo(() => (size === 'tall' ? ['70%', '92%'] : undefined), [size]);
 
@@ -46,6 +48,7 @@ export const Sheet = forwardRef<SheetHandle, SheetProps>(function Sheet({ title,
   return (
     <BottomSheetModal
       ref={modal}
+      overrideReduceMotion={reduced ? ReduceMotion.Always : ReduceMotion.Never}
       snapPoints={snapPoints}
       enableDynamicSizing={size === 'auto'}
       backdropComponent={backdrop}
@@ -57,7 +60,10 @@ export const Sheet = forwardRef<SheetHandle, SheetProps>(function Sheet({ title,
       android_keyboardInputMode="adjustResize"
     >
       <Body contentContainerStyle={scroll ? { paddingHorizontal: t.spacing.xl, paddingBottom: t.spacing.huge } : undefined} style={scroll ? undefined : { paddingHorizontal: t.spacing.xl, paddingBottom: t.spacing.huge }}>
-        {title ? <Text variant="h2" style={{ marginBottom: t.spacing.md, marginTop: 4 }}>{title}</Text> : null}
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: t.spacing.md, marginTop: 4 }}>
+          <Text variant="h2" style={{ flex: 1 }}>{title}</Text>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close sheet" onPress={() => modal.current?.dismiss()} style={({ pressed }) => ({ width: 36, height: 36, borderRadius: 18, backgroundColor: pressed ? t.colors.cardAlt : t.colors.neutralSoft, alignItems: 'center', justifyContent: 'center' })}><X size={16} color={t.colors.inkMuted} /></Pressable>
+        </View>
         {children}
       </Body>
     </BottomSheetModal>

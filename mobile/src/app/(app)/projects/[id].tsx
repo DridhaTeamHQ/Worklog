@@ -1,74 +1,56 @@
+import { useUser } from '@/auth/store';
+import { isManagerLevel } from '@/types';
 import { useState } from 'react';
-import { Alert, View } from 'react-native';
+import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Archive, ArchiveRestore } from 'lucide-react-native';
-import { useProject, useUpdateProject } from '@/hooks/useProjects';
-import { ApiError, errorMessage } from '@/api/client';
-import { BentoCard, ErrorState, PillButton, Screen, ScreenHeader, SkeletonList, Text, useToast } from '@/components';
-import { ProjectForm } from '@/features/ProjectForm';
+import { ArrowUpRight, Bug, ListChecks, Pencil } from 'lucide-react-native';
+import { useProject, useProjects } from '@/hooks/useProjects';
+import { useTasks } from '@/hooks/useTasks';
+import { useTickets } from '@/hooks/useTickets';
+import { formatDateShort } from '@/lib/format';
+import { BentoCard, EmptyState, ErrorState, IconPillButton, ListGroup, Reveal, Screen, ScreenHeader, SearchField, SectionTitle, SegmentedTabs, SkeletonList, Text, TextButton, ValueRow } from '@/components';
+import { ProjectHero } from '@/features/ProjectHero';
+import { TaskCard } from '@/features/TaskCard';
+import { TicketCard } from '@/features/TicketCard';
 
-/** Rename, re-key, re-describe or archive a project. */
-export default function EditProject() {
+/** Project home: a live overview and its work, with editing on a separate route. */
+export default function ProjectDetail() {
   const router = useRouter();
-  const toast = useToast();
+  const manager = isManagerLevel(useUser()?.role);
   const { id: raw } = useLocalSearchParams<{ id: string }>();
   const id = Number(raw) || null;
   const project = useProject(id);
-  const update = useUpdateProject();
-  const [errors, setErrors] = useState<Record<string, string>>({});
+  const summaries = useProjects(true);
+  const [tab, setTab] = useState<'work' | 'tickets' | 'about'>('work');
+  const [search, setSearch] = useState('');
+  const tasks = useTasks({ projectId: id ?? undefined, search: search || undefined, sort: 'deadline_asc', limit: 200 }, { enabled: !!id && !project.isError });
+  const tickets = useTickets({ projectId: id ?? undefined, search: search || undefined, sort: 'created_desc', limit: 200 }, { enabled: !!id && tab === 'tickets' && !project.isError });
   const p = project.data;
+  const summary = summaries.data?.find((item) => item.id === id);
+  const refresh = () => { void project.refetch(); void summaries.refetch(); void tasks.refetch(); if (tab === 'tickets') void tickets.refetch(); };
 
-  const toggleArchive = () => {
-    if (!p) return;
-    const archiving = !p.is_archived;
-    Alert.alert(archiving ? 'Archive this project?' : 'Restore this project?', archiving ? 'Its tasks stay readable, but nothing new can be added to it.' : 'New tasks can be added to it again.', [
-      { text: 'Cancel', style: 'cancel' },
-      { text: archiving ? 'Archive' : 'Restore', style: archiving ? 'destructive' : 'default', onPress: () => update.mutate({ id: p.id, patch: { isArchived: archiving } }, { onSuccess: () => { toast.success(archiving ? 'Project archived' : 'Project restored'); router.back(); }, onError: (err) => toast.error('Could not update', errorMessage(err)) }) },
-    ]);
-  };
-
-  return (
-    <Screen>
-      <ScreenHeader title="Edit project" subtitle={p?.project_key} />
-      {project.isPending ? <SkeletonList count={2} /> : project.isError || !p ? <ErrorState error={project.error} onRetry={() => project.refetch()} /> : (
-        <>
-          <ProjectForm
-            editing
-            initial={{ name: p.name, key: p.project_key, description: p.description ?? '', leadId: p.lead_id }}
-            submitLabel="Save changes"
-            busy={update.isPending}
-            errors={errors}
-            onSubmit={(values) => {
-              const next: Record<string, string> = {};
-              if (!values.name.trim()) next.name = 'Give the project a name.';
-              if (!/^[A-Z][A-Z0-9]{1,9}$/.test(values.key)) next.key = 'Use 2–10 letters or digits, starting with a letter.';
-              setErrors(next);
-              if (Object.keys(next).length) return;
-              const go = () => update.mutate({ id: p.id, patch: { name: values.name.trim(), key: values.key, description: values.description.trim() || null, leadId: values.leadId } }, {
-                onSuccess: () => { toast.success('Project updated'); router.back(); },
-                onError: (err) => {
-                  if (err instanceof ApiError && err.details?.length) setErrors(err.fieldErrors);
-                  else toast.error('Could not save', errorMessage(err));
-                },
-              });
-              if (values.key !== p.project_key) {
-                Alert.alert('Change the key?', `Every task in this project is renamed: ${p.project_key}-4 becomes ${values.key}-4. Anyone holding the old key in a note will find it out of date.`, [
-                  { text: 'Cancel', style: 'cancel' }, { text: 'Change it', style: 'destructive', onPress: go },
-                ]);
-              } else go();
-            }}
-          />
-          <BentoCard tone="outline">
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-              <View style={{ flex: 1 }}>
-                <Text variant="bodyStrong">{p.is_archived ? 'Archived' : 'Archive project'}</Text>
-                <Text variant="small" color="inkMuted">{p.is_archived ? 'Tasks stay readable; nothing new can be added.' : 'Keeps its tasks readable while blocking new ones.'}</Text>
-              </View>
-              <PillButton label={p.is_archived ? 'Restore' : 'Archive'} size="sm" variant={p.is_archived ? 'ink' : 'ghost'} icon={p.is_archived ? ArchiveRestore : Archive} onPress={toggleArchive} />
-            </View>
-          </BentoCard>
-        </>
-      )}
-    </Screen>
-  );
+  return <Screen refreshing={project.isRefetching} onRefresh={refresh}>
+    <ScreenHeader big={false} title="Project" right={p && manager ? <IconPillButton icon={Pencil} tone="soft" accessibilityLabel="Edit project" onPress={() => router.push(`/projects/edit/${p.id}`)} /> : undefined} />
+    {project.isPending ? <SkeletonList count={3} /> : project.isError || !p ? <ErrorState error={project.error} onRetry={() => project.refetch()} /> : <>
+      <Reveal>{summary ? <ProjectHero project={{ ...p, counts: summary.counts }} canManage={manager} /> : summaries.isPending ? <SkeletonList count={1} /> : <ErrorState error={summaries.error ?? new Error('Project totals are unavailable.')} onRetry={() => summaries.refetch()} />}</Reveal>
+      <SegmentedTabs items={[{ key: 'work', label: 'Work' }, { key: 'tickets', label: 'Tickets' }, { key: 'about', label: 'About' }]} value={tab} onChange={(next) => { setTab(next); setSearch(''); }} />
+      {tab === 'about' ? <Reveal>
+        <View style={{ gap: 20 }}>
+          <BentoCard><Text variant="caption" color="inkMuted" style={{ letterSpacing: 1.6, marginBottom: 12 }}>THE BIG PICTURE</Text><Text variant="body">{p.description || 'Every good project starts with a little context. Add a description so the team knows what you are building.'}</Text>{manager ? <View style={{ marginTop: 18 }}><TextButton label="Edit project details" icon={Pencil} onPress={() => router.push(`/projects/edit/${p.id}`)} /></View> : null}</BentoCard>
+          <ListGroup><ValueRow label="Project key" value={p.project_key} /><ValueRow label="Created" value={formatDateShort(p.created_at)} divider /><ValueRow label="Updated" value={formatDateShort(p.updated_at)} divider /><ValueRow label="Status" value={p.is_archived ? 'Archived' : 'Active'} divider /></ListGroup>
+        </View>
+      </Reveal> : <>
+        <SearchField value={search} onChange={setSearch} placeholder={tab === 'work' ? 'Search project tasks' : 'Search project tickets'} />
+        <SectionTitle title={tab === 'work' ? 'Project tasks' : 'Conversations'} right={tab === 'work' ? <TextButton label="Open board" icon={ArrowUpRight} onPress={() => router.push({ pathname: manager ? '/(app)/(manager)/tasks' : '/(app)/(member)/tasks', params: { projectId: String(p.id), view: 'board', status: 'all' } })} /> : undefined} />
+        {tab === 'work' ? tasks.isPending || tasks.isPlaceholderData ? <SkeletonList count={2} /> : tasks.isError ? <ErrorState error={tasks.error} onRetry={() => tasks.refetch()} /> : tasks.data.items.length ? <>
+          {tasks.data.items.map((task, i) => <Reveal key={task.id} index={Math.min(i, 4)}><TaskCard task={task} showAssignee onPress={() => router.push(`/tasks/${task.id}`)} /></Reveal>)}
+          {tasks.data.total > tasks.data.items.length ? <Text variant="small" color="inkMuted">Showing {tasks.data.items.length} of {tasks.data.total}. Narrow your search to find more.</Text> : null}
+        </> : <EmptyState icon={ListChecks} title={search ? 'No matching work' : 'A fresh canvas'} body={search ? 'Try a different word or key.' : 'Give your project its first task.'} action={manager && !search && !p.is_archived ? { label: 'Add a task', onPress: () => router.push({ pathname: '/tasks/assign', params: { projectId: String(p.id) } }) } : undefined} />
+        : tickets.isPending || tickets.isPlaceholderData ? <SkeletonList count={2} /> : tickets.isError ? <ErrorState error={tickets.error} onRetry={() => tickets.refetch()} /> : tickets.data.items.length ? <>
+          {tickets.data.items.map((ticket, i) => <Reveal key={ticket.id} index={Math.min(i, 4)}><TicketCard ticket={ticket} showReporter onPress={() => router.push(`/tickets/${ticket.id}`)} /></Reveal>)}
+          {tickets.data.total > tickets.data.items.length ? <Text variant="small" color="inkMuted">Showing {tickets.data.items.length} of {tickets.data.total}. Narrow your search to find more.</Text> : null}
+        </> : <EmptyState icon={Bug} title={search ? 'No matching tickets' : 'A clear path'} body={search ? 'Try a different word or key.' : 'Tickets linked to this project will appear here.'} />}
+      </>}
+    </>}
+  </Screen>;
 }

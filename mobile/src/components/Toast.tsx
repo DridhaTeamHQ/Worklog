@@ -1,10 +1,10 @@
-import { createContext, useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Pressable, View } from 'react-native';
 import { AnimatePresence, MotiView } from 'moti';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BlurView } from 'expo-blur';
 import { AlertCircle, Bell, CheckCircle2, Info } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 import { Text } from './Text';
 import { SuccessMark } from './Loaders';
 
@@ -38,6 +38,8 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const insets = useSafeAreaInsets();
   const t = useTheme();
+  const reduced = useReducedMotion();
+  useEffect(() => () => { if (timer.current) clearTimeout(timer.current); }, []);
 
   const dismiss = useCallback(() => {
     if (timer.current) clearTimeout(timer.current);
@@ -69,10 +71,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
           {toast ? (
             <MotiView
               key={toast.id}
-              from={{ opacity: 0, translateY: -24, scale: 0.96 }}
+              from={{ opacity: reduced ? 1 : 0, translateY: reduced ? 0 : -24, scale: reduced ? 1 : 0.96 }}
               animate={{ opacity: 1, translateY: 0, scale: 1 }}
-              exit={{ opacity: 0, translateY: -16, scale: 0.98 }}
-              transition={{ type: 'spring', ...t.motion.spring }}
+              exit={{ opacity: 0, translateY: reduced ? 0 : -16, scale: reduced ? 1 : 0.98 }}
+              transition={reduced ? { type: 'timing', duration: 0 } : { type: 'spring', ...t.motion.spring }}
               style={[{ borderRadius: t.radius.lg, overflow: 'hidden', maxWidth: 520, alignSelf: 'stretch', borderWidth: 1, borderColor: t.colors.glassBorder }, t.shadow.float]}
             >
               <BlurView intensity={t.isDark ? 30 : 60} tint={t.isDark ? 'dark' : 'light'} style={{ backgroundColor: t.isDark ? 'rgba(18,18,20,0.94)' : 'rgba(250,250,251,0.94)' }}>
@@ -82,7 +84,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
                   accessibilityRole="alert"
                 >
                   {toast.tone === 'success' ? <SuccessMark size={34} /> : (
-                    <MotiView from={{ scale: 0.6, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12, stiffness: 200, delay: 60 }} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: toneColor, alignItems: 'center', justifyContent: 'center' }}>
+                    <MotiView from={{ scale: reduced ? 1 : 0.6, opacity: reduced ? 1 : 0 }} animate={{ scale: 1, opacity: 1 }} transition={{ type: 'spring', damping: 12, stiffness: 200, delay: 60 }} style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: toneColor, alignItems: 'center', justifyContent: 'center' }}>
                       <Icon size={18} color="#FFFFFF" strokeWidth={2.4} />
                     </MotiView>
                   )}

@@ -58,7 +58,7 @@ export default function TaskReports() {
         )}
         ListHeaderComponent={(
           <View style={{ gap: 12, paddingTop: insets.top + 8, paddingBottom: 4 }}>
-            <ScreenHeader big={false} title="Task reports" subtitle={reports.data ? `${count} ${count === 1 ? 'report' : 'reports'} ${rangeWord[range]}${people ? ` · ${people} ${people === 1 ? 'person' : 'people'}` : ''}` : undefined} right={<IconPillButton icon={UserRound} tone={employeeId ? 'ink' : 'soft'} onPress={employeeSheet.open} accessibilityLabel="Filter by person" />} />
+            <ScreenHeader tone="rose" title="Task reports" subtitle={reports.data ? `${count} ${count === 1 ? 'report' : 'reports'} ${rangeWord[range]}${people ? ` · ${people} ${people === 1 ? 'person' : 'people'}` : ''}` : undefined} right={<IconPillButton icon={UserRound} tone={employeeId ? 'ink' : 'soft'} onPress={employeeSheet.open} accessibilityLabel="Filter by person" />} />
             <SegmentedTabs items={[{ key: 'today', label: 'Today' }, { key: 'week', label: 'Week' }, { key: 'month', label: 'Month' }, { key: 'all', label: 'All' }]} value={range} onChange={setRange} />
             <SearchField value={search} onChange={setSearch} placeholder="Search report text or people" loading={reports.isFetching && !!search} />
           </View>

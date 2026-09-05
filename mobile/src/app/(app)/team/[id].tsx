@@ -1,3 +1,4 @@
+import { IdentityCard } from '@/components';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -30,24 +31,17 @@ export default function EmployeeDetail() {
   const e = detail.data?.employee;
   const c = e?.counts;
 
-  if (detail.isError) return <Screen><ScreenHeader title="Team member" /><ErrorState error={detail.error} onRetry={() => detail.refetch()} /></Screen>;
+  if (detail.isError) return <Screen><ScreenHeader tone="sage" title="Team member" /><ErrorState error={detail.error} onRetry={() => detail.refetch()} /></Screen>;
 
   return (
     <Screen refreshing={detail.isRefetching} onRefresh={() => { void detail.refetch(); void reports.refetch(); void tasks.refetch(); }}>
-      <ScreenHeader big={false} />
+      <ScreenHeader tone="sage" big={false} />
 
       {detail.isPending || !e ? <LoadingState /> : (
         <>
           <Reveal>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 16 }}>
-              <Avatar name={e.name} src={e.profile_image} size="lg" />
-              <View style={{ flex: 1, gap: 4 }}>
-                <Text variant="h2">{e.name}</Text>
-                <Text variant="body" color="inkMuted">{[e.department, e.job_title].filter(Boolean).join(' · ') || e.email}</Text>
-                {e.department || e.job_title ? <Text variant="small" color="inkFaint">{e.email}</Text> : null}
-                {e.invited ? <View style={{ flexDirection: 'row' }}><Chip label="Invited, not signed in yet" color={t.colors.warning} size="sm" /></View> : null}
-              </View>
-            </View>
+            <IdentityCard name={e.name} image={e.profile_image} subtitle={[e.department, e.job_title].filter(Boolean).join(' · ')} detail={e.email} />
+            {e.invited ? <View style={{ marginTop: 10, alignSelf: 'flex-start' }}><Chip label="Invitation pending" color={t.colors.warning} /></View> : null}
           </Reveal>
 
           <Reveal index={1}>

@@ -56,7 +56,7 @@ export default function NotificationsScreen() {
         renderItem={({ item, index }) => <Reveal index={index} style={{ marginBottom: 10 }}><NotificationRow notification={item} onPress={() => open(item)} /></Reveal>}
         ListHeaderComponent={(
           <View style={{ gap: 12, paddingTop: insets.top + 8, paddingBottom: 6 }}>
-            <ScreenHeader big={false} title="Notifications" subtitle={list.data ? (list.data.unread ? `${list.data.unread} unread` : 'All caught up') : undefined} right={list.data?.unread ? <TextButton label="Mark all read" icon={CheckCheck} onPress={() => markAll.mutate()} /> : undefined} />
+            <ScreenHeader tone="sage" title="Notifications" subtitle={list.data ? (list.data.unread ? `${list.data.unread} unread` : 'All caught up') : undefined} right={list.data?.unread ? <TextButton label="Mark all read" icon={CheckCheck} onPress={() => markAll.mutate()} /> : undefined} />
             {prefs.pushPermission !== 'granted' ? (
               <InsightCard eyebrow="This phone" title="Pushes are off" detail="Turn them on to hear about new tasks and comments" icon={Bell} onPress={enable} />
             ) : showSettings ? (

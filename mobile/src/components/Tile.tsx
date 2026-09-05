@@ -3,7 +3,7 @@ import { Pressable, View } from 'react-native';
 import type { LucideIcon } from 'lucide-react-native';
 import { ChevronRight } from 'lucide-react-native';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '@/theme';
+import { alpha, useTheme } from '@/theme';
 import { BentoCard } from './BentoCard';
 import { Text } from './Text';
 
@@ -30,7 +30,7 @@ export function ListRow({ icon: Icon, label, hint, badge, onPress, danger, right
     <Pressable
       onPress={onPress ? () => { Haptics.selectionAsync().catch(() => {}); onPress(); } : undefined}
       disabled={!onPress}
-      accessibilityRole="button"
+      accessibilityRole={onPress ? "button" : undefined}
       style={({ pressed }) => ({
         flexDirection: 'row', alignItems: 'center', gap: 14,
         paddingVertical: 14, paddingHorizontal: t.spacing.xl,
@@ -38,7 +38,7 @@ export function ListRow({ icon: Icon, label, hint, badge, onPress, danger, right
         backgroundColor: pressed ? t.colors.cardAlt : 'transparent',
       })}
     >
-      {Icon ? <Icon size={20} color={danger ? t.colors.danger : t.colors.inkMuted} strokeWidth={1.9} /> : null}
+      {Icon ? <View style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: alpha(danger ? t.colors.danger : t.colors.hero, 0.12), alignItems: "center", justifyContent: "center" }}><Icon size={19} color={danger ? t.colors.danger : t.colors.hero} strokeWidth={1.7} /></View> : null}
       <View style={{ flex: 1 }}>
         <Text variant="body" color={fg}>{label}</Text>
         {hint ? <Text variant="small" color="inkMuted">{hint}</Text> : null}
@@ -78,7 +78,7 @@ export function ValueRow({ label, value, color, onPress, divider }: { label: str
         backgroundColor: pressed ? t.colors.cardAlt : 'transparent',
       })}
     >
-      <Text variant="body" color="inkMuted">{label}</Text>
+      <Text variant="small" color="inkMuted" style={{ maxWidth: "38%" }}>{label}</Text>
       <View style={{ flex: 1, alignItems: 'flex-end' }}>
         <Text variant="body" color={color ?? 'ink'} numberOfLines={2} style={{ flexShrink: 1, textAlign: 'right' }}>{value}</Text>
       </View>

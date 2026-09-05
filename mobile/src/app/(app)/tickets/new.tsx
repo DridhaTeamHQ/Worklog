@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useEffect, useMemo, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -67,7 +68,7 @@ export default function NewTicket() {
 
   return (
     <Screen>
-      <ScreenHeader title="Raise a ticket" subtitle="A bug you hit while working on a task." />
+      <ScreenHeader tone="clay" title="Raise a ticket" subtitle="A bug you hit while working on a task." />
       {noTasks ? <EmptyState icon={ListChecks} title="No tasks yet" body="Tickets are raised against a task assigned to you. Once you have one, come back here." /> : (
         <View style={{ gap: 16 }}>
           <PickerField label="Project" required icon={FolderKanban} value={projects.find((p) => p.id === projectId) ? `${projects.find((p) => p.id === projectId)!.key} · ${projects.find((p) => p.id === projectId)!.name}` : null} placeholder="Choose a project" onPress={projectSheet.open} error={errors.projectId} />
@@ -80,9 +81,11 @@ export default function NewTicket() {
               </View>
             </BentoCard>
           ) : null}
-          <TextField label="Summary" required value={title} onChangeText={setTitle} placeholder="Crash when saving twice" maxLength={160} error={errors.title} />
+          <FormSection title="Issue details">
+<TextField label="Summary" required value={title} onChangeText={setTitle} placeholder="Crash when saving twice" maxLength={160} error={errors.title} />
           <TextField label="What happened" required value={description} onChangeText={setDescription} placeholder={TICKET_PLACEHOLDER} multiline maxLength={6000} error={errors.description} style={{ minHeight: 140 }} />
           <SeverityPicker value={severity} onChange={setSeverity} />
+          </FormSection>
           <PillButton label="Raise ticket" size="lg" block onPress={submit} loading={create.isPending} haptic="success" />
           <Text variant="small" color="inkFaint" align="center">The manager who assigned the task is notified.</Text>
         </View>

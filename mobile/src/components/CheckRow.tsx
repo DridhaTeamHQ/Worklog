@@ -33,10 +33,10 @@ export function CheckRow({ checked, label, meta, onToggle, right, onPressLabel, 
   const circle = { width: 26, height: 26, borderRadius: 13, borderWidth: 2, alignItems: 'center' as const, justifyContent: 'center' as const };
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 10, opacity: disabled ? 0.6 : 1 }}>
-      <Pressable onPress={toggle} hitSlop={10} accessibilityRole="checkbox" accessibilityState={{ checked, disabled }} disabled={disabled || !onToggle}>
+      <Pressable onPress={toggle} hitSlop={10} accessibilityLabel={label} accessibilityRole="checkbox" aria-checked={checked} aria-disabled={disabled || !onToggle} accessibilityState={{ checked, disabled: disabled || !onToggle }} disabled={disabled || !onToggle}>
         {reduced ? (
           <View style={[circle, { backgroundColor: checked ? t.colors.hero : 'transparent', borderColor: checked ? t.colors.hero : t.colors.inkFaint }]}>
-            {checked ? <Check size={15} color="#FFFFFF" strokeWidth={3} /> : null}
+            {checked ? <Check size={15} color={t.colors.onHero} strokeWidth={3} /> : null}
           </View>
         ) : (
           <MotiView
@@ -45,7 +45,7 @@ export function CheckRow({ checked, label, meta, onToggle, right, onPressLabel, 
             style={circle}
           >
             <MotiView animate={{ scale: checked ? 1 : 0, opacity: checked ? 1 : 0 }} transition={{ type: 'spring', damping: 14, stiffness: 260 }}>
-              <Check size={15} color="#FFFFFF" strokeWidth={3} />
+              <Check size={15} color={t.colors.onHero} strokeWidth={3} />
             </MotiView>
           </MotiView>
         )}

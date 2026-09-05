@@ -20,7 +20,7 @@ export function SeverityPicker({ value, onChange }: { value: TicketSeverity; onC
           const selected = value === s.value;
           const color = t.tone('severity', s.value).color;
           return (
-            <Pressable key={s.value} onPress={() => onChange(s.value)} accessibilityRole="radio" accessibilityState={{ selected }} style={{ flex: 1, borderRadius: t.radius.md, paddingVertical: 13, paddingHorizontal: 6, borderWidth: 1.5, borderColor: selected ? color : t.colors.border, backgroundColor: selected ? alpha(color, t.isDark ? 0.22 : 0.1) : t.colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
+            <Pressable key={s.value} onPress={() => onChange(s.value)} accessibilityRole="radio" accessibilityState={{ checked: selected }} aria-checked={selected} style={{ flex: 1, borderRadius: t.radius.md, paddingVertical: 13, paddingHorizontal: 6, borderWidth: 1.5, borderColor: selected ? color : t.colors.border, backgroundColor: selected ? alpha(color, t.isDark ? 0.22 : 0.1) : t.colors.cardAlt, alignItems: 'center', justifyContent: 'center' }}>
               <Text variant="smallStrong" color={selected ? color : 'inkMuted'} numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.8}>{s.label}</Text>
             </Pressable>
           );

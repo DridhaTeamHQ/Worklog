@@ -13,7 +13,7 @@ export default function NewProject() {
 
   return (
     <Screen>
-      <ScreenHeader title="New project" subtitle="A home for tasks, with its own keys." />
+      <ScreenHeader tone="iris" title="New project" subtitle="A home for tasks, with its own keys." />
       <ProjectForm
         submitLabel="Create project"
         busy={create.isPending}

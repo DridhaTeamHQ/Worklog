@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Alert, Pressable, TextInput, View } from 'react-native';
 import { Plus, Trash2 } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
+import Animated, { FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { useAddChecklistItem, useChecklist, useDeleteChecklistItem, useToggleChecklistItem } from '@/hooks/useChecklist';
 import { errorMessage } from '@/api/client';
 import { CheckRow, IconPillButton, ProgressBar, Skeleton, Text, useToast } from '@/components';
@@ -11,9 +12,14 @@ interface Props {
   editable: boolean;
 }
 
+const ROW_ENTER = FadeInDown.duration(180);
+const ROW_EXIT = FadeOut.duration(120);
+const ROW_LAYOUT = LinearTransition.duration(220);
+
 /** The sub-steps of a task: tick, add, remove, with a progress bar on top. */
 export function Checklist({ taskId, editable }: Props) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const toast = useToast();
   const items = useChecklist(taskId);
   const add = useAddChecklistItem(taskId);
@@ -26,7 +32,7 @@ export function Checklist({ taskId, editable }: Props) {
 
   const submit = async () => {
     const title = draft.trim();
-    if (!title) return;
+    if (!title || add.isPending) return;
     try {
       await add.mutateAsync(title);
       setDraft('');
@@ -45,22 +51,23 @@ export function Checklist({ taskId, editable }: Props) {
       ) : null}
       {items.isPending ? <Skeleton height={40} /> : null}
       {list.map((item) => (
-        <CheckRow
-          key={item.id}
-          checked={item.is_done}
-          label={item.title}
-          onToggle={editable ? (next) => toggle.mutate({ itemId: item.id, isDone: next }) : undefined}
-          disabled={!editable}
-          right={editable ? (
-            <Pressable
-              onPress={() => Alert.alert('Remove item?', item.title, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(item.id) }])}
-              hitSlop={8}
-              accessibilityLabel="Remove checklist item"
-            >
-              <Trash2 size={16} color={t.colors.inkFaint} />
-            </Pressable>
-          ) : undefined}
-        />
+        <Animated.View key={item.id} entering={reduced ? undefined : ROW_ENTER} exiting={reduced ? undefined : ROW_EXIT} layout={reduced ? undefined : ROW_LAYOUT}>
+          <CheckRow
+            checked={item.is_done}
+            label={item.title}
+            onToggle={editable ? (next) => toggle.mutate({ itemId: item.id, isDone: next }, { onError: (err) => toast.error('Could not update step', errorMessage(err)) }) : undefined}
+            disabled={!editable || toggle.isPending}
+            right={editable ? (
+              <Pressable
+                onPress={() => Alert.alert('Remove item?', item.title, [{ text: 'Cancel', style: 'cancel' }, { text: 'Remove', style: 'destructive', onPress: () => remove.mutate(item.id) }])}
+                hitSlop={8}
+                accessibilityLabel="Remove checklist item"
+              >
+                <Trash2 size={16} color={t.colors.inkFaint} />
+              </Pressable>
+            ) : undefined}
+          />
+        </Animated.View>
       ))}
       {!items.isPending && list.length === 0 && !editable ? <Text variant="small" color="inkFaint">No checklist.</Text> : null}
       {editable ? (

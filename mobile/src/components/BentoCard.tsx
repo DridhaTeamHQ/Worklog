@@ -3,7 +3,7 @@ import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'rea
 import { MotiView } from 'moti';
 import { BlurView } from 'expo-blur';
 import * as Haptics from 'expo-haptics';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 
 export type CardTone = 'card' | 'alt' | 'accent' | 'hero' | 'glass' | 'outline';
 
@@ -36,6 +36,7 @@ export function BentoCard({
   children, tone = 'card', padding, radius, onPress, onLongPress, disabled, elevated = true, blur = false, style, accessibilityLabel,
 }: Props) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const pad = padding ?? t.spacing.xl;
   const r = radius ?? t.radius.lg;
   // A card asked to flex (a tile in a row) must flex from its outer wrapper too, or
@@ -58,8 +59,8 @@ export function BentoCard({
 
   const inner = (pressed: boolean) => (
     <MotiView
-      animate={{ scale: pressed ? t.motion.pressScale : 1, opacity: disabled ? 0.55 : 1 }}
-      transition={{ type: 'spring', ...t.motion.spring }}
+      animate={{ scale: pressed && !reduced ? t.motion.pressScale : 1, opacity: disabled ? 0.55 : 1 }}
+      transition={reduced ? { type: 'timing', duration: 0 } : { type: 'spring', ...t.motion.spring }}
       style={[
         { borderRadius: r, padding: pad, overflow: tone === 'glass' ? 'hidden' : 'visible' },
         background[tone],

@@ -1,30 +1,19 @@
-/**
- * Design tokens for the Taskr mobile app.
- *
- * Concept: "warm precision". A white screen, light-grey cards with a hairline edge,
- * near-black type, and one warm accent — orange — used only where it means
- * "this is the number", "this is active" or "go here". Charts draw in the same
- * orange with white-filled dots; a secondary blue exists solely for a comparison
- * series. Dark is true black with tonal surfaces and the accent lifted for contrast.
- *
- * Restraint is the rule: one accent, sentence case, colour only where it carries
- * meaning (status, priority, severity keep the web app's semantics).
- */
+/** Taskr — quiet dark surfaces, mineral colors, and an airy editorial type scale. */
 
 export const palette = {
   light: {
     // The accent. `hero` is its historical name — every "brand" use points here.
-    hero: '#F26E1C',
-    heroDeep: '#D95A10',
-    heroSoft: '#FF8A45',
+    hero: '#466451',
+    heroDeep: '#273D31',
+    heroSoft: '#63816D',
     heroLine: 'rgba(255,255,255,0.5)',
     onHero: '#FFFFFF',
     onHeroMuted: 'rgba(255,255,255,0.75)',
-    accentSoft: 'rgba(242,110,28,0.12)',
+    accentSoft: 'rgba(70,100,81,0.10)',
 
-    ground: '#FFFFFF',
-    card: '#F6F6F8',
-    cardAlt: '#ECECF0',
+    ground: '#F6F6F0',
+    card: '#FFFFFF',
+    cardAlt: '#ECEEE7',
     border: 'rgba(17,18,20,0.07)',
     hairline: 'rgba(17,18,20,0.06)',
     glass: 'rgba(255,255,255,0.82)',
@@ -33,11 +22,11 @@ export const palette = {
     tooltip: '#1E1E22',
     onTooltip: '#FFFFFF',
 
-    ink: '#111214',
-    inkMuted: '#6E7178',
-    inkFaint: '#A5A8B0',
+    ink: '#20251F',
+    inkMuted: '#666D64',
+    inkFaint: '#747B71',
 
-    accent: '#F26E1C',
+    accent: '#466451',
     onAccent: '#FFFFFF',
     pill: '#111214',
     onPill: '#FFFFFF',
@@ -54,38 +43,38 @@ export const palette = {
     neutralSoft: 'rgba(17,18,20,0.06)',
   },
   dark: {
-    hero: '#FF7A2E',
-    heroDeep: '#E8631A',
-    heroSoft: '#FF9558',
+    hero: '#BDCFAC',
+    heroDeep: '#334C40',
+    heroSoft: '#789988',
     heroLine: 'rgba(255,255,255,0.32)',
-    onHero: '#FFFFFF',
-    onHeroMuted: 'rgba(255,255,255,0.72)',
-    accentSoft: 'rgba(255,122,46,0.16)',
+    onHero: '#172018',
+    onHeroMuted: 'rgba(23,32,24,0.8)',
+    accentSoft: 'rgba(189,207,172,0.12)',
 
-    ground: '#000000',
-    card: '#0E0E10',
-    cardAlt: '#18181B',
+    ground: '#080A09',
+    card: '#141715',
+    cardAlt: '#202520',
     border: 'rgba(255,255,255,0.09)',
     hairline: 'rgba(255,255,255,0.07)',
-    glass: 'rgba(14,14,16,0.82)',
+    glass: 'rgba(25,29,25,0.88)',
     glassBorder: 'rgba(255,255,255,0.10)',
     scrim: 'rgba(0,0,0,0.6)',
     tooltip: '#2A2A2F',
     onTooltip: '#FFFFFF',
 
-    ink: '#F4F4F6',
-    inkMuted: '#9A9AA4',
-    inkFaint: '#5B5B64',
+    ink: '#F3F4ED',
+    inkMuted: '#A1AAA0',
+    inkFaint: '#808A80',
 
-    accent: '#FF7A2E',
-    onAccent: '#FFFFFF',
-    pill: '#FFFFFF',
-    onPill: '#000000',
+    accent: '#DCEAAB',
+    onAccent: '#172018',
+    pill: '#E5EDCE',
+    onPill: '#172018',
 
-    info: '#7A9BF5',
-    success: '#3FD68E',
-    warning: '#F0B441',
-    danger: '#F27070',
+    info: '#9CABDE',
+    success: '#A9C8A7',
+    warning: '#E9C78F',
+    danger: '#EB9BA4',
     infoSoft: 'rgba(122,155,245,0.16)',
     successSoft: 'rgba(63,214,142,0.16)',
     warningSoft: 'rgba(240,180,65,0.16)',
@@ -114,11 +103,11 @@ export const softOf: Record<string, ColorName> = {
   hero: 'accentSoft', info: 'infoSoft', success: 'successSoft', warning: 'warningSoft', danger: 'dangerSoft', inkMuted: 'neutralSoft',
 };
 
-export const radius = { xs: 8, sm: 12, md: 14, lg: 20, xl: 24, xxl: 32, pill: 999 } as const;
+export const radius = { xs: 8, sm: 12, md: 16, lg: 24, xl: 28, xxl: 36, pill: 999 } as const;
 
 /** An 8pt rhythm. `screen` is the horizontal page margin, `stack` the gap between cards. */
 export const spacing = {
-  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 40, screen: 24, stack: 20, section: 32,
+  xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24, xxxl: 32, huge: 40, screen: 22, stack: 20, section: 32,
 } as const;
 
 export const fonts = {
@@ -132,22 +121,22 @@ export const fonts = {
 /** Sentence case throughout; weight and size carry the hierarchy, not caps or colour. */
 export const type = {
   /** The one huge number at the top of a metric screen. */
-  hero: { fontSize: 56, lineHeight: 60, fontFamily: fonts.extrabold, letterSpacing: -2.2 },
+  hero: { fontSize: 58, lineHeight: 64, fontFamily: fonts.regular, letterSpacing: -2.8 },
   /** The same idea at list-screen scale. */
-  heroSm: { fontSize: 44, lineHeight: 48, fontFamily: fonts.extrabold, letterSpacing: -1.6 },
+  heroSm: { fontSize: 44, lineHeight: 50, fontFamily: fonts.regular, letterSpacing: -1.8 },
   /** The unit beside it — lighter, smaller, muted. */
   unit: { fontSize: 20, lineHeight: 26, fontFamily: fonts.regular, letterSpacing: -0.3 },
-  display: { fontSize: 36, lineHeight: 42, fontFamily: fonts.extrabold, letterSpacing: -1.2 },
-  h1: { fontSize: 30, lineHeight: 36, fontFamily: fonts.bold, letterSpacing: -0.8 },
-  h2: { fontSize: 24, lineHeight: 30, fontFamily: fonts.bold, letterSpacing: -0.5 },
-  h3: { fontSize: 18, lineHeight: 24, fontFamily: fonts.semibold, letterSpacing: -0.2 },
+  display: { fontSize: 42, lineHeight: 48, fontFamily: fonts.regular, letterSpacing: -1.8 },
+  h1: { fontSize: 32, lineHeight: 39, fontFamily: fonts.medium, letterSpacing: -1.0 },
+  h2: { fontSize: 24, lineHeight: 30, fontFamily: fonts.medium, letterSpacing: -0.5 },
+  h3: { fontSize: 17, lineHeight: 24, fontFamily: fonts.medium, letterSpacing: -0.2 },
   body: { fontSize: 15, lineHeight: 23, fontFamily: fonts.regular },
   bodyStrong: { fontSize: 15, lineHeight: 23, fontFamily: fonts.semibold },
   small: { fontSize: 13, lineHeight: 19, fontFamily: fonts.regular },
   smallStrong: { fontSize: 13, lineHeight: 19, fontFamily: fonts.semibold },
   caption: { fontSize: 12, lineHeight: 16, fontFamily: fonts.medium, letterSpacing: 0.1 },
   mono: { fontSize: 12, lineHeight: 16, fontFamily: fonts.semibold, letterSpacing: 0.2 },
-  stat: { fontSize: 34, lineHeight: 38, fontFamily: fonts.bold, letterSpacing: -1 },
+  stat: { fontSize: 34, lineHeight: 40, fontFamily: fonts.regular, letterSpacing: -1 },
 } as const;
 
 /** Cards sit on the ground by tone and a hairline; shadows are for the few things that float. */
@@ -159,7 +148,7 @@ export const shadow = {
     shadowColor: '#111214', shadowOpacity: 0.14, shadowRadius: 24, shadowOffset: { width: 0, height: 10 }, elevation: 8,
   },
   hero: {
-    shadowColor: '#D95A10', shadowOpacity: 0.2, shadowRadius: 28, shadowOffset: { width: 0, height: 14 }, elevation: 6,
+    shadowColor: '#334C40', shadowOpacity: 0.2, shadowRadius: 28, shadowOffset: { width: 0, height: 14 }, elevation: 6,
   },
 } as const;
 
@@ -173,5 +162,5 @@ export const motion = {
 } as const;
 
 /** Space the floating tab bar needs at the bottom of a scrolling screen. */
-export const TAB_BAR_HEIGHT = 64;
+export const TAB_BAR_HEIGHT = 72;
 export const TAB_BAR_INSET = 24;

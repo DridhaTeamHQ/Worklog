@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Pressable, ScrollView, View, type LayoutChangeEvent } from 'react-native';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
@@ -39,12 +39,17 @@ export function SegmentedTabs<T extends string>({ items, value, onChange, onHero
   const reduced = useReducedMotion();
   const [layouts, setLayouts] = useState<Record<string, { x: number; width: number }>>({});
   const active = layouts[value];
+  const activeX = active?.x;
+  const scroller = useRef<ScrollView>(null);
+  useEffect(() => {
+    if (scroll && activeX !== undefined) scroller.current?.scrollTo({ x: Math.max(0, activeX - 12), animated: !reduced });
+  }, [activeX, scroll, reduced]);
   const symbols = iconic ?? items.every((i) => !!i.icon);
 
   const trackBg = onHero ? 'rgba(255,255,255,0.18)' : t.colors.neutralSoft;
   // On black the card colour would sink into the track; the pill needs to sit above it.
-  const pillBg = onHero ? '#FFFFFF' : t.isDark ? '#2A2A2F' : t.colors.card;
-  const activeFg = onHero ? t.colors.hero : t.colors.ink;
+  const pillBg = onHero ? '#FFFFFF' : t.colors.pill;
+  const activeFg = onHero ? t.colors.heroDeep : t.colors.onPill;
   const idleFg = onHero ? 'rgba(255,255,255,0.85)' : t.colors.inkMuted;
 
   const onLayout = (key: string) => (e: LayoutChangeEvent) => {
@@ -79,6 +84,7 @@ export function SegmentedTabs<T extends string>({ items, value, onChange, onHero
             accessibilityRole="tab"
             accessibilityLabel={item.label}
             accessibilityState={{ selected }}
+            aria-selected={selected}
             style={[
               { paddingHorizontal: scroll ? 16 : 6, height: 36, alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 5 },
               scroll ? null
@@ -105,5 +111,5 @@ export function SegmentedTabs<T extends string>({ items, value, onChange, onHero
   );
 
   if (!scroll) return row;
-  return <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>{row}</ScrollView>;
+  return <ScrollView ref={scroller} horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingRight: 4 }}>{row}</ScrollView>;
 }

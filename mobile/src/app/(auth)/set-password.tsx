@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -51,7 +52,7 @@ export default function SetPassword() {
 
   return (
     <Screen statusBar={t.isDark ? 'light' : 'dark'}>
-      <ScreenHeader title={`Welcome${name ? `, ${name}` : ''}`} subtitle="Choose the password you will sign in with. Nobody else knows it, and nobody else can set it." />
+      <ScreenHeader tone="sage" title={`Welcome${name ? `, ${name}` : ''}`} subtitle="Choose the password you will sign in with. Nobody else knows it, and nobody else can set it." />
       {state === 'invalid' ? (
         <EmptyState
           title="No invitation waiting"
@@ -60,9 +61,11 @@ export default function SetPassword() {
         />
       ) : (
         <View style={{ gap: 16 }}>
-          <TextField label="Email" value={email} editable={false} />
+          <FormSection title="Secure your account">
+<TextField label="Email" value={email} editable={false} />
           <TextField label="New password" icon={KeyRound} value={password} onChangeText={setPassword} password placeholder="At least 8 characters" textContentType="newPassword" />
           <TextField label="Confirm password" icon={KeyRound} value={confirm} onChangeText={setConfirm} password placeholder="Type it again" onSubmitEditing={submit} returnKeyType="go" error={error} />
+          </FormSection>
           <PillButton label="Set password and sign in" size="lg" block onPress={submit} loading={busy || state === 'checking'} haptic="success" />
           <Text variant="small" color="inkFaint" align="center">You will be signed in on this phone straight away.</Text>
         </View>

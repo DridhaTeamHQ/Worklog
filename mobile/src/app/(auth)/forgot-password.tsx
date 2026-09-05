@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -33,7 +34,7 @@ export default function ForgotPassword() {
 
   return (
     <Screen statusBar={t.isDark ? 'light' : 'dark'}>
-      <ScreenHeader title="Forgot password" subtitle="We will email a link that lets you choose a new one. It works for 30 minutes." />
+      <ScreenHeader tone="sage" title="Forgot password" subtitle="We will email a link that lets you choose a new one. It works for 30 minutes." />
       {sent ? (
         <View style={{ gap: 16 }}>
           <EmptyState icon={MailCheck} title="Check your inbox" body={`If ${email.trim()} is an account, a reset link is on its way. Open it on this phone to continue here.`} compact />
@@ -49,7 +50,9 @@ export default function ForgotPassword() {
         </View>
       ) : (
         <View style={{ gap: 16 }}>
-          <TextField label="Work email" icon={Mail} value={email} onChangeText={setEmail} error={error} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="you@company.com" onSubmitEditing={submit} returnKeyType="send" />
+          <FormSection title="Account recovery">
+<TextField label="Work email" icon={Mail} value={email} onChangeText={setEmail} error={error} autoCapitalize="none" keyboardType="email-address" autoComplete="email" placeholder="you@company.com" onSubmitEditing={submit} returnKeyType="send" />
+          </FormSection>
           <PillButton label="Send reset link" size="lg" block onPress={submit} loading={busy} />
         </View>
       )}

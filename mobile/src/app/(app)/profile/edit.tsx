@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -31,14 +32,16 @@ export default function EditProfile() {
 
   return (
     <Screen>
-      <ScreenHeader title="Edit profile" />
+      <ScreenHeader tone="sage" title="Edit profile" />
       <View style={{ gap: 16 }}>
-        <TextField label="Full name" required value={name} onChangeText={setName} error={errors.name} textContentType="name" />
+        <FormSection title="Personal details">
+<TextField label="Full name" required value={name} onChangeText={setName} error={errors.name} textContentType="name" />
         <TextField label="Email" value={user?.email ?? ''} editable={false} hint="Managed by your admin." />
         <TextField label="Job title" value={jobTitle} onChangeText={setJobTitle} error={errors.jobTitle} />
         <TextField label="Department" value={department} onChangeText={setDepartment} error={errors.department} />
         <TextField label="Phone" value={phone} onChangeText={setPhone} keyboardType="phone-pad" textContentType="telephoneNumber" error={errors.phone} />
-        <PillButton label="Save changes" size="lg" block onPress={submit} loading={update.isPending} />
+        </FormSection>
+          <PillButton label="Save changes" size="lg" block onPress={submit} loading={update.isPending} />
         <Text variant="small" color="inkFaint" align="center">Your timezone is set from this phone automatically.</Text>
       </View>
     </Screen>

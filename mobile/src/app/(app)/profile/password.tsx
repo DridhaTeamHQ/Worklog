@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useState } from 'react';
 import { View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -47,12 +48,14 @@ export default function ChangePassword() {
 
   return (
     <Screen>
-      <ScreenHeader title="Change password" />
+      <ScreenHeader tone="sage" title="Change password" />
       <View style={{ gap: 16 }}>
-        <TextField label="Current password" icon={KeyRound} value={current} onChangeText={setCurrent} password textContentType="password" />
+        <FormSection title="Security">
+<TextField label="Current password" icon={KeyRound} value={current} onChangeText={setCurrent} password textContentType="password" />
         <TextField label="New password" icon={KeyRound} value={next} onChangeText={setNext} password placeholder="At least 8 characters" textContentType="newPassword" />
         <TextField label="Confirm new password" icon={KeyRound} value={confirm} onChangeText={setConfirm} password error={error} onSubmitEditing={submit} returnKeyType="go" />
-        <PillButton label="Change password" size="lg" block onPress={submit} loading={busy} haptic="success" />
+        </FormSection>
+          <PillButton label="Change password" size="lg" block onPress={submit} loading={busy} haptic="success" />
         <Text variant="small" color="inkFaint" align="center">Every other phone and browser is signed out. This one stays signed in.</Text>
       </View>
     </Screen>

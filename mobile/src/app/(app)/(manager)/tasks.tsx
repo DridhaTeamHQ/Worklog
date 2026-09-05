@@ -1,3 +1,5 @@
+import { TaskBoard, TaskViewSwitch, type TaskView } from '@/features/TaskBoard';
+import { PageIntro } from '@/components/ScreenHeader';
 import { useEffect, useMemo, useState } from 'react';
 import { FlatList, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -37,11 +39,12 @@ export default function ManagerTasks() {
   const insets = useSafeAreaInsets();
   const bottom = useTabBarInset();
   const barScroll = useAutoHideTabBar();
-  const params = useLocalSearchParams<{ status?: string; projectId?: string; employeeId?: string }>();
+  const params = useLocalSearchParams<{ status?: string; projectId?: string; employeeId?: string; view?: string }>();
 
   const [status, setStatus] = useState<StatusTab>('all');
   const [projectId, setProjectId] = useState<number | null>(null);
   const [search, setSearch] = useState('');
+  const [taskView, setTaskView] = useState<TaskView>('list');
   const [sort, setSort] = useState('created_desc');
   const [employeeId, setEmployeeId] = useState<number | null>(null);
   const [priority, setPriority] = useState<Priority | null>(null);
@@ -55,10 +58,11 @@ export default function ManagerTasks() {
   const labelSheet = useSheet();
 
   useEffect(() => {
+    if (params.view === 'board' || params.view === 'list') setTaskView(params.view);
     if (params.status && STATUS_TABS.some((s) => s.key === params.status)) setStatus(params.status as StatusTab);
     if (params.projectId) setProjectId(Number(params.projectId) || null);
     if (params.employeeId) setEmployeeId(Number(params.employeeId) || null);
-  }, [params.status, params.projectId, params.employeeId]);
+  }, [params.status, params.projectId, params.employeeId, params.view]);
 
   const projects = useProjects(false);
   const team = useTeam();
@@ -83,15 +87,9 @@ export default function ManagerTasks() {
 
   const overdue = (list.data?.items ?? []).filter((x) => x.effective_status === 'overdue').length;
   const header = (
-    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 4 }}>
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View style={{ flex: 1 }}>
-          <Text variant="h1">Tasks</Text>
-          <Text variant="small" color="inkMuted">{list.data ? `${list.data.total} in view${overdue ? ` · ${overdue} overdue` : ''}` : ' '}</Text>
-        </View>
-        <IconPillButton icon={SlidersHorizontal} tone="soft" badge={activeFilters || undefined} onPress={filterSheet.open} accessibilityLabel="Filters" />
-        <IconPillButton icon={Plus} onPress={() => router.push({ pathname: '/tasks/assign', params: projectId ? { projectId: String(projectId) } : {} })} accessibilityLabel="Assign a task" />
-      </View>
+    <View style={{ gap: 12, paddingTop: insets.top + 12, paddingBottom: 16 }}>
+      <PageIntro compact={taskView === 'board'} title="Tasks" tone="sage" eyebrow="KEEP WORK MOVING" subtitle={list.data ? `${list.data.total} in view${overdue ? ` · ${overdue} overdue` : ''}` : ' '} right={<><IconPillButton icon={SlidersHorizontal} tone="glass" badge={activeFilters || undefined} onPress={filterSheet.open} accessibilityLabel="Filters" />
+        <IconPillButton icon={Plus} onPress={() => router.push({ pathname: '/tasks/assign', params: projectId ? { projectId: String(projectId) } : {} })} accessibilityLabel="Assign a task" /></>} />
       {(projects.data?.length ?? 0) > 0 ? (
         <SegmentedTabs
           scroll
@@ -100,8 +98,9 @@ export default function ManagerTasks() {
           onChange={(k) => setProjectId(k === 'all' ? null : Number(k))}
         />
       ) : null}
-      <SegmentedTabs items={STATUS_TABS} value={status} onChange={setStatus} />
+      <SegmentedTabs scroll iconic={false} items={STATUS_TABS} value={status} onChange={setStatus} />
       <SearchField value={search} onChange={setSearch} placeholder="Search tasks, keys, people" loading={list.isFetching && !!search} />
+      <TaskViewSwitch value={taskView} onChange={setTaskView} />
     </View>
   );
 
@@ -110,7 +109,7 @@ export default function ManagerTasks() {
   return (
     <View style={{ flex: 1, backgroundColor: t.colors.ground }}>
       <FlatList
-        data={list.isPending ? [] : list.data?.items ?? []}
+        data={list.isPending || taskView === 'board' ? [] : list.data?.items ?? []}
         keyExtractor={(item) => String(item.id)}
         renderItem={({ item, index }) => (
           <Reveal index={index} style={{ marginBottom: 16 }}>
@@ -118,7 +117,7 @@ export default function ManagerTasks() {
           </Reveal>
         )}
         ListHeaderComponent={header}
-        ListEmptyComponent={list.isPending ? <SkeletonList count={4} /> : list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : empty ? (
+        ListEmptyComponent={taskView === 'board' && !list.isPending && !list.isError && (list.data?.items.length ?? 0) > 0 ? <TaskBoard tasks={list.data!.items} total={list.data!.total} showAssignee /> : list.isPending ? <SkeletonList count={4} /> : list.isError ? <ErrorState error={list.error} onRetry={() => list.refetch()} /> : empty ? (
           <EmptyState icon={ListChecks} title="No projects yet" body="Tasks live inside projects. Create one, then assign the first task." action={{ label: 'New project', onPress: () => router.push('/projects/new') }} />
         ) : (
           <EmptyState icon={ListChecks} title="Nothing here" body={activeFilters || search || status !== 'all' ? 'Try loosening the filters.' : 'Assign the first task with the + button.'} action={activeFilters || search ? { label: 'Clear filters', onPress: () => { clearFilters(); setSearch(''); setStatus('all'); } } : undefined} />

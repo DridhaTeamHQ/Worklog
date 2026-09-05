@@ -1,3 +1,4 @@
+import { FormSection } from '@/components';
 import { useEffect, useState } from 'react';
 import { View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -52,12 +53,14 @@ export default function EditTicket() {
 
   return (
     <Screen>
-      <ScreenHeader title="Edit ticket" subtitle={ticket.data?.ticket_key} />
+      <ScreenHeader tone="clay" title="Edit ticket" subtitle={ticket.data?.ticket_key} />
       {ticket.isPending ? <SkeletonList count={2} /> : ticket.isError ? <ErrorState error={ticket.error} onRetry={() => ticket.refetch()} /> : (
         <View style={{ gap: 16 }}>
-          <TextField label="Summary" required value={title} onChangeText={setTitle} maxLength={160} error={errors.title} />
+          <FormSection title="Issue details">
+<TextField label="Summary" required value={title} onChangeText={setTitle} maxLength={160} error={errors.title} />
           <TextField label="What happened" required value={description} onChangeText={setDescription} multiline maxLength={6000} error={errors.description} style={{ minHeight: 140 }} />
           <SeverityPicker value={severity} onChange={setSeverity} />
+          </FormSection>
           <PillButton label="Save changes" size="lg" block onPress={submit} loading={update.isPending} />
         </View>
       )}

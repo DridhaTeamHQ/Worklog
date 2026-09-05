@@ -4,7 +4,7 @@ import { Spinner } from './Loaders';
 import { MotiView } from 'moti';
 import * as Haptics from 'expo-haptics';
 import type { LucideIcon } from 'lucide-react-native';
-import { useTheme } from '@/theme';
+import { useReducedMotion, useTheme } from '@/theme';
 import { Text } from './Text';
 
 type Variant = 'white' | 'ink' | 'hero' | 'ghost' | 'danger' | 'accent' | 'soft';
@@ -33,6 +33,7 @@ export function PillButton({
   label, onPress, variant = 'ink', size = 'md', icon: Icon, iconRight: IconRight, loading, disabled, block, haptic = 'light', style,
 }: PillButtonProps) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const c = t.colors;
   const looks: Record<Variant, { bg: string; fg: string; border?: string }> = {
     // Literal white: this variant sits on the blue hero, which is blue in both themes.
@@ -58,11 +59,11 @@ export function PillButton({
   };
 
   return (
-    <Pressable onPress={fire} disabled={disabled || loading} accessibilityRole="button" style={block ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }}>
+    <Pressable onPress={fire} disabled={disabled || loading} accessibilityRole="button" accessibilityLabel={label} accessibilityState={{ disabled: !!disabled || !!loading, busy: !!loading }} style={block ? { alignSelf: 'stretch' } : { alignSelf: 'flex-start' }}>
       {({ pressed }) => (
         <MotiView
-          animate={{ scale: pressed ? t.motion.pressScale : 1, opacity: disabled ? 0.5 : 1 }}
-          transition={{ type: 'spring', ...t.motion.spring }}
+          animate={{ scale: pressed && !reduced ? t.motion.pressScale : 1, opacity: disabled ? 0.5 : 1 }}
+          transition={reduced ? { type: 'timing', duration: 0 } : { type: 'spring', ...t.motion.spring }}
           style={[
             {
               height: heights[size],
@@ -110,12 +111,13 @@ export function IconPillButton({
   icon: Icon, onPress, size = 44, tone = 'ink', badge, disabled, accessibilityLabel, style,
 }: IconPillButtonProps) {
   const t = useTheme();
+  const reduced = useReducedMotion();
   const c = t.colors;
   const looks = {
     ink: { bg: c.pill, fg: c.onPill, border: 'transparent' },
     white: { bg: c.card, fg: c.ink, border: t.isDark ? c.border : 'transparent' },
     hero: { bg: c.hero, fg: c.onHero, border: 'transparent' },
-    glass: { bg: 'rgba(255,255,255,0.18)', fg: c.onHero, border: 'rgba(255,255,255,0.35)' },
+    glass: { bg: 'rgba(255,255,255,0.12)', fg: '#FFFFFF', border: 'rgba(255,255,255,0.24)' },
     soft: { bg: c.neutralSoft, fg: c.ink, border: 'transparent' },
     accent: { bg: c.accent, fg: c.onAccent, border: 'transparent' },
     danger: { bg: c.dangerSoft, fg: c.danger, border: 'transparent' },
@@ -133,8 +135,8 @@ export function IconPillButton({
     >
       {({ pressed }) => (
         <MotiView
-          animate={{ scale: pressed ? 0.92 : 1, opacity: disabled ? 0.5 : 1 }}
-          transition={{ type: 'spring', ...t.motion.spring }}
+          animate={{ scale: pressed && !reduced ? 0.94 : 1, opacity: disabled ? 0.5 : 1 }}
+          transition={reduced ? { type: 'timing', duration: 0 } : { type: 'spring', ...t.motion.spring }}
           style={[
             {
               width: size, height: size, borderRadius: size / 2,
@@ -153,7 +155,7 @@ export function IconPillButton({
               borderWidth: 2, borderColor: tone === 'glass' ? c.hero : c.ground,
             }}
             >
-              <Text variant="caption" color="#FFFFFF" style={{ letterSpacing: 0 }}>{badge > 99 ? '99+' : badge}</Text>
+              <Text variant="caption" color={t.isDark ? t.colors.onAccent : '#FFFFFF'} style={{ letterSpacing: 0 }}>{badge > 99 ? '99+' : badge}</Text>
             </View>
           ) : null}
         </MotiView>

@@ -29,10 +29,10 @@ const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 /**
  * Resolves the user's choice (system / light / dark) against the OS, and hands every
- * component the same token object. The choice persists per device; "system" is the
- * default, so the app follows the phone until somebody says otherwise.
+ * component the same token object. The choice persists per device; dark is the
+ * default. Existing saved preferences, including system, always take precedence.
  */
-export function ThemeProvider({ children, initialMode = 'system' }: { children: ReactNode; initialMode?: ThemeMode }) {
+export function ThemeProvider({ children, initialMode = 'dark' }: { children: ReactNode; initialMode?: ThemeMode }) {
   const system = useColorScheme();
   const [mode, setModeState] = useState<ThemeMode>(initialMode);
 
