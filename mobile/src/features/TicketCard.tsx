@@ -1,6 +1,6 @@
 import { View } from 'react-native';
 import { useTheme } from '@/theme';
-import { relativeTime } from '@/lib/format';
+import { formatDateShort, relativeTime } from '@/lib/format';
 import type { Ticket } from '@/types';
 import { Avatar, BentoCard, KeyChip, SeverityChip, Text, TicketStatusChip } from '@/components';
 
@@ -14,6 +14,7 @@ export function TicketCard({ ticket, onPress, showReporter }: Props) {
   const t = useTheme();
   const severity = { low: 1, medium: 2, high: 3, critical: 4 }[ticket.severity];
   const severityColor = t.tone('severity', ticket.severity).color;
+  const done = ticket.status === 'resolved' || ticket.status === 'closed';
   return (
     <BentoCard onPress={onPress} accessibilityLabel={`${ticket.ticket_key}: ${ticket.title}. ${ticket.severity} severity, ${ticket.status.replace('_', ' ')}.`}>
       <View style={{ gap: 14 }}>
@@ -29,14 +30,19 @@ export function TicketCard({ ticket, onPress, showReporter }: Props) {
         <Text variant="small" color="inkMuted" numberOfLines={2}>
           {ticket.task_key ? `${ticket.task_key} · ` : ''}{ticket.task_title || ticket.project_name}
         </Text>
-        <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8, marginTop: 2, paddingTop: 12, borderTopWidth: 1, borderTopColor: t.colors.hairline }}>
-          <TicketStatusChip status={ticket.status} size="sm" />
-          <Text variant="caption" color="inkFaint">{relativeTime(ticket.created_at)}</Text>
-          <View style={{ flex: 1 }} />
+        <View style={{ gap: 10, marginTop: 2, paddingTop: 12, borderTopWidth: 1, borderTopColor: t.colors.hairline }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+            <TicketStatusChip status={ticket.status} size="sm" />
+            <Text variant="caption" color={done ? 'success' : 'inkFaint'}>
+              {done && ticket.resolved_at ? `Closed ${formatDateShort(ticket.resolved_at)}` : `Raised ${relativeTime(ticket.created_at)}`}
+            </Text>
+          </View>
           {showReporter ? (
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
-              <Text variant="small" color="inkMuted" numberOfLines={1} style={{ maxWidth: 120 }}>{ticket.reporter_name.split(' ')[0]}</Text>
+              <Text variant="small" color="inkMuted" numberOfLines={1} style={{ flex: 1 }}>
+                Raised by {ticket.reporter_name} · {formatDateShort(ticket.created_at)}
+              </Text>
             </View>
           ) : null}
         </View>

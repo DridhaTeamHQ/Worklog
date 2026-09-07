@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from 'react';
-import { authApi } from '../api/endpoints';
+import { authApi, profileApi } from '../api/endpoints';
 import { onUnauthorized, tokenStore } from '../api/client';
 import type { User } from '../types';
 
@@ -55,6 +55,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const unsubscribe = onUnauthorized(() => setUser(null));
     return () => { unsubscribe(); };
   }, []);
+
+  /**
+   * Records the browser's timezone on the profile the first time it is missing. It is
+   * what "today" means on the server for this person's daily report and to-dos; the
+   * mobile app sends its own on every request, so this only matters for web-only users.
+   */
+  useEffect(() => {
+    if (!user || user.timezone) return;
+    let zone: string | undefined;
+    try { zone = Intl.DateTimeFormat().resolvedOptions().timeZone; } catch { zone = undefined; }
+    if (!zone) return;
+    void profileApi.update({ timezone: zone })
+      .then(({ data }) => setUser(data))
+      .catch(() => { /* cosmetic — the next sign-in tries again */ });
+  }, [user]);
 
   const login = useCallback(async (email: string, password: string) => {
     const { data } = await authApi.login(email, password);

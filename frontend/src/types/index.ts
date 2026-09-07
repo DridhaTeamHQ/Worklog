@@ -33,6 +33,8 @@ export interface User {
   job_title: string | null;
   phone: string | null;
   profile_image: string | null;
+  /** IANA zone, e.g. "Asia/Kolkata" — what "today" means for this person's report. */
+  timezone: string | null;
   is_active: boolean;
   created_at: string;
   updated_at: string;
@@ -112,6 +114,66 @@ export interface Task {
   employee_profile_image: string | null;
   manager_name: string;
   manager_profile_image: string | null;
+  /** Colour tags that cut across projects. */
+  labels: Label[];
+  /** Sub-steps: how many exist and how many are ticked. */
+  checklist_total: number;
+  checklist_done: number;
+  comment_count: number;
+}
+
+export interface Label {
+  id: number;
+  name: string;
+  /** Hex colour, e.g. "#5b7fe8". */
+  color: string;
+  created_at?: string;
+  task_count?: number;
+}
+
+export interface ChecklistItem {
+  id: number;
+  task_id: number;
+  title: string;
+  is_done: boolean;
+  done_at: string | null;
+  position: number;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type ActivityKind =
+  | 'comment' | 'status_changed' | 'field_changed' | 'assigned' | 'checklist' | 'attachment'
+  | 'report_linked' | 'labels_changed' | 'ticket_raised';
+
+/** One row of a task's or ticket's thread: a comment, or a change the system recorded. */
+export interface ActivityEntry {
+  id: number;
+  task_id: number | null;
+  ticket_id: number | null;
+  actor_id: number | null;
+  kind: ActivityKind;
+  body: string | null;
+  /** Small JSON object describing the change, e.g. { from: 'pending', to: 'in_progress' }. */
+  meta: Record<string, unknown> | null;
+  edited_at: string | null;
+  created_at: string;
+  actor_name: string | null;
+  actor_role: Role | null;
+  actor_profile_image: string | null;
+}
+
+/** One line of a daily report, optionally tied to a task and timed. */
+export interface ReportItem {
+  id: number;
+  task_id: number | null;
+  text: string;
+  minutes: number | null;
+  position: number;
+  task_key: string | null;
+  task_title: string | null;
+  task_status: TaskStatus | null;
 }
 
 export interface DailyReport {
@@ -124,6 +186,8 @@ export interface DailyReport {
   employee_name: string;
   employee_email: string;
   employee_department: string | null;
+  items: ReportItem[];
+  total_minutes: number;
 }
 
 export type TicketSeverity = 'low' | 'medium' | 'high' | 'critical';
@@ -194,7 +258,9 @@ export interface TicketCounts {
 
 export type NotificationType =
   | 'task_assigned' | 'task_updated' | 'status_changed' | 'report_submitted'
-  | 'ticket_raised' | 'ticket_updated' | 'general';
+  | 'ticket_raised' | 'ticket_updated' | 'general'
+  | 'task_commented' | 'ticket_commented' | 'mentioned'
+  | 'due_tomorrow' | 'overdue' | 'report_missing' | 'team_overdue_digest';
 
 export interface AppNotification {
   id: number;
@@ -203,6 +269,8 @@ export interface AppNotification {
   type: NotificationType;
   related_task_id: number | null;
   related_ticket_id: number | null;
+  /** The person it is about — who submitted the report, who mentioned you. */
+  related_user_id: number | null;
   task_title: string | null;
   task_employee_id: number | null;
   is_read: boolean;

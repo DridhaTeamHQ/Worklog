@@ -16,6 +16,13 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   ticket_raised: 'Ticket raised',
   ticket_updated: 'Ticket updated',
   general: 'General',
+  task_commented: 'Comment',
+  ticket_commented: 'Comment',
+  mentioned: 'Mentioned you',
+  due_tomorrow: 'Due tomorrow',
+  overdue: 'Overdue',
+  report_missing: 'Report missing',
+  team_overdue_digest: 'Team overdue',
 };
 
 /** Shared by both portals — the payload is already scoped to the signed-in user. */

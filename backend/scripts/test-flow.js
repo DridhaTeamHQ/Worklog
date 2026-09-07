@@ -1477,7 +1477,10 @@ async function run() {
     const empReminders2 = await api('/notifications?limit=100', { token: empToken });
     check('running the job again does not repeat it', ranAgain.status === 200 && empReminders2.data?.filter((n) => n.type === 'overdue' && n.related_task_id === overdueId).length === 1);
     const mgrDigest = await api('/notifications?limit=100', { token: managerToken });
-    check('the manager gets one overdue digest', mgrDigest.data?.filter((n) => n.type === 'team_overdue_digest').length === 1, mgrDigest.data?.filter((n) => n.type === 'team_overdue_digest'));
+    // One per day, not one ever: a database the suite has run against before already
+    // holds yesterday's digest, and counting those would fail an honest dedupe.
+    const digestsToday = mgrDigest.data?.filter((n) => n.type === 'team_overdue_digest' && n.created_at.slice(0, 10) === new Date().toISOString().slice(0, 10)) || [];
+    check('the manager gets one overdue digest today', digestsToday.length === 1, digestsToday);
     const reportsRun = await api('/jobs/tick?force=reports', { headers: { Authorization: `Bearer ${cronSecret}` } });
     const empMissing = await api('/notifications?limit=100', { token: empToken });
     check('someone who filed today is not nagged', reportsRun.status === 200 && !empMissing.data?.some((n) => n.type === 'report_missing'), empMissing.data?.filter((n) => n.type === 'report_missing'));

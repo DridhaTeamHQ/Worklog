@@ -268,6 +268,6 @@ export const todoApi = {
 
 export const profileApi = {
   get: () => api.get<User>('/profile'),
-  update: (patch: Partial<Pick<User, 'name' | 'department' | 'phone'>> & { jobTitle?: string | null }) =>
+  update: (patch: Partial<Pick<User, 'name' | 'department' | 'phone' | 'timezone'>> & { jobTitle?: string | null }) =>
     api.patch<User>('/profile', patch),
 };

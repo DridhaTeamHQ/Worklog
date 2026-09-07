@@ -10,11 +10,7 @@ interface TabBarState {
 /** Whether the floating tab bar is tucked away because the user is scrolling down. */
 export const useTabBarStore = create<TabBarState>((set) => ({
   hidden: false,
-  setHidden: (hidden) => set((s) => {
-    if (s.hidden === hidden) return s;
-    if (__DEV__) console.log('[tabbar]', hidden ? 'hide' : 'show');
-    return { hidden };
-  }),
+  setHidden: (hidden) => set((s) => (s.hidden === hidden ? s : { hidden })),
 }));
 
 /**

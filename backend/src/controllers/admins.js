@@ -9,7 +9,7 @@ import { asyncHandler, forbidden, badRequest } from '../utils/errors.js';
 import { ROLES, grantableRoles, roleLabel, isAdmin } from '../utils/roles.js';
 import {
   listManagers, createUser, deleteManagerAccount, countAdmins, countActiveAdmins,
-  setManagerAccess,
+  setManagerAccess, setUserRole, findById,
 } from '../models/user.js';
 import { sendInviteEmail } from '../services/mail.js';
 
@@ -109,6 +109,46 @@ export const remove = asyncHandler(async (req, res) => {
  * cannot block yourself, and the last admin who can still sign in cannot be blocked,
  * because a blocked admin cannot lift their own block and nobody else could.
  */
+/**
+ * PATCH /api/admins/:id/role — move an account between tiers.
+ *
+ * Lives on this router rather than /team because it is administration: who holds which
+ * access is exactly what this section is for, and the target may be at any tier.
+ *
+ * Three refusals, in the order they can bite. You cannot change your own role, because
+ * the only mistake that cannot be undone from inside the app is demoting yourself. You
+ * cannot demote the last admin who can sign in, for the reason blocking them is
+ * refused. And a demotion to team member must carry a department and job title, which
+ * the roster groups by — the model enforces that one.
+ */
+export const setRole = asyncHandler(async (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) throw badRequest('Invalid account id.');
+
+  const { role, department, jobTitle } = req.body;
+  if (!grantableRoles(req.user.role).includes(role)) {
+    throw forbidden('Only an admin can change what access somebody holds.');
+  }
+  if (targetId === req.user.id) {
+    throw forbidden('You cannot change your own access. Ask another admin to do it.');
+  }
+
+  const target = await findById(targetId);
+  if (!target) throw badRequest('That account could not be found.');
+
+  // Counted before the change, or the answer would always be "enough".
+  if (isAdmin(target.role) && role !== ROLES.ADMIN && target.is_active && await countActiveAdmins() <= 1) {
+    throw forbidden('This is the only admin who can sign in. Grant admin access to someone else first.');
+  }
+
+  const { user, changed, from } = await setUserRole(targetId, role, { department, jobTitle });
+  return ok(res, user, {
+    message: changed
+      ? `${user.name} is now ${roleLabel(role).toLowerCase()}, was ${roleLabel(from).toLowerCase()}. They will be asked to sign in again.`
+      : `${user.name} already had ${roleLabel(role).toLowerCase()} access.`,
+  });
+});
+
 export const setAccess = asyncHandler(async (req, res) => {
   const targetId = Number(req.params.id);
   if (!Number.isInteger(targetId) || targetId <= 0) throw badRequest('Invalid account id.');

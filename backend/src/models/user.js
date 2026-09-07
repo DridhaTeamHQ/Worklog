@@ -2,7 +2,7 @@ import bcrypt from 'bcryptjs';
 import { getDb } from '../db/index.js';
 import config from '../config/env.js';
 import { nowIso, todayIn, DEFAULT_TIMEZONE } from '../utils/dates.js';
-import { conflict, notFound } from '../utils/errors.js';
+import { conflict, notFound, badRequest } from '../utils/errors.js';
 import { taskCountsByEmployee } from './task.js';
 import { MANAGER_ROLES } from '../utils/roles.js';
 
@@ -438,6 +438,40 @@ export async function setManagerAccess(accountId, isActive) {
     [isActive ? 1 : 0, nowIso(), accountId],
   );
   return findById(accountId);
+}
+
+/**
+ * Move an account to a different tier.
+ *
+ * Unlike every other write in this file it is not scoped to one role, because moving
+ * someone between tiers is the whole point. The caller owns the policy — who may do
+ * it, and whether the last admin is about to disappear; this function owns the data.
+ *
+ * Two things travel with the role. Department and job title are required of team
+ * members and optional above, so a demotion carries them in rather than leaving a hole
+ * in the roster. And the session version is bumped: the role sits in the person's JWT
+ * and in the portal their app has already routed them to, so the honest outcome of a
+ * tier change is that they sign in again and land in the right place.
+ */
+export async function setUserRole(userId, role, { department, jobTitle } = {}) {
+  const db = await getDb();
+  const existing = await db.get('SELECT id, role, department, job_title FROM users WHERE id = ?', [userId]);
+  if (!existing) throw notFound('That account could not be found.');
+  if (existing.role === role) return { user: await findById(userId), changed: false };
+
+  const nextDepartment = department ?? existing.department;
+  const nextJobTitle = jobTitle ?? existing.job_title;
+  if (role === 'team_member' && (!nextDepartment || !nextJobTitle)) {
+    throw badRequest('A team member needs a department and a job title. Send both with the role.');
+  }
+
+  await db.run(
+    `UPDATE users
+       SET role = ?, department = ?, job_title = ?, session_version = session_version + 1, updated_at = ?
+     WHERE id = ?`,
+    [role, nextDepartment ?? null, nextJobTitle ?? null, nowIso(), userId],
+  );
+  return { user: await findById(userId), changed: true, from: existing.role };
 }
 
 export async function getTeamMember(employeeId) {

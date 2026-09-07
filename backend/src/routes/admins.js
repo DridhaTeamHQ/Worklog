@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { ROLES } from '../utils/roles.js';
-import { list, create, remove, setAccess } from '../controllers/admins.js';
+import { list, create, remove, setAccess, setRole } from '../controllers/admins.js';
 
 const router = Router();
 
@@ -29,11 +29,24 @@ const createSchema = z.object({
 
 const accessSchema = z.object({ isActive: z.boolean() });
 
+/*
+ * Department and job title ride along because a team member is required to have both,
+ * and the account being demoted may be a manager who never needed one. Sending them is
+ * only necessary when the target lacks them; the model says so if they are missing.
+ */
+const roleSchema = z.object({
+  role: z.enum([ROLES.ADMIN, ROLES.MANAGER, ROLES.TEAM_MEMBER]),
+  department: optionalText(120),
+  jobTitle: optionalText(120),
+});
+
 router.get('/', validate(listQuery, 'query'), list);
 router.post('/', validate(createSchema), create);
 // Blocking is separate from DELETE on purpose: it is reversible and touches nothing
 // but the sign-in, where delete closes the account and moves its work elsewhere.
 router.patch('/:id', validate(accessSchema), setAccess);
+// Moving between tiers, rather than switching one tier's access off.
+router.patch('/:id/role', validate(roleSchema), setRole);
 router.delete('/:id', remove);
 
 export default router;

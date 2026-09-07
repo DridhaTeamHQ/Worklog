@@ -43,6 +43,7 @@ export default function AppLayout() {
       <Stack.Screen name="tasks/[id]/edit" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
       <Stack.Screen name="tickets/new" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
       <Stack.Screen name="tickets/[id]/edit" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
+      <Stack.Screen name="team/new" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
       <Stack.Screen name="projects/new" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />
       <Stack.Screen name="projects/[id]" />
       <Stack.Screen name="projects/edit/[id]" options={{ presentation: 'modal', animation: reduced ? 'none' : 'slide_from_bottom' }} />

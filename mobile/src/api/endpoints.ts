@@ -3,7 +3,7 @@ import { api } from './client';
 import type {
   ActivityEntry, AnalyticsPayload, AppNotification, ChecklistItem, DailyReport, DashboardRange,
   EmployeeDashboard, Label, ManagerDashboard, Manager, PersonalTodo, Priority, Project, Task,
-  TaskStatus, TeamMember, TeamMemberDetail, Ticket, TicketCounts, TicketSeverity, TicketStatus, User,
+  Role, TaskStatus, TeamMember, TeamMemberDetail, Ticket, TicketCounts, TicketSeverity, TicketStatus, User,
 } from '@/types';
 
 /* --------------------------------------------------------------------- auth */
@@ -202,11 +202,28 @@ export const teamApi = {
   reports: (id: number, params: ReportFilters = {}, signal?: AbortSignal) =>
     api.get<DailyReport[]>(`/team/${id}/reports`, params as Record<string, string | number | undefined>, signal),
   tasks: (id: number, signal?: AbortSignal) => api.get<Task[]>(`/team/${id}/tasks`, undefined, signal),
+  /** Admin-only. No password: the person sets their own from the invite. */
+  create: (input: { name: string; email: string; department: string; jobTitle: string; phone?: string }) =>
+    api.post<{
+      employee: User;
+      email: { delivered: boolean; mode: string; error?: string };
+      message: string;
+    }>('/team', input),
 };
 
 export const adminApi = {
   list: (params: { search?: string } = {}, signal?: AbortSignal) =>
     api.get<Manager[]>('/admins', params, signal),
+  /** Admin-only. Moves any account between tiers; department/job title ride along for a demotion. */
+  setRole: (id: number, input: { role: Role; department?: string; jobTitle?: string }) =>
+    api.patch<User>(`/admins/${id}/role`, input),
+  /** Admin-only. Grants manager or admin access; the invite sets the password. */
+  create: (input: { name: string; email: string; role: 'manager' | 'admin'; department?: string; jobTitle?: string; phone?: string }) =>
+    api.post<{
+      admin: User;
+      email: { delivered: boolean; mode: string; error?: string };
+      message: string;
+    }>('/admins', input),
 };
 
 /* ----------------------------------------------------------------- projects */
