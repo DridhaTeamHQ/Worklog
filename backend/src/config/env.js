@@ -1,10 +1,29 @@
-import 'dotenv/config';
+import dotenv from 'dotenv';
 import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const backendRoot = path.resolve(__dirname, '..', '..');
+
+/*
+ * Load .env from a path this file computes, not from the current directory.
+ *
+ * `import 'dotenv/config'` reads `.env` relative to `process.cwd()`, and the cwd
+ * depends entirely on how the app was started: `npm run dev` from the repo root runs
+ * the backend with the ROOT as its cwd (npm --prefix does not move it), while
+ * `cd backend && npm run dev` leaves it in backend/. The same .env file therefore
+ * worked or was silently ignored depending on which command someone typed — and when
+ * it is ignored the app does not fail, it quietly falls back to an empty SQLite
+ * database and refuses every login as an unknown address. That failure looks like a
+ * broken account rather than a missing config, which is what makes it expensive.
+ *
+ * Both locations are read, backend/ first. dotenv never overwrites a variable that is
+ * already set, so backend/.env wins where the two overlap and a real environment
+ * variable still beats both — which is what a container or CI needs.
+ */
+dotenv.config({ path: path.join(backendRoot, '.env') });
+dotenv.config({ path: path.join(backendRoot, '..', '.env') });
 
 const bool = (v, fallback = false) =>
   v === undefined ? fallback : ['1', 'true', 'yes', 'on'].includes(String(v).toLowerCase());
