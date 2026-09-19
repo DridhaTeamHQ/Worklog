@@ -205,11 +205,23 @@ data access lives in services, so authorization rules are stated once each.
 
 ### Everyone — chat
 
-A launcher sits in the bottom-right corner of every signed-in screen, with a badge for
-unread messages. It opens onto the company directory: everyone active, conversations
-that have history first and the rest alphabetically behind them. Picking a person opens
-the thread — Enter sends, Shift+Enter starts a new line, and a message you sent shows
+**Chat** is a section in the sidebar, like every other one, and the link carries a
+badge for unread messages. The page is two panes: rooms and people on the left, the
+open conversation on the right. Below `lg` there is only room for one, so the list
+gives way to the conversation and a back arrow returns to it.
+
+The list is the company directory — everyone active, with conversations that have
+history first and the rest alphabetically behind them. Picking a person opens the
+thread: Enter sends, Shift+Enter starts a new line, and a message you sent shows
 "Read" once the other person has opened it.
+
+**Search** looks in two places at once. The one box narrows the list of people and
+rooms *and* searches the text of messages across every room you can see — your own
+threads, the team channel, and groups you are in. Each store applies its own scope on
+the server, so a result can never name a room you are not allowed to open. Following
+a result loads the conversation **at** that message rather than at the bottom, and
+marks it, because finding it in the results and then having to find it again in the
+conversation is two searches for one question.
 
 **This is the one feature that is not split by role.** A team member, a manager and an
 admin reach the same directory and the same endpoints. The department confinement that
@@ -525,7 +537,7 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `GET` | `/team/:id/tasks` | manager | That employee's tasks |
 | `GET` | `/chat/contacts` | any | Everyone messageable, with each thread's preview and unread count |
 | `GET` | `/chat/unread-count` | any | Badge count, plus a per-thread breakdown |
-| `GET` | `/chat/:userId/messages` | any | One conversation; `after` fetches only what is new |
+| `GET` | `/chat/:userId/messages` | any | One conversation; `after` fetches what is new, `before` opens it at a message |
 | `POST` | `/chat/:userId/messages` | any | Send a direct message |
 | `PATCH` | `/chat/:userId/read` | any | Mark a conversation read |
 | `GET` | `/chat/team/messages` | any | The team channel; `after` fetches only what is new |
@@ -537,6 +549,7 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `GET` | `/chat/groups/:id/messages` | member | One group's messages |
 | `POST` | `/chat/groups/:id/messages` | member | Post to a group |
 | `PATCH` | `/chat/groups/:id/read` | member | Mark a group read |
+| `GET` | `/chat/search` | any | Search message text across every room you can see |
 
 ---
 

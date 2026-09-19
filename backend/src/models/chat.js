@@ -19,6 +19,7 @@
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
 import { badRequest, notFound } from '../utils/errors.js';
+import { escapeLike } from '../utils/http.js';
 
 /** Fields of the other person that the chat UI shows. Never the password hash. */
 const PARTNER_COLUMNS = 'u.id, u.name, u.email, u.role, u.department, u.job_title, u.profile_image';
@@ -141,10 +142,27 @@ export async function findPartner(userId, partnerId) {
  * the whole history each time. Without it the newest `limit` messages are returned,
  * which is what opening a thread wants.
  */
-export async function listConversation(userId, partnerId, { limit = 100, afterId = 0 } = {}) {
+export async function listConversation(userId, partnerId, { limit = 100, afterId = 0, beforeId = 0 } = {}) {
   const db = await getDb();
   const pair = `((m.sender_id = ? AND m.recipient_id = ?) OR (m.sender_id = ? AND m.recipient_id = ?))`;
   const params = [userId, partnerId, partnerId, userId];
+
+  /*
+   * Opening the thread at a particular message, which is how a search result is
+   * followed. Inclusive, so the message being looked for is the last one on screen
+   * rather than just above the fold.
+   */
+  if (beforeId > 0) {
+    const rows = await db.query(
+      `SELECT m.id, m.sender_id, m.recipient_id, m.body, m.read_at, m.created_at
+         FROM chat_messages m
+        WHERE ${pair} AND m.id <= ?
+        ORDER BY m.id DESC
+        LIMIT ?`,
+      [...params, beforeId, limit],
+    );
+    return rows.reverse().map(toMessage);
+  }
 
   if (afterId > 0) {
     const rows = await db.query(
@@ -201,6 +219,59 @@ export async function markConversationRead(userId, partnerId) {
     [nowIso(), userId, partnerId],
   );
   return res.changes;
+}
+
+
+/*
+ * Message search.
+ *
+ * `LIKE` over the body rather than a full-text index: both drivers would spell that
+ * differently (tsvector on postgres, FTS5 on sqlite), and this app's whole data layer
+ * is written once to run on both. At the volumes an internal team produces this is a
+ * scan of a small table, and the alternative is two divergent implementations of the
+ * same feature.
+ *
+ * The term is bound as a parameter like every other value here; the wildcards are
+ * added around it, and LIKE metacharacters inside it are escaped so a search for
+ * "100%" does not match everything.
+ */
+export async function searchDirect(userId, term, limit = 30) {
+  const db = await getDb();
+  const needle = `%${escapeLike(term.toLowerCase())}%`;
+  const rows = await db.query(
+    `SELECT m.id, m.body, m.created_at, m.sender_id, m.recipient_id,
+            s.name AS sender_name, s.profile_image AS sender_profile_image,
+            CASE WHEN m.sender_id = ? THEN m.recipient_id ELSE m.sender_id END AS partner_id
+       FROM chat_messages m
+       JOIN users s ON s.id = m.sender_id
+      WHERE (m.sender_id = ? OR m.recipient_id = ?)
+        AND LOWER(m.body) LIKE ? ESCAPE '\\'
+      ORDER BY m.id DESC
+      LIMIT ?`,
+    [userId, userId, userId, needle, limit],
+  );
+
+  // The partner's name has to come from whichever side of the row they are on, so it
+  // is resolved here rather than with a second JOIN whose ON clause repeats the CASE.
+  const ids = [...new Set(rows.map((r) => Number(r.partner_id)))];
+  if (!ids.length) return [];
+  const people = await db.query(
+    `SELECT id, name FROM users WHERE id IN (${ids.map(() => '?').join(', ')})`,
+    ids,
+  );
+  const nameById = new Map(people.map((p) => [Number(p.id), p.name]));
+
+  return rows.map((r) => ({
+    kind: 'dm',
+    message_id: Number(r.id),
+    body: r.body,
+    created_at: r.created_at,
+    sender_id: Number(r.sender_id),
+    sender_name: r.sender_name,
+    sender_profile_image: r.sender_profile_image,
+    partner_id: Number(r.partner_id),
+    room_name: nameById.get(Number(r.partner_id)) || 'Unknown',
+  }));
 }
 
 /** Total unread across every thread — the number on the chat launcher. */

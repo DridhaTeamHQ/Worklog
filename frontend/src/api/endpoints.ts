@@ -1,6 +1,7 @@
 import { api } from './client';
 import type {
-  AnalyticsPayload, AppNotification, ChatContact, ChatGroup, ChatMessage, ChatUnread, DailyReport,
+  AnalyticsPayload, AppNotification, ChatContact, ChatGroup, ChatMessage, ChatSearchHit, ChatUnread,
+  DailyReport,
   DashboardRange, GroupMessage,
   EmployeeDashboard, ManagerDashboard,
   Manager, PersonalTodo, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail,
@@ -278,6 +279,14 @@ export const todoApi = {
  * "from" id, so there is nothing to spoof.
  */
 export const chatApi = {
+  /**
+   * Searches the text of messages across every room the caller can see — their own
+   * threads, the team channel, and groups they are in. The scope is applied per store
+   * on the server, so there is no parameter here that could widen it.
+   */
+  search: (q: string, signal?: AbortSignal) =>
+    api.get<ChatSearchHit[]>('/chat/search', { q }, signal),
+
   /** Everyone messageable, newest thread first, each with its preview and badge. */
   contacts: (search?: string, signal?: AbortSignal) =>
     api.get<ChatContact[]>('/chat/contacts', { search }, signal),
@@ -296,10 +305,11 @@ export const chatApi = {
    */
   messages: (
     userId: number,
-    params: { after?: number; limit?: number; markRead?: boolean } = {},
+    params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
     signal?: AbortSignal,
   ) => api.get<ChatMessage[]>(`/chat/${userId}/messages`, {
     after: params.after,
+    before: params.before,
     limit: params.limit,
     markRead: params.markRead === false ? 'false' : undefined,
   }, signal),
@@ -331,10 +341,11 @@ export const chatApi = {
 
     messages: (
       groupId: number,
-      params: { after?: number; limit?: number; markRead?: boolean } = {},
+      params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
       signal?: AbortSignal,
     ) => api.get<GroupMessage[]>(`/chat/groups/${groupId}/messages`, {
       after: params.after,
+      before: params.before,
       limit: params.limit,
       markRead: params.markRead === false ? 'false' : undefined,
     }, signal),
@@ -348,10 +359,11 @@ export const chatApi = {
 
   team: {
     messages: (
-      params: { after?: number; limit?: number; markRead?: boolean } = {},
+      params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
       signal?: AbortSignal,
     ) => api.get<TeamMessage[]>('/chat/team/messages', {
       after: params.after,
+      before: params.before,
       limit: params.limit,
       markRead: params.markRead === false ? 'false' : undefined,
     }, signal),

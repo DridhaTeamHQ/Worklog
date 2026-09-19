@@ -1,6 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes, Link } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { NotificationProvider } from './context/NotificationContext';
+import { ChatProvider } from './context/ChatContext';
 import { ToastProvider } from './components/Toast';
 import { AppLayout } from './components/AppLayout';
 import { RequireAuth, RequireRole, RedirectIfAuthed, homeFor } from './components/RouteGuards';
@@ -11,6 +12,7 @@ import { SetPasswordPage } from './pages/auth/SetPasswordPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { MyDayPage } from './pages/MyDayPage';
+import { ChatPage } from './pages/ChatPage';
 
 import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { TasksDonePage } from './pages/employee/TasksDonePage';
@@ -33,6 +35,7 @@ export default function App() {
       <AuthProvider>
         <ToastProvider>
           <NotificationProvider>
+            <ChatProvider>
             <Routes>
               <Route path="/login" element={<RedirectIfAuthed><LoginPage /></RedirectIfAuthed>} />
               <Route path="/forgot-password" element={<RedirectIfAuthed><ForgotPasswordPage /></RedirectIfAuthed>} />
@@ -52,6 +55,7 @@ export default function App() {
                     <Route path="/manager/reports" element={<TaskReportsPage />} />
                     <Route path="/manager/tickets" element={<ManagerTicketsPage />} />
                     <Route path="/manager/analytics" element={<AnalyticsPage />} />
+                    <Route path="/manager/chat" element={<ChatPage />} />
                     <Route path="/manager/notifications" element={<NotificationsPage />} />
                     <Route path="/manager/profile" element={<ProfilePage />} />
                   </Route>
@@ -63,6 +67,7 @@ export default function App() {
                     <Route path="/employee/tasks-done" element={<TasksDonePage />} />
                     <Route path="/employee/my-day" element={<MyDayPage />} />
                     <Route path="/employee/tickets" element={<TicketsPage />} />
+                    <Route path="/employee/chat" element={<ChatPage />} />
                     <Route path="/employee/notifications" element={<NotificationsPage />} />
                     <Route path="/employee/profile" element={<ProfilePage />} />
                   </Route>
@@ -72,6 +77,7 @@ export default function App() {
               <Route path="/" element={<HomeRedirect />} />
               <Route path="*" element={<NotFoundPage />} />
             </Routes>
+            </ChatProvider>
           </NotificationProvider>
         </ToastProvider>
       </AuthProvider>

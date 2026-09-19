@@ -23,6 +23,7 @@
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
 import { badRequest, forbidden, notFound } from '../utils/errors.js';
+import { escapeLike } from '../utils/http.js';
 
 const SENDER_COLUMNS = `u.name AS sender_name, u.role AS sender_role,
                         u.department AS sender_department, u.profile_image AS sender_profile_image`;
@@ -227,11 +228,23 @@ export async function renameGroup(groupId, name) {
 }
 
 /** One group's messages, oldest last. Membership is checked before anything is read. */
-export async function listGroupMessages(userId, groupId, { limit = 100, afterId = 0 } = {}) {
+export async function listGroupMessages(userId, groupId, { limit = 100, afterId = 0, beforeId = 0 } = {}) {
   const db = await getDb();
   const group = await requireMembership(db, groupId, userId);
 
-  const rows = afterId > 0
+  // `beforeId` opens the room at a particular message — how a search result is
+  // followed. Inclusive, so the message looked for is the last one on screen.
+  const rows = beforeId > 0
+    ? (await db.query(
+      `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
+         FROM chat_group_messages c
+         JOIN users u ON u.id = c.sender_id
+        WHERE c.group_id = ? AND c.id <= ?
+        ORDER BY c.id DESC
+        LIMIT ?`,
+      [groupId, beforeId, limit],
+    )).reverse()
+    : afterId > 0
     ? await db.query(
       `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
          FROM chat_group_messages c
@@ -305,6 +318,41 @@ export async function markGroupRead(userId, groupId) {
     }
   }
   return target;
+}
+
+/**
+ * Matching posts in groups the caller is in.
+ *
+ * The JOIN onto `chat_group_members` is the scope: a group the caller is not in
+ * contributes no rows, so search can never surface a room they cannot open.
+ */
+export async function searchGroups(userId, term, limit = 30) {
+  const db = await getDb();
+  const needle = `%${escapeLike(term.toLowerCase())}%`;
+  const rows = await db.query(
+    `SELECT c.id, c.group_id, c.body, c.created_at, c.sender_id,
+            u.name AS sender_name, u.profile_image AS sender_profile_image,
+            g.name AS room_name
+       FROM chat_group_messages c
+       JOIN chat_group_members m ON m.group_id = c.group_id AND m.user_id = ?
+       JOIN chat_groups g ON g.id = c.group_id
+       JOIN users u ON u.id = c.sender_id
+      WHERE LOWER(c.body) LIKE ? ESCAPE '\\'
+      ORDER BY c.id DESC
+      LIMIT ?`,
+    [userId, needle, limit],
+  );
+  return rows.map((r) => ({
+    kind: 'group',
+    message_id: Number(r.id),
+    body: r.body,
+    created_at: r.created_at,
+    sender_id: Number(r.sender_id),
+    sender_name: r.sender_name,
+    sender_profile_image: r.sender_profile_image,
+    group_id: Number(r.group_id),
+    room_name: r.room_name,
+  }));
 }
 
 /** Unread across every group the caller is in — one number for the launcher badge. */

@@ -36,10 +36,10 @@ export function NotificationBell() {
     if (!n.is_read) await markRead(n.id);
 
     const base = isManagerLevel(user?.role) ? '/manager' : '/employee';
-    /* Chat is a widget rather than a route, so the mention is handed to it through
-       the URL — the same way a task notification hands over a ?highlight. */
+    /* `?room=team` tells the chat page which room to open, the same way a task
+       notification hands over a ?highlight. */
     if (n.type === 'chat_mention') {
-      navigate(`${base}?chat=team`);
+      navigate(`${base}/chat?room=team`);
       return;
     }
     if (n.related_ticket_id) {

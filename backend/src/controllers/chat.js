@@ -13,14 +13,14 @@ import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest } from '../utils/errors.js';
 import {
   listContacts, findPartner, listConversation, sendMessage,
-  markConversationRead, unreadTotal, unreadByPartner,
+  markConversationRead, unreadTotal, unreadByPartner, searchDirect,
 } from '../models/chat.js';
 import {
-  listTeamMessages, postTeamMessage, teamUnread, markTeamRead,
+  listTeamMessages, postTeamMessage, teamUnread, markTeamRead, searchTeam,
 } from '../models/teamChat.js';
 import {
   listGroups, createGroup, renameGroup, listGroupMessages,
-  postGroupMessage, markGroupRead, groupsUnreadTotal,
+  postGroupMessage, markGroupRead, groupsUnreadTotal, searchGroups,
 } from '../models/groupChat.js';
 
 const parseId = (raw) => {
@@ -70,8 +70,8 @@ export const unread = asyncHandler(async (req, res) => {
  * screen when the message lands.
  */
 export const teamMessages = asyncHandler(async (req, res) => {
-  const { limit, after, markRead: shouldMark } = req.validatedQuery;
-  const messages = await listTeamMessages({ limit, afterId: after });
+  const { limit, after, before, markRead: shouldMark } = req.validatedQuery;
+  const messages = await listTeamMessages({ limit, afterId: after, beforeId: before });
   if (shouldMark !== false) await markTeamRead(req.user.id);
   return ok(res, messages, { unread: await unreadTotal(req.user.id) });
 });
@@ -103,8 +103,8 @@ export const conversation = asyncHandler(async (req, res) => {
   const partner = await findPartner(req.user.id, partnerId);
   if (!partner) throw badRequest('That person could not be found.');
 
-  const { limit, after, markRead } = req.validatedQuery;
-  const messages = await listConversation(req.user.id, partnerId, { limit, afterId: after });
+  const { limit, after, before, markRead } = req.validatedQuery;
+  const messages = await listConversation(req.user.id, partnerId, { limit, afterId: after, beforeId: before });
   if (markRead !== false) await markConversationRead(req.user.id, partnerId);
 
   return ok(res, messages, { partner, unread: await unreadTotal(req.user.id) });
@@ -148,8 +148,8 @@ export const renameGroupRoom = asyncHandler(async (req, res) => {
 /** One group. Opening it marks it read, as every other room here does. */
 export const groupMessages = asyncHandler(async (req, res) => {
   const groupId = parseId(req.params.groupId);
-  const { limit, after, markRead: shouldMark } = req.validatedQuery;
-  const { group, messages } = await listGroupMessages(req.user.id, groupId, { limit, afterId: after });
+  const { limit, after, before, markRead: shouldMark } = req.validatedQuery;
+  const { group, messages } = await listGroupMessages(req.user.id, groupId, { limit, afterId: after, beforeId: before });
   if (shouldMark !== false) await markGroupRead(req.user.id, groupId);
   return ok(res, messages, { group, unread: await unreadTotal(req.user.id) });
 });
@@ -166,4 +166,38 @@ export const markGroupRoomRead = asyncHandler(async (req, res) => {
   const groupId = parseId(req.params.groupId);
   const lastReadId = await markGroupRead(req.user.id, groupId);
   return ok(res, { lastReadId, unread: await unreadTotal(req.user.id) });
+});
+
+/* --------------------------------------------------------------- search */
+
+/**
+ * Searches every room the caller can see, in one call.
+ *
+ * Three stores are asked separately and merged here, newest first, because they are
+ * genuinely different tables and a UNION would have to invent matching columns for
+ * all of them. Each query carries its own scope — direct messages are limited to the
+ * caller's own threads and groups to ones they are a member of — so a result can
+ * never name a room they are not allowed to open.
+ *
+ * Each hit carries what the UI needs to *go* there: the room it is in, and the id of
+ * the message, which the reader then opens the room at.
+ */
+export const search = asyncHandler(async (req, res) => {
+  const { q, limit } = req.validatedQuery;
+  const term = q.trim();
+  if (term.length < 2) {
+    return ok(res, [], { query: term, total: 0, message: 'Type at least two characters.' });
+  }
+
+  const [direct, team, groups] = await Promise.all([
+    searchDirect(req.user.id, term, limit),
+    searchTeam(term, limit),
+    searchGroups(req.user.id, term, limit),
+  ]);
+
+  const hits = [...direct, ...team, ...groups]
+    .sort((a, b) => (a.created_at < b.created_at ? 1 : -1))
+    .slice(0, limit);
+
+  return ok(res, hits, { query: term, total: hits.length });
 });

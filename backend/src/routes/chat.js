@@ -6,6 +6,7 @@ import {
   contacts, unread, conversation, send, markRead,
   teamMessages, postToTeam, markTeamChannelRead,
   groups, createGroupRoom, renameGroupRoom, groupMessages, postToGroup, markGroupRoomRead,
+  search,
 } from '../controllers/chat.js';
 
 const router = Router();
@@ -37,7 +38,20 @@ const contactsQuery = z.object({
 const conversationQuery = z.object({
   limit: z.coerce.number().int().min(1).max(200).default(100),
   after: z.coerce.number().int().min(0).default(0),
+  // Opens the room at a particular message, which is how a search result is
+  // followed. Inclusive, so the message looked for is on screen.
+  before: z.coerce.number().int().min(0).default(0),
   markRead: z.enum(['true', 'false']).transform((v) => v === 'true').optional(),
+});
+
+/*
+ * Search runs across direct messages, the team channel and the caller's groups. The
+ * scope is applied per store in the models, so there is no parameter here that could
+ * widen it.
+ */
+const searchQuery = z.object({
+  q: z.string().trim().min(1, 'Type something to search for.').max(200),
+  limit: z.coerce.number().int().min(1).max(100).default(30),
 });
 
 const sendSchema = z.object({
@@ -85,6 +99,7 @@ router.get('/groups/:groupId/messages', validate(conversationQuery, 'query'), gr
 router.post('/groups/:groupId/messages', validate(sendSchema), postToGroup);
 router.patch('/groups/:groupId/read', markGroupRoomRead);
 
+router.get('/search', validate(searchQuery, 'query'), search);
 router.get('/contacts', validate(contactsQuery, 'query'), contacts);
 router.get('/unread-count', unread);
 router.get('/team/messages', validate(conversationQuery, 'query'), teamMessages);

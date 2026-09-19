@@ -5,44 +5,48 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send,
-  Users, UserRound, X,
+  Users, UserRound,
 } from 'lucide-react';
 import { chatApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useChatUnread } from '../context/ChatContext';
 import { formatDate, formatTime, relativeTime, todayIso } from '../lib/format';
-import { Avatar, EmptyState, Spinner } from './ui';
-import { GroupModal } from './GroupModal';
+import { Avatar, EmptyState, Spinner } from '../components/ui';
+import { GroupModal } from '../components/GroupModal';
 import {
   isAdmin, roleLabel,
-  type ChatContact, type ChatGroup, type ChatMessage, type GroupMessage, type TeamMessage,
+  type ChatContact, type ChatGroup, type ChatMessage, type ChatSearchHit,
+  type GroupMessage, type TeamMessage,
 } from '../types';
 
 /**
- * The chat launcher and its panel.
+ * The chat page — reached from the sidebar, like every other section.
  *
- * Mounted once by AppLayout, so it is present on every signed-in screen rather than
- * being a page someone has to navigate to — a conversation is something you have
- * *while* looking at a task, not instead of.
+ * Two panes: the list of rooms and people on the left, the open conversation on the
+ * right. Below `lg` there is only room for one, so the list gives way to the
+ * conversation and the back arrow returns to it.
  *
- * Two kinds of room, one panel. **Team Chat** is a single company-wide channel that
- * everybody is in; below it is the directory of people for one-to-one threads. Every
- * role gets both — nothing here branches on role, and the server does not either.
+ * Three kinds of room, one list. **Team Chat** is a single company-wide channel
+ * everybody is in; **groups** are named rooms an admin creates for a chosen set of
+ * people; below them is the directory for one-to-one threads. Every role gets all
+ * three — nothing here branches on role, and the server does not either.
  *
- * In the channel you can tag somebody with `@`. A tag is not just styling: the person
- * named gets a notification, and the channel row shows an `@` marker so being
- * addressed reads differently from ordinary traffic.
+ * The search box looks in two places at once: it narrows the list of people and
+ * rooms, and it searches the text of messages across every room the viewer can see.
+ * Opening a result loads the conversation *at* that message rather than at the
+ * bottom, which is the only reason to search a conversation in the first place.
  *
- * Live-ness is polling, matching the notification bell. Two rates, because they answer
- * different questions: the badge only has to be roughly current, an open room has to
- * feel immediate. Both pause while the tab is hidden, and an open room asks only for
- * messages newer than the last one on screen.
+ * Live-ness is polling, matching the notification bell. The unread counts come from
+ * ChatContext, which polls once for the whole app so the sidebar badge and this page
+ * do not ask the same question twice. An open room polls faster, asks only for
+ * messages newer than the last one on screen, and pauses while the tab is hidden.
  */
 
-/** How often the launcher badge re-checks. Matches the notification bell. */
-const BADGE_POLL_MS = 20_000;
 /** How often an open conversation or channel asks for new messages. */
 const THREAD_POLL_MS = 5_000;
+/** Below this, searching messages is more noise than signal. */
+const MIN_SEARCH = 2;
 
 /** Which room is open. `null` is the directory. */
 /** Anything that can appear in a room: a DM, a channel post, or a group post. */
@@ -54,14 +58,13 @@ type ActiveRoom =
   | { kind: 'group'; group: ChatGroup }
   | null;
 
-export function ChatWidget() {
+export function ChatPage() {
   const { user } = useAuth();
+  const { counts, refresh: refreshCounts, setTotal } = useChatUnread();
   const [searchParams, setSearchParams] = useSearchParams();
 
-  const [open, setOpen] = useState(false);
-  const [unread, setUnread] = useState(0);
-  const [teamUnread, setTeamUnread] = useState({ unread: 0, mentions: 0 });
-  const [groupUnreadTotal, setGroupUnreadTotal] = useState(0);
+  const teamUnread = counts.team;
+  const groupUnreadTotal = counts.groups;
 
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [contactsLoading, setContactsLoading] = useState(false);
@@ -76,6 +79,12 @@ export function ChatWidget() {
   const [groupDialog, setGroupDialog] = useState<{ mode: 'create' } | { mode: 'rename'; group: ChatGroup } | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+
+  /** Message-search results for the current term, and whether they are in flight. */
+  const [hits, setHits] = useState<ChatSearchHit[]>([]);
+  const [searching, setSearching] = useState(false);
+  /** The message a search result led to, marked so the eye finds it. */
+  const [highlightId, setHighlightId] = useState<number | null>(null);
   const [roomLoading, setRoomLoading] = useState(false);
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
@@ -86,43 +95,23 @@ export function ChatWidget() {
   /** The newest id on screen — what the poll asks for messages after. */
   const lastIdRef = useRef(0);
 
-  /* ------------------------------------------------------------ unread badge */
-
-  const refreshBadge = useCallback(async (signal?: AbortSignal) => {
-    try {
-      const { data } = await chatApi.unreadCount(signal);
-      setUnread(data.unread);
-      setTeamUnread(data.team);
-      setGroupUnreadTotal(data.groups);
-      const byId = new Map(data.threads.map((t) => [t.user_id, t.unread]));
-      setContacts((prev) => prev.map((c) => ({ ...c, unread: byId.get(c.id) ?? 0 })));
-    } catch {
-      // A failed poll is not worth interrupting anyone over; the next tick retries.
-    }
-  }, []);
-
+  /*
+    The per-thread badges follow the shared counts, so a message arriving while the
+    list is on screen updates the right row without this page polling for itself.
+  */
   useEffect(() => {
-    if (!user) {
-      setUnread(0);
-      setTeamUnread({ unread: 0, mentions: 0 });
-      setGroupUnreadTotal(0);
-      setOpen(false);
-      return undefined;
-    }
-    const controller = new AbortController();
-    void refreshBadge(controller.signal);
-
-    const id = window.setInterval(() => {
-      if (!document.hidden) void refreshBadge();
-    }, BADGE_POLL_MS);
-    const onVisible = () => { if (!document.hidden) void refreshBadge(); };
-    document.addEventListener('visibilitychange', onVisible);
-    return () => {
-      controller.abort();
-      window.clearInterval(id);
-      document.removeEventListener('visibilitychange', onVisible);
-    };
-  }, [user, refreshBadge]);
+    const byId = new Map(counts.threads.map((t) => [t.user_id, t.unread]));
+    setContacts((prev) => {
+      let changed = false;
+      const next = prev.map((c) => {
+        const n = byId.get(c.id) ?? 0;
+        if (n === c.unread) return c;
+        changed = true;
+        return { ...c, unread: n };
+      });
+      return changed ? next : prev;
+    });
+  }, [counts.threads]);
 
   /* --------------------------------------------------------------- directory */
 
@@ -140,25 +129,50 @@ export function ChatWidget() {
     }
   }, []);
 
+  // Debounced so a request is not fired per keystroke.
   useEffect(() => {
-    if (!open || active) return undefined;
     const controller = new AbortController();
     const timer = window.setTimeout(() => { void loadContacts(search, controller.signal); }, search ? 250 : 0);
     return () => {
       window.clearTimeout(timer);
       controller.abort();
     };
-  }, [open, active, search, loadContacts]);
+  }, [search, loadContacts]);
 
   /*
-    The channel's mention picker needs the full roster, which the directory only holds
-    while it is showing and unfiltered. Loading it once when the panel opens means the
-    picker is populated no matter which room you go into first.
+    Message search, on the same term as the list filter.
+
+    One box, two questions: which person or room am I looking for, and where was that
+    thing said. Running both means never having to decide which you meant. It waits
+    for a couple of characters, because a single letter matches most of the history
+    and tells nobody anything.
   */
   useEffect(() => {
-    if (!open || contacts.length) return;
-    void loadContacts('');
-  }, [open, contacts.length, loadContacts]);
+    const term = search.trim();
+    if (term.length < MIN_SEARCH) {
+      setHits([]);
+      setSearching(false);
+      return undefined;
+    }
+    const controller = new AbortController();
+    setSearching(true);
+    const timer = window.setTimeout(() => {
+      void (async () => {
+        try {
+          const { data } = await chatApi.search(term, controller.signal);
+          setHits(data);
+        } catch (err) {
+          if ((err as Error).name !== 'AbortError') setHits([]);
+        } finally {
+          setSearching(false);
+        }
+      })();
+    }, 300);
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
+  }, [search]);
 
   /* ------------------------------------------------------------------ groups */
 
@@ -191,20 +205,22 @@ export function ChatWidget() {
     lastIdRef.current = 0;
     setDraft('');
     setError(null);
+    setHighlightId(null);
   }, []);
 
-  const openThread = useCallback(async (contact: ChatContact) => {
+  const openThread = useCallback(async (contact: ChatContact, beforeId?: number) => {
     setActive({ kind: 'dm', contact });
     setMessages([]);
     lastIdRef.current = 0;
     setDraft('');
     setError(null);
+    setHighlightId(beforeId ?? null);
     setRoomLoading(true);
     try {
-      const { data, meta } = await chatApi.messages(contact.id);
+      const { data, meta } = await chatApi.messages(contact.id, { before: beforeId });
       setMessages(data);
       lastIdRef.current = data.length ? data[data.length - 1].id : 0;
-      if (typeof meta?.unread === 'number') setUnread(meta.unread);
+      if (typeof meta?.unread === 'number') setTotal(meta.unread);
       setContacts((prev) => prev.map((c) => (c.id === contact.id ? { ...c, unread: 0 } : c)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not open that conversation.');
@@ -212,41 +228,44 @@ export function ChatWidget() {
       setRoomLoading(false);
       window.setTimeout(() => composerRef.current?.focus(), 0);
     }
-  }, []);
+  }, [setTotal]);
 
-  const openTeam = useCallback(async () => {
+  const openTeam = useCallback(async (beforeId?: number) => {
     setActive({ kind: 'team' });
     setTeamMessages([]);
     lastIdRef.current = 0;
     setDraft('');
     setError(null);
+    setHighlightId(beforeId ?? null);
     setRoomLoading(true);
     try {
-      const { data, meta } = await chatApi.team.messages();
+      const { data, meta } = await chatApi.team.messages({ before: beforeId });
       setTeamMessages(data);
       lastIdRef.current = data.length ? data[data.length - 1].id : 0;
-      if (typeof meta?.unread === 'number') setUnread(meta.unread);
-      setTeamUnread({ unread: 0, mentions: 0 });
+      if (typeof meta?.unread === 'number') setTotal(meta.unread);
+      void refreshCounts();
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not open Team Chat.');
     } finally {
       setRoomLoading(false);
       window.setTimeout(() => composerRef.current?.focus(), 0);
     }
-  }, []);
+  }, [setTotal, refreshCounts]);
 
-  const openGroup = useCallback(async (group: ChatGroup) => {
+  const openGroup = useCallback(async (group: ChatGroup, beforeId?: number) => {
     setActive({ kind: 'group', group });
     setGroupMessages([]);
     lastIdRef.current = 0;
     setDraft('');
     setError(null);
+    setHighlightId(beforeId ?? null);
     setRoomLoading(true);
     try {
-      const { data, meta } = await chatApi.groups.messages(group.id);
+      const { data, meta } = await chatApi.groups.messages(group.id, { before: beforeId });
       setGroupMessages(data);
       lastIdRef.current = data.length ? data[data.length - 1].id : 0;
-      if (typeof meta?.unread === 'number') setUnread(meta.unread);
+      if (typeof meta?.unread === 'number') setTotal(meta.unread);
+      void refreshCounts();
       // The server returns the group with its current name and members, which may
       // have moved on since the list was drawn.
       const fresh = meta?.group as ChatGroup | undefined;
@@ -258,10 +277,28 @@ export function ChatWidget() {
       setRoomLoading(false);
       window.setTimeout(() => composerRef.current?.focus(), 0);
     }
-  }, []);
+  }, [setTotal, refreshCounts]);
+
+  /**
+   * Follows a search result into the room it was said in.
+   *
+   * The room is opened *at* that message rather than at the bottom, and the message
+   * is marked so the eye lands on it — otherwise finding it in the list and then
+   * having to find it again in the conversation is two searches for one question.
+   */
+  const openHit = useCallback((hit: ChatSearchHit) => {
+    if (hit.kind === 'team') { void openTeam(hit.message_id); return; }
+    if (hit.kind === 'group') {
+      const group = groups.find((g) => g.id === hit.group_id);
+      if (group) void openGroup(group, hit.message_id);
+      return;
+    }
+    const contact = contacts.find((c) => c.id === hit.partner_id);
+    if (contact) void openThread(contact, hit.message_id);
+  }, [groups, contacts, openTeam, openGroup, openThread]);
 
   /*
-    `?chat=team` opens the channel.
+    `?room=team` opens the channel.
 
     A mention notification has to lead somewhere, and chat is a widget rather than a
     route — there is no /chat to navigate to. The bell hands the intent over in the
@@ -269,11 +306,10 @@ export function ChatWidget() {
     is cleared once acted on so a refresh or a back-button press does not reopen it.
   */
   useEffect(() => {
-    if (searchParams.get('chat') !== 'team') return;
-    setOpen(true);
+    if (searchParams.get('room') !== 'team') return;
     void openTeam();
     const next = new URLSearchParams(searchParams);
-    next.delete('chat');
+    next.delete('room');
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, openTeam]);
 
@@ -290,7 +326,7 @@ export function ChatWidget() {
           });
           lastIdRef.current = data[data.length - 1].id;
         }
-        if (typeof meta?.unread === 'number') setUnread(meta.unread);
+        if (typeof meta?.unread === 'number') setTotal(meta.unread);
         return;
       }
       if (room.kind === 'group') {
@@ -303,7 +339,7 @@ export function ChatWidget() {
           });
           lastIdRef.current = data[data.length - 1].id;
         }
-        if (typeof meta?.unread === 'number') setUnread(meta.unread);
+        if (typeof meta?.unread === 'number') setTotal(meta.unread);
         return;
       }
       const { data, meta } = await chatApi.team.messages({ after: lastIdRef.current });
@@ -315,14 +351,14 @@ export function ChatWidget() {
         });
         lastIdRef.current = data[data.length - 1].id;
       }
-      if (typeof meta?.unread === 'number') setUnread(meta.unread);
+      if (typeof meta?.unread === 'number') setTotal(meta.unread);
     } catch {
       /* transient; the next tick retries */
     }
-  }, []);
+  }, [setTotal]);
 
   useEffect(() => {
-    if (!open || !active) return undefined;
+    if (!active) return undefined;
     const id = window.setInterval(() => {
       if (!document.hidden) void pollRoom(active);
     }, THREAD_POLL_MS);
@@ -407,108 +443,98 @@ export function ChatWidget() {
 
   /* ---------------------------------------------------------------- behaviour */
 
+  // Escape backs out of a room to the list, which is the only level there is now.
   useEffect(() => {
-    if (!open) return undefined;
-    const onKey = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return;
-      if (active) openDirectory();
-      else setOpen(false);
-    };
+    if (!active) return undefined;
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') openDirectory(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [open, active, openDirectory]);
+  }, [active, openDirectory]);
 
+  /*
+    New messages pin the view to the bottom — except when the room was opened at a
+    search result, where the whole point is to land on that message instead.
+  */
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (highlightId) {
+      const target = el.querySelector(`[data-message-id="${highlightId}"]`);
+      if (target) { target.scrollIntoView({ block: 'center' }); return; }
+    }
     el.scrollTop = el.scrollHeight;
-  }, [messages, teamMessages, groupMessages, active]);
+  }, [messages, teamMessages, groupMessages, active, highlightId]);
 
   if (!user) return null;
 
-  const title = active?.kind === 'dm'
-    ? `Chat with ${active.contact.name}`
-    : active?.kind === 'team' ? 'Team Chat'
-      : active?.kind === 'group' ? active.group.name : 'Chat';
-
   return (
-    <>
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        aria-label={unread > 0 ? `Chat, ${unread} unread messages` : 'Chat'}
-        aria-expanded={open}
-        title="Chat"
-        className="fixed bottom-5 right-5 z-40 inline-flex h-14 w-14 items-center justify-center rounded-full
-                   bg-primary text-primary-foreground shadow-lg transition-transform
-                   hover:bg-primary/90 active:scale-95 sm:bottom-6 sm:right-6"
-      >
-        {open ? <X className="h-6 w-6" /> : <MessageCircle className="h-6 w-6" />}
-        {!open && unread > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-5 min-w-[1.25rem] items-center justify-center
-                           rounded-full bg-destructive px-1 text-[10px] font-bold text-destructive-foreground">
-            {unread > 99 ? '99+' : unread}
-          </span>
-        )}
-      </button>
-
-      {open && (
-        <div
-          role="dialog"
-          aria-modal="false"
-          aria-label={title}
-          className="animate-in-up fixed bottom-24 right-4 z-40 flex w-[min(23rem,calc(100vw-2rem))]
-                     h-[min(32rem,calc(100vh-9rem))] flex-col overflow-hidden rounded-2xl border border-border
-                     bg-popover text-popover-foreground shadow-2xl sm:right-6"
-        >
-          {active === null ? (
-            <DirectoryView
-              contacts={contacts}
-              groups={groups}
-              canCreateGroup={isAdmin(user.role)}
-              loading={contactsLoading}
-              error={error}
-              search={search}
-              unread={unread}
-              teamUnread={teamUnread}
-              onSearch={setSearch}
-              onRefresh={() => { void loadContacts(search); void loadGroups(); }}
-              onClose={() => setOpen(false)}
-              onPick={(c) => void openThread(c)}
-              onPickTeam={() => void openTeam()}
-              onPickGroup={(g) => void openGroup(g)}
-              onNewGroup={() => { setGroupError(null); setGroupDialog({ mode: 'create' }); }}
-            />
-          ) : (
-            <RoomView
-              me={user.id}
-              room={active}
-              messages={messages}
-              teamMessages={teamMessages}
-              groupMessages={groupMessages}
-              contacts={contacts}
-              loading={roomLoading}
-              error={error}
-              draft={draft}
-              sending={sending}
-              scrollRef={scrollRef}
-              composerRef={composerRef}
-              onBack={openDirectory}
-              onClose={() => { openDirectory(); setOpen(false); }}
-              onDraft={setDraft}
-              onSend={() => void send()}
-              canRenameGroup={isAdmin(user.role)}
-              onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
-            />
-          )}
-        </div>
-      )}
-
+    <div className="flex h-[calc(100vh-9.5rem)] min-h-[26rem] overflow-hidden rounded-xl border border-border bg-card">
       {/*
-        The dialog lives outside the panel so it is not clipped by its rounded,
-        overflow-hidden frame, and it renders above it — creating a group is a
-        deliberate act that should take the foreground while it is happening.
+        Two panes on a wide screen, one at a time below `lg`. The list is the default
+        there and the room replaces it, which is why each pane's visibility depends on
+        whether a room is open rather than being fixed.
       */}
+      <aside
+        className={`w-full shrink-0 flex-col border-border lg:flex lg:w-80 lg:border-r ${
+          active ? 'hidden' : 'flex'
+        }`}
+      >
+        <DirectoryView
+          contacts={contacts}
+          groups={groups}
+          canCreateGroup={isAdmin(user.role)}
+          loading={contactsLoading}
+          error={error}
+          search={search}
+          unread={counts.unread}
+          teamUnread={teamUnread}
+          groupUnread={groupUnreadTotal}
+          hits={hits}
+          searching={searching}
+          active={active}
+          onSearch={setSearch}
+          onRefresh={() => { void loadContacts(search); void loadGroups(); void refreshCounts(); }}
+          onPick={(c) => void openThread(c)}
+          onPickTeam={() => void openTeam()}
+          onPickGroup={(g) => void openGroup(g)}
+          onPickHit={openHit}
+          onNewGroup={() => { setGroupError(null); setGroupDialog({ mode: 'create' }); }}
+        />
+      </aside>
+
+      <section className={`min-w-0 flex-1 flex-col ${active ? 'flex' : 'hidden lg:flex'}`}>
+        {active ? (
+          <RoomView
+            me={user.id}
+            room={active}
+            messages={messages}
+            teamMessages={teamMessages}
+            groupMessages={groupMessages}
+            contacts={contacts}
+            loading={roomLoading}
+            error={error}
+            draft={draft}
+            sending={sending}
+            highlightId={highlightId}
+            scrollRef={scrollRef}
+            composerRef={composerRef}
+            onBack={openDirectory}
+            onDraft={setDraft}
+            onSend={() => void send()}
+            canRenameGroup={isAdmin(user.role)}
+            onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
+          />
+        ) : (
+          <div className="flex flex-1 items-center justify-center">
+            <EmptyState
+              icon={<MessageCircle className="h-6 w-6" />}
+              title="Pick a conversation"
+              description="Choose Team Chat, a group, or someone on the left. Search to find a person, a room, or something that was said."
+            />
+          </div>
+        )}
+      </section>
+
       <GroupModal
         open={!!groupDialog}
         mode={groupDialog?.mode ?? 'create'}
@@ -519,7 +545,7 @@ export function ChatWidget() {
         onClose={() => { setGroupDialog(null); setGroupError(null); }}
         onSubmit={(name, memberIds) => void submitGroup(name, memberIds)}
       />
-    </>
+    </div>
   );
 }
 
@@ -582,11 +608,34 @@ function renderBody(body: string, mentions: { id: number; name: string }[], meId
   return out;
 }
 
+/** The matched part of a snippet, marked so the eye finds it in a wall of text. */
+function markTerm(text: string, term: string) {
+  const needle = term.trim();
+  if (!needle) return text;
+  const at = text.toLowerCase().indexOf(needle.toLowerCase());
+  if (at === -1) return text;
+  /*
+    A window around the hit rather than the whole message: a search result is a
+    pointer, and 200 characters of unrelated text buries the thing being pointed at.
+  */
+  const from = Math.max(0, at - 40);
+  const head = from > 0 ? '…' : '';
+  const tail = text.length > at + needle.length + 60 ? '…' : '';
+  return (
+    <>
+      {head}{text.slice(from, at)}
+      <mark className="rounded bg-primary/30 px-0.5 text-foreground">{text.slice(at, at + needle.length)}</mark>
+      {text.slice(at + needle.length, at + needle.length + 60)}{tail}
+    </>
+  );
+}
+
 /* ------------------------------------------------------------------ directory */
 
 function DirectoryView({
-  contacts, groups, canCreateGroup, loading, error, search, unread, teamUnread,
-  onSearch, onRefresh, onClose, onPick, onPickTeam, onPickGroup, onNewGroup,
+  contacts, groups, canCreateGroup, loading, error, search, unread, teamUnread, groupUnread,
+  hits, searching, active,
+  onSearch, onRefresh, onPick, onPickTeam, onPickGroup, onPickHit, onNewGroup,
 }: {
   contacts: ChatContact[];
   groups: ChatGroup[];
@@ -596,12 +645,16 @@ function DirectoryView({
   search: string;
   unread: number;
   teamUnread: { unread: number; mentions: number };
+  groupUnread: number;
+  hits: ChatSearchHit[];
+  searching: boolean;
+  active: ActiveRoom;
   onSearch: (v: string) => void;
   onRefresh: () => void;
-  onClose: () => void;
   onPick: (c: ChatContact) => void;
   onPickTeam: () => void;
   onPickGroup: (g: ChatGroup) => void;
+  onPickHit: (h: ChatSearchHit) => void;
   onNewGroup: () => void;
 }) {
   /* Groups are filtered by the search box too — it is the fastest way to reach one
@@ -635,18 +688,11 @@ function DirectoryView({
           <button
             type="button"
             onClick={onRefresh}
-            aria-label="Refresh contacts"
+            aria-label="Refresh conversations"
+            title="Refresh"
             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <RefreshCw className="h-4 w-4" />
-          </button>
-          <button
-            type="button"
-            onClick={onClose}
-            aria-label="Close chat"
-            className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-          >
-            <X className="h-4 w-4" />
           </button>
         </div>
       </header>
@@ -658,8 +704,8 @@ function DirectoryView({
             type="search"
             value={search}
             onChange={(e) => onSearch(e.target.value)}
-            placeholder="Search people…"
-            aria-label="Search people"
+            placeholder="Search people and messages…"
+            aria-label="Search people and messages"
             className="input pl-9"
           />
         </div>
@@ -676,7 +722,10 @@ function DirectoryView({
         <button
           type="button"
           onClick={onPickTeam}
-          className="flex w-full items-center gap-3 border-b border-border bg-muted/40 px-4 py-3 text-left transition-colors hover:bg-muted"
+          aria-current={active?.kind === 'team' ? 'true' : undefined}
+          className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
+            active?.kind === 'team' ? 'bg-accent' : 'bg-muted/40 hover:bg-muted'
+          }`}
         >
           <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary-strong">
             <Users className="h-5 w-5" />
@@ -705,13 +754,23 @@ function DirectoryView({
         </button>
 
         {visibleGroups.length > 0 && (
-          <ul>
+          <>
+            <p className="eyebrow flex items-center justify-between px-4 pb-1 pt-3 text-muted-foreground">
+              Groups
+              {groupUnread > 0 && (
+                <span className="font-semibold text-primary-strong">{groupUnread} unread</span>
+              )}
+            </p>
+            <ul>
             {visibleGroups.map((g) => (
               <li key={g.id}>
                 <button
                   type="button"
                   onClick={() => onPickGroup(g)}
-                  className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted"
+                  aria-current={active?.kind === 'group' && active.group.id === g.id ? 'true' : undefined}
+                  className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
+                    active?.kind === 'group' && active.group.id === g.id ? 'bg-accent' : 'hover:bg-muted'
+                  }`}
                 >
                   <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
                     <Users className="h-5 w-5" />
@@ -740,7 +799,12 @@ function DirectoryView({
                 </button>
               </li>
             ))}
-          </ul>
+            </ul>
+          </>
+        )}
+
+        {contacts.length > 0 && (
+          <p className="eyebrow px-4 pb-1 pt-3 text-muted-foreground">People</p>
         )}
 
         {loading && contacts.length === 0 ? (
@@ -760,7 +824,10 @@ function DirectoryView({
                 <button
                   type="button"
                   onClick={() => onPick(c)}
-                  className="flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors hover:bg-muted"
+                  aria-current={active?.kind === 'dm' && active.contact.id === c.id ? 'true' : undefined}
+                  className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
+                    active?.kind === 'dm' && active.contact.id === c.id ? 'bg-accent' : 'hover:bg-muted'
+                  }`}
                 >
                   <Avatar name={c.name} src={c.profile_image} size="md" />
                   <span className="min-w-0 flex-1">
@@ -791,6 +858,45 @@ function DirectoryView({
             ))}
           </ul>
         )}
+        {/*
+          Matching messages, under the people and rooms rather than instead of them:
+          one box answers "who" and "where was that said" at once, and which one you
+          meant is obvious from the results.
+        */}
+        {search.trim().length >= MIN_SEARCH && (
+          <div className="border-t border-border">
+            <p className="eyebrow flex items-center justify-between px-4 pb-1 pt-3 text-muted-foreground">
+              Messages
+              {searching && <Spinner className="h-3 w-3" />}
+            </p>
+            {!searching && hits.length === 0 ? (
+              <p className="px-4 pb-4 text-xs text-muted-foreground">
+                Nothing said matches “{search.trim()}”.
+              </p>
+            ) : (
+              <ul>
+                {hits.map((h) => (
+                  <li key={`${h.kind}-${h.message_id}`}>
+                    <button
+                      type="button"
+                      onClick={() => onPickHit(h)}
+                      className="flex w-full flex-col gap-0.5 border-b border-border px-4 py-2.5 text-left transition-colors hover:bg-muted"
+                    >
+                      <span className="flex items-center justify-between gap-2">
+                        <span className="truncate text-xs font-semibold text-foreground">{h.room_name}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">{relativeTime(h.created_at)}</span>
+                      </span>
+                      <span className="line-clamp-2 text-xs text-muted-foreground">
+                        <span className="font-medium text-foreground">{h.sender_name}: </span>
+                        {markTerm(h.body, search)}
+                      </span>
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </div>
     </>
   );
@@ -800,7 +906,7 @@ function DirectoryView({
 
 function RoomView({
   me, room, messages, teamMessages, groupMessages, contacts, loading, error, draft, sending,
-  scrollRef, composerRef, onBack, onClose, onDraft, onSend, canRenameGroup, onRenameGroup,
+  highlightId, scrollRef, composerRef, onBack, onDraft, onSend, canRenameGroup, onRenameGroup,
 }: {
   me: number;
   room: NonNullable<ActiveRoom>;
@@ -812,10 +918,10 @@ function RoomView({
   error: string | null;
   draft: string;
   sending: boolean;
+  highlightId: number | null;
   scrollRef: React.RefObject<HTMLDivElement>;
   composerRef: React.RefObject<HTMLTextAreaElement>;
   onBack: () => void;
-  onClose: () => void;
   onDraft: (v: string) => void;
   onSend: () => void;
   canRenameGroup: boolean;
@@ -918,11 +1024,12 @@ function RoomView({
   return (
     <>
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-3">
+        {/* Only below `lg`, where the list is not on screen beside this. */}
         <button
           type="button"
           onClick={onBack}
           aria-label="Back to all conversations"
-          className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground lg:hidden"
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
@@ -954,14 +1061,6 @@ function RoomView({
             <Pencil className="h-4 w-4" />
           </button>
         )}
-        <button
-          type="button"
-          onClick={onClose}
-          aria-label="Close chat"
-          className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <X className="h-4 w-4" />
-        </button>
       </header>
 
       <div ref={scrollRef} className="flex-1 space-y-4 overflow-y-auto bg-muted/40 px-3 py-4">
@@ -988,10 +1087,18 @@ function RoomView({
                 const startsRun = !prev || prev.sender_id !== m.sender_id;
                 const taggedMe = !!team?.mentions.some((x) => x.id === me);
 
+                const found = m.id === highlightId;
+
                 return (
-                  <div key={m.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+                  <div
+                    key={m.id}
+                    data-message-id={m.id}
+                    className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
+                  >
                     <div
                       className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${
+                        found ? 'ring-2 ring-ring ring-offset-2 ring-offset-muted' : ''
+                      } ${
                         mine
                           ? 'rounded-br-sm bg-primary text-primary-foreground'
                           : `rounded-bl-sm bg-card text-card-foreground border ${

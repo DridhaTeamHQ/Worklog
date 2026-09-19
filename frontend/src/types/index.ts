@@ -290,6 +290,26 @@ export interface GroupMessage {
   sender_profile_image: string | null;
 }
 
+/**
+ * One message matched by a search, with what the UI needs to *go* there.
+ *
+ * `kind` says which store it came from and therefore which id identifies the room:
+ * `partner_id` for a direct thread, `group_id` for a group, neither for the team
+ * channel. `room_name` is what to show, already resolved by the server.
+ */
+export interface ChatSearchHit {
+  kind: 'dm' | 'team' | 'group';
+  message_id: number;
+  body: string;
+  created_at: string;
+  sender_id: number;
+  sender_name: string;
+  sender_profile_image: string | null;
+  room_name: string;
+  partner_id?: number;
+  group_id?: number;
+}
+
 /** What the launcher and the conversation list need to draw their badges. */
 export interface ChatUnread {
   /** The launcher number: direct messages plus unread team posts. */

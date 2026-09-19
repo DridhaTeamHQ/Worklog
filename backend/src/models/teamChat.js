@@ -17,6 +17,7 @@
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
 import { createNotification } from './notification.js';
+import { escapeLike } from '../utils/http.js';
 
 /** The sender fields every message carries, so the channel can show who is talking. */
 const SENDER_COLUMNS = `u.name AS sender_name, u.role AS sender_role,
@@ -74,8 +75,23 @@ async function withMentions(db, rows) {
  * shown. Without it the newest `limit` are returned and then flipped, because the
  * tail is what opening the room wants but it has to arrive in reading order.
  */
-export async function listTeamMessages({ limit = 100, afterId = 0 } = {}) {
+export async function listTeamMessages({ limit = 100, afterId = 0, beforeId = 0 } = {}) {
   const db = await getDb();
+
+  // Opening the channel at a particular message — how a search result is followed.
+  // Inclusive, so the message looked for is the last one on screen.
+  if (beforeId > 0) {
+    const rows = await db.query(
+      `SELECT t.id, t.sender_id, t.body, t.created_at, ${SENDER_COLUMNS}
+         FROM team_messages t
+         JOIN users u ON u.id = t.sender_id
+        WHERE t.id <= ?
+        ORDER BY t.id DESC
+        LIMIT ?`,
+      [beforeId, limit],
+    );
+    return withMentions(db, rows.reverse());
+  }
 
   if (afterId > 0) {
     const rows = await db.query(
@@ -151,6 +167,32 @@ export async function postTeamMessage(senderId, body, mentionIds) {
     const [message] = await withMentions(tx, rows);
     return message;
   });
+}
+
+/** Matching posts in the channel. Everybody is in it, so there is nothing to scope. */
+export async function searchTeam(term, limit = 30) {
+  const db = await getDb();
+  const needle = `%${escapeLike(term.toLowerCase())}%`;
+  const rows = await db.query(
+    `SELECT t.id, t.body, t.created_at, t.sender_id,
+            u.name AS sender_name, u.profile_image AS sender_profile_image
+       FROM team_messages t
+       JOIN users u ON u.id = t.sender_id
+      WHERE LOWER(t.body) LIKE ? ESCAPE '\\'
+      ORDER BY t.id DESC
+      LIMIT ?`,
+    [needle, limit],
+  );
+  return rows.map((r) => ({
+    kind: 'team',
+    message_id: Number(r.id),
+    body: r.body,
+    created_at: r.created_at,
+    sender_id: Number(r.sender_id),
+    sender_name: r.sender_name,
+    sender_profile_image: r.sender_profile_image,
+    room_name: 'Team Chat',
+  }));
 }
 
 /** How far this person has read. Absent means they have never opened the channel. */

@@ -3,16 +3,23 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import {
   LayoutDashboard, Users, ClipboardList, FileText, BarChart3, Bell,
   LogOut, Menu, X, CheckSquare, Bug, PanelLeftClose, PanelLeftOpen, Pencil,
-  NotebookPen, Sun, Moon,
+  NotebookPen, Sun, Moon, MessageCircle,
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
-import { ChatWidget } from './ChatWidget';
+import { useChatUnread } from '../context/ChatContext';
 import { applyTheme, currentTheme, type Theme } from '../lib/theme';
 import { Avatar } from './ui';
 import { isManagerLevel, roleLabel } from '../types';
 
-interface NavItem { to: string; label: string; icon: ReactNode; end?: boolean }
+interface NavItem {
+  to: string;
+  label: string;
+  icon: ReactNode;
+  end?: boolean;
+  /** Draws the unread-chat count on this item. Only the chat link sets it. */
+  badge?: 'chat';
+}
 
 const MANAGER_NAV: NavItem[] = [
   { to: '/manager', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
@@ -21,6 +28,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/manager/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
   { to: '/manager/reports', label: 'Daily Reports', icon: <FileText className="h-[18px] w-[18px]" /> },
   { to: '/manager/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
+  { to: '/manager/chat', label: 'Chat', icon: <MessageCircle className="h-[18px] w-[18px]" />, badge: 'chat' },
   { to: '/manager/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
 ];
@@ -31,6 +39,7 @@ const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee/tasks-done', label: 'Tasks Done', icon: <CheckSquare className="h-[18px] w-[18px]" /> },
   { to: '/employee/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
   { to: '/employee/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
+  { to: '/employee/chat', label: 'Chat', icon: <MessageCircle className="h-[18px] w-[18px]" />, badge: 'chat' },
   { to: '/employee/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
 ];
 
@@ -43,6 +52,7 @@ const readCollapsed = () => {
 
 export function AppLayout() {
   const { user, logout } = useAuth();
+  const { counts } = useChatUnread();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -185,6 +195,21 @@ export function AppLayout() {
               >
                 {item.icon}
                 <span className={collapsed ? 'lg:hidden' : ''}>{item.label}</span>
+                {/*
+                  Unread chat, on the link itself. Collapsed, the rail has no room for
+                  a number beside the label, so it shrinks to a dot — which still says
+                  "something is waiting" without pretending to say how much.
+                */}
+                {item.badge === 'chat' && counts.unread > 0 && (collapsed ? (
+                  <span
+                    aria-hidden
+                    className="absolute right-2 top-2 h-2 w-2 rounded-full bg-primary lg:block"
+                  />
+                ) : (
+                  <span className="ml-auto inline-flex h-5 min-w-[1.25rem] items-center justify-center rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                    {counts.unread > 99 ? '99+' : counts.unread}
+                  </span>
+                ))}
                 {/* Collapsed, the label arrives as a flyout — the rail must still say
                     what each icon is, without depending on a native tooltip's delay. */}
                 {collapsed && (
@@ -257,13 +282,6 @@ export function AppLayout() {
         </main>
       </div>
 
-      {/*
-        Chat lives at the layout level rather than on a page, so the launcher is in
-        the same corner on every screen and an open conversation survives navigating
-        between them. Every role sees it — it is the one feature that is not split
-        into a manager side and a team-member side.
-      */}
-      <ChatWidget />
     </div>
   );
 }
