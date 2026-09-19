@@ -15,6 +15,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   report_submitted: 'Report submitted',
   ticket_raised: 'Ticket raised',
   ticket_updated: 'Ticket updated',
+  chat_mention: 'Mentioned in Team Chat',
   general: 'General',
 };
 
@@ -34,6 +35,12 @@ export function NotificationsPage() {
 
   const open = async (n: AppNotification) => {
     if (!n.is_read) await markRead(n.id);
+    /* Chat is a widget rather than a route, so the mention is handed to it through
+       the URL — the same way a task notification hands over a ?highlight. */
+    if (n.type === 'chat_mention') {
+      navigate(`${base}?chat=team`);
+      return;
+    }
     if (n.related_ticket_id) {
       navigate(`${base}/tickets?highlight=${n.related_ticket_id}`);
       return;
@@ -98,7 +105,7 @@ export function NotificationsPage() {
         ) : (
           <ul className="divide-y divide-border">
             {visible.map((n) => {
-              const clickable = Boolean(n.related_task_id || n.related_ticket_id);
+              const clickable = Boolean(n.related_task_id || n.related_ticket_id || n.type === 'chat_mention');
               const Tag = clickable ? 'button' : 'div';
               return (
                 <li key={n.id}>

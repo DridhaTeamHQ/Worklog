@@ -203,6 +203,60 @@ data access lives in services, so authorization rules are stated once each.
 - **Analytics** — per-employee productivity, status breakdown, and daily/weekly activity,
   all filterable by employee, department and date range.
 
+### Everyone — chat
+
+A launcher sits in the bottom-right corner of every signed-in screen, with a badge for
+unread messages. It opens onto the company directory: everyone active, conversations
+that have history first and the rest alphabetically behind them. Picking a person opens
+the thread — Enter sends, Shift+Enter starts a new line, and a message you sent shows
+"Read" once the other person has opened it.
+
+**This is the one feature that is not split by role.** A team member, a manager and an
+admin reach the same directory and the same endpoints. The department confinement that
+narrows a manager's task, report and analytics views is deliberately not applied: those
+views are about a department's work, and a message is addressed to a person. What still
+holds is that a thread belongs to its two participants — every read and write is scoped
+to the pair in SQL, so there is no id a third party could pass to reach it.
+
+Above the directory sits **Team Chat** — one company-wide room everybody is in.
+There is deliberately only one, and membership is not stored: every active account is
+in it, so nobody can be left out of it by accident.
+
+In the channel you can tag someone by typing `@`, which opens a picker of everybody on
+the team. A tag is not just styling — the person named gets a notification, and
+clicking it opens the channel. Being tagged yourself is shown harder than someone else
+being tagged: your name is highlighted in the brand colour and the message keeps a
+coloured border, so in a busy room *you were addressed* reads differently from *there
+is traffic*. The channel row carries the two counts separately for the same reason — an
+`@n` badge for mentions and a plain count for ordinary posts.
+
+**A tag cannot be forged.** The client sends which people it thinks were tagged, and
+the server keeps only the ids that belong to an active account *and* whose name is
+actually written in the message. A payload claiming a mention the text does not
+contain is dropped, so the endpoint cannot be used to notify people who were never
+addressed.
+
+**Groups** sit between the two. An admin creates one from the `+` in the chat header,
+names it, and picks who is in it; everybody added can read and post, and an admin can
+rename it later from the pencil in the room. Members see it in their list with a
+preview and an unread badge, and nobody else sees it at all.
+
+The two permissions are deliberately kept apart:
+
+- **Creating and renaming** is administration of who-talks-to-whom, so it is
+  admin-only — the same line already drawn for creating accounts. A manager runs
+  their department but does not decide the company's rooms.
+- **Reading and posting** is participation, decided by membership alone.
+
+So an admin who is not in a group cannot read it, does not see it listed, and is not
+badged for it. Being able to administer a room is not the same as being party to the
+conversation. The UI hides the controls from non-admins, but that is convenience
+only: a hand-written request is refused with a 403 regardless.
+
+Direct conversations remain one-to-one, and nobody — admins included — can read a
+conversation they are not in. All three stores are separate: a DM never appears in a
+room, and a group post never reaches the team channel.
+
 ---
 
 ## Security
@@ -469,6 +523,20 @@ bearer token. Responses are `{ success, data, meta? }` or `{ success: false, err
 | `DELETE` | `/team/:id` | **admin** | Remove a team member and all their data |
 | `GET` | `/team/:id/reports` | manager | That employee's reports |
 | `GET` | `/team/:id/tasks` | manager | That employee's tasks |
+| `GET` | `/chat/contacts` | any | Everyone messageable, with each thread's preview and unread count |
+| `GET` | `/chat/unread-count` | any | Badge count, plus a per-thread breakdown |
+| `GET` | `/chat/:userId/messages` | any | One conversation; `after` fetches only what is new |
+| `POST` | `/chat/:userId/messages` | any | Send a direct message |
+| `PATCH` | `/chat/:userId/read` | any | Mark a conversation read |
+| `GET` | `/chat/team/messages` | any | The team channel; `after` fetches only what is new |
+| `POST` | `/chat/team/messages` | any | Post to the team channel, with optional `mentions` |
+| `PATCH` | `/chat/team/read` | any | Mark the team channel read |
+| `GET` | `/chat/groups` | any | Groups you are a member of |
+| `POST` | `/chat/groups` | **admin** | Create a group and choose who is in it |
+| `PATCH` | `/chat/groups/:id` | **admin** | Rename a group |
+| `GET` | `/chat/groups/:id/messages` | member | One group's messages |
+| `POST` | `/chat/groups/:id/messages` | member | Post to a group |
+| `PATCH` | `/chat/groups/:id/read` | member | Mark a group read |
 
 ---
 

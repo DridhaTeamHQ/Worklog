@@ -16,6 +16,14 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Ordered child-first so foreign keys never block a --fresh rebuild.
 const TABLES = [
+  'chat_group_reads',
+  'chat_group_messages',
+  'chat_group_members',
+  'chat_groups',
+  'team_message_mentions',
+  'team_channel_reads',
+  'team_messages',
+  'chat_messages',
   'personal_todos',
   'password_reset_tokens',
   'notifications',

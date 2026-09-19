@@ -3,7 +3,7 @@ import { nowIso } from '../utils/dates.js';
 
 export const NOTIFICATION_TYPES = [
   'task_assigned', 'task_updated', 'status_changed', 'report_submitted',
-  'ticket_raised', 'ticket_updated', 'general',
+  'ticket_raised', 'ticket_updated', 'chat_mention', 'general',
 ];
 
 /**

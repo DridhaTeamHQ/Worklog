@@ -23,6 +23,7 @@ import adminRoutes from './routes/admins.js';
 import dashboardRoutes from './routes/dashboard.js';
 import todoRoutes from './routes/todos.js';
 import profileRoutes from './routes/profile.js';
+import chatRoutes from './routes/chat.js';
 
 export function createApp() {
   const app = express();
@@ -115,6 +116,7 @@ export function createApp() {
   app.use('/api/admins', adminRoutes);
   app.use('/api/dashboard', dashboardRoutes);
   app.use('/api/todos', todoRoutes);
+  app.use('/api/chat', chatRoutes);
 
   // Serve frontend SPA if built files are present (frontend/dist or backend/public)
   const candidateDirs = [

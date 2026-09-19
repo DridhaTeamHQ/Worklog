@@ -140,3 +140,109 @@ CREATE TABLE IF NOT EXISTS personal_todos (
   updated_at TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS idx_personal_todos_owner_day ON personal_todos (user_id, todo_date, id);
+
+-- Direct messages between two people.
+--
+-- One flat table rather than conversations + participants: every thread here is a
+-- pair, so the pair *is* the conversation and a second table would only restate the
+-- two ids already on the row. A thread is read with a symmetric WHERE over the pair,
+-- which is why both directions are indexed.
+--
+-- Everyone in the company has this: team members, managers and admins alike. The
+-- department scoping that confines a manager's task and report views deliberately
+-- does not apply — a message is addressed to a person, not filed against a department.
+CREATE TABLE IF NOT EXISTS chat_messages (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  sender_id     INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  recipient_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  body          TEXT NOT NULL,
+  -- NULL until the recipient opens the thread. Only the recipient ever sets it, so a
+  -- sender cannot mark their own message as read on someone else's behalf.
+  read_at       TEXT,
+  created_at    TEXT NOT NULL
+);
+-- Reading one thread: both directions of the same pair, oldest first.
+CREATE INDEX IF NOT EXISTS idx_chat_pair ON chat_messages (sender_id, recipient_id, id);
+CREATE INDEX IF NOT EXISTS idx_chat_pair_reverse ON chat_messages (recipient_id, sender_id, id);
+-- The unread badge, which asks only about mail addressed to one person.
+CREATE INDEX IF NOT EXISTS idx_chat_unread ON chat_messages (recipient_id, read_at, id DESC);
+
+-- The team channel: one company-wide room everybody reads and writes.
+--
+-- Deliberately a single room rather than a `channels` table. There is exactly one,
+-- every active account is in it, and membership is therefore not a thing that can be
+-- stored or changed — which means there is no join table to keep correct and no way
+-- for someone to be accidentally left out of it.
+CREATE TABLE IF NOT EXISTS team_messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  sender_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_team_messages_recent ON team_messages (id DESC);
+
+-- Who was tagged in a message.
+--
+-- Stored rather than re-parsed from the body on every read: the body is free text and
+-- a name can be typed that was never meant as a tag. The row is what makes a mention
+-- real — it is what the "@" badge counts and what the notification was sent for.
+CREATE TABLE IF NOT EXISTS team_message_mentions (
+  message_id INTEGER NOT NULL REFERENCES team_messages (id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  PRIMARY KEY (message_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_team_mentions_user ON team_message_mentions (user_id, message_id DESC);
+
+-- How far each person has read.
+--
+-- A high-water mark rather than a read flag per person per message: the channel is
+-- read top to bottom, so one integer answers "what is new for me" without writing a
+-- row per reader per message.
+CREATE TABLE IF NOT EXISTS team_channel_reads (
+  user_id      INTEGER PRIMARY KEY REFERENCES users (id) ON DELETE CASCADE,
+  last_read_id INTEGER NOT NULL DEFAULT 0,
+  updated_at   TEXT NOT NULL
+);
+
+-- Group chats: named rooms an admin creates for a chosen set of people.
+--
+-- Unlike the single team channel, membership here is real data — the whole point is
+-- that a group is *some* people and not others — so it gets a join table and every
+-- read and write is gated on a row in it.
+CREATE TABLE IF NOT EXISTS chat_groups (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  name       TEXT NOT NULL,
+  -- Kept as SET NULL: closing the account of whoever made the group must not take
+  -- the group and its history with it.
+  created_by INTEGER REFERENCES users (id) ON DELETE SET NULL,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS chat_group_members (
+  group_id INTEGER NOT NULL REFERENCES chat_groups (id) ON DELETE CASCADE,
+  user_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  added_at TEXT NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);
+-- "Which groups am I in" — the question every listing starts from.
+CREATE INDEX IF NOT EXISTS idx_group_members_user ON chat_group_members (user_id, group_id);
+
+CREATE TABLE IF NOT EXISTS chat_group_messages (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  group_id   INTEGER NOT NULL REFERENCES chat_groups (id) ON DELETE CASCADE,
+  sender_id  INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  body       TEXT NOT NULL,
+  created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_group_messages_room ON chat_group_messages (group_id, id DESC);
+
+-- How far each member has read each group, the same high-water mark the team
+-- channel uses — one row per member per group rather than per message.
+CREATE TABLE IF NOT EXISTS chat_group_reads (
+  group_id     INTEGER NOT NULL REFERENCES chat_groups (id) ON DELETE CASCADE,
+  user_id      INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  last_read_id INTEGER NOT NULL DEFAULT 0,
+  updated_at   TEXT NOT NULL,
+  PRIMARY KEY (group_id, user_id)
+);

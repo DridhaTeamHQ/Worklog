@@ -1,7 +1,10 @@
 import { api } from './client';
 import type {
-  AnalyticsPayload, AppNotification, DailyReport, DashboardRange, EmployeeDashboard, ManagerDashboard,
-  Manager, PersonalTodo, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail, Ticket,
+  AnalyticsPayload, AppNotification, ChatContact, ChatGroup, ChatMessage, ChatUnread, DailyReport,
+  DashboardRange, GroupMessage,
+  EmployeeDashboard, ManagerDashboard,
+  Manager, PersonalTodo, Priority, Project, Task, TaskStatus, TeamMember, TeamMemberDetail,
+  TeamMessage, Ticket,
   TicketCounts, TicketSeverity, TicketStatus, User,
 } from '../types';
 
@@ -262,6 +265,103 @@ export const todoApi = {
     patch: { title?: string; date?: string; isDone?: boolean; projectId?: number | null; taskId?: number | null },
   ) => api.patch<PersonalTodo>(`/todos/${id}`, patch),
   remove: (id: number) => api.delete<{ id: number; message: string }>(`/todos/${id}`),
+};
+
+/* --------------------------------------------------------------------- chat */
+
+/**
+ * Direct messages.
+ *
+ * Every role reaches this — team members, managers and admins share one directory,
+ * which is why there is no manager-only variant here the way there is for the team
+ * and admin endpoints. The sender is always the signed-in account: no call takes a
+ * "from" id, so there is nothing to spoof.
+ */
+export const chatApi = {
+  /** Everyone messageable, newest thread first, each with its preview and badge. */
+  contacts: (search?: string, signal?: AbortSignal) =>
+    api.get<ChatContact[]>('/chat/contacts', { search }, signal),
+
+  /**
+   * Every badge in one call: the launcher total, each thread's count, and the team
+   * channel's unread and mention counts.
+   */
+  unreadCount: (signal?: AbortSignal) =>
+    api.get<ChatUnread>('/chat/unread-count', undefined, signal),
+
+  /**
+   * One thread, oldest first. Pass `after` to fetch only what arrived since the last
+   * message already on screen — that is how an open thread polls cheaply. Reading a
+   * thread marks it read; `markRead: false` fetches without clearing the badge.
+   */
+  messages: (
+    userId: number,
+    params: { after?: number; limit?: number; markRead?: boolean } = {},
+    signal?: AbortSignal,
+  ) => api.get<ChatMessage[]>(`/chat/${userId}/messages`, {
+    after: params.after,
+    limit: params.limit,
+    markRead: params.markRead === false ? 'false' : undefined,
+  }, signal),
+
+  send: (userId: number, body: string) =>
+    api.post<ChatMessage>(`/chat/${userId}/messages`, { body }),
+
+  markRead: (userId: number) =>
+    api.patch<{ marked: number; unread: number }>(`/chat/${userId}/read`, {}),
+
+  /**
+   * The team channel — one room the whole company is in, so none of these take an id.
+   *
+   * `mentions` is who the sender tagged. The server keeps only the ids whose name is
+   * actually written in the message, so a stale picker cannot tag someone silently.
+   */
+  /**
+   * Group chats. Listing, reading and posting are open to members; creating and
+   * renaming are admin-only and the server refuses anyone else.
+   */
+  groups: {
+    list: (signal?: AbortSignal) => api.get<ChatGroup[]>('/chat/groups', undefined, signal),
+
+    create: (name: string, memberIds: number[]) =>
+      api.post<ChatGroup>('/chat/groups', { name, memberIds }),
+
+    rename: (groupId: number, name: string) =>
+      api.patch<ChatGroup>(`/chat/groups/${groupId}`, { name }),
+
+    messages: (
+      groupId: number,
+      params: { after?: number; limit?: number; markRead?: boolean } = {},
+      signal?: AbortSignal,
+    ) => api.get<GroupMessage[]>(`/chat/groups/${groupId}/messages`, {
+      after: params.after,
+      limit: params.limit,
+      markRead: params.markRead === false ? 'false' : undefined,
+    }, signal),
+
+    post: (groupId: number, body: string) =>
+      api.post<GroupMessage>(`/chat/groups/${groupId}/messages`, { body }),
+
+    markRead: (groupId: number) =>
+      api.patch<{ lastReadId: number; unread: number }>(`/chat/groups/${groupId}/read`, {}),
+  },
+
+  team: {
+    messages: (
+      params: { after?: number; limit?: number; markRead?: boolean } = {},
+      signal?: AbortSignal,
+    ) => api.get<TeamMessage[]>('/chat/team/messages', {
+      after: params.after,
+      limit: params.limit,
+      markRead: params.markRead === false ? 'false' : undefined,
+    }, signal),
+
+    post: (body: string, mentions: number[] = []) =>
+      api.post<TeamMessage>('/chat/team/messages', { body, mentions }),
+
+    markRead: () =>
+      api.patch<{ lastReadId: number; unread: number }>('/chat/team/read', {}),
+  },
 };
 
 /* ------------------------------------------------------------------ profile */

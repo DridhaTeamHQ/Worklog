@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 import { NotificationBell } from './NotificationBell';
+import { ChatWidget } from './ChatWidget';
 import { applyTheme, currentTheme, type Theme } from '../lib/theme';
 import { Avatar } from './ui';
 import { isManagerLevel, roleLabel } from '../types';
@@ -255,6 +256,14 @@ export function AppLayout() {
           <Outlet />
         </main>
       </div>
+
+      {/*
+        Chat lives at the layout level rather than on a page, so the launcher is in
+        the same corner on every screen and an open conversation survives navigating
+        between them. Every role sees it — it is the one feature that is not split
+        into a manager side and a team-member side.
+      */}
+      <ChatWidget />
     </div>
   );
 }

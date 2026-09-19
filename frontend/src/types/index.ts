@@ -182,6 +182,126 @@ export interface PersonalTodo {
   updated_at: string;
 }
 
+/* ---------------------------------------------------------------------- chat */
+
+/**
+ * Somebody the signed-in user can message, with the state of their thread.
+ *
+ * The directory and the conversation list are the same list: everyone active appears,
+ * and the ones with history simply carry a preview. `last_message` is null for a
+ * person who has never been messaged, which is what the UI reads to tell the two
+ * apart rather than a separate flag.
+ */
+export interface ChatContact {
+  id: number;
+  name: string;
+  email: string;
+  role: Role;
+  department: string | null;
+  job_title: string | null;
+  profile_image: string | null;
+  /** The most recent message either way, or null when the thread is empty. */
+  last_message: string | null;
+  last_message_at: string | null;
+  /** True when the preview is something the signed-in user sent. */
+  last_message_mine: boolean;
+  /** How many of this person's messages the signed-in user has not read. */
+  unread: number;
+}
+
+/** One direct message. `is_read` is only ever meaningful for messages you sent. */
+export interface ChatMessage {
+  id: number;
+  sender_id: number;
+  recipient_id: number;
+  body: string;
+  read_at: string | null;
+  is_read: boolean;
+  created_at: string;
+}
+
+/** Somebody tagged in a team-channel message. */
+export interface ChatMention {
+  id: number;
+  name: string;
+}
+
+/**
+ * A post in the team channel — the one room everybody is in.
+ *
+ * Unlike a `ChatMessage` it has no recipient: it is addressed to the whole company.
+ * It carries its sender's details because a room shows who is talking, and the
+ * mentions it resolved to, which is what the UI highlights and what decided who got
+ * a notification.
+ */
+export interface TeamMessage {
+  id: number;
+  sender_id: number;
+  body: string;
+  created_at: string;
+  sender_name: string;
+  sender_role: Role;
+  sender_department: string | null;
+  sender_profile_image: string | null;
+  mentions: ChatMention[];
+}
+
+/** Somebody in a group. Enough to draw them, never their credentials. */
+export interface ChatGroupMember {
+  id: number;
+  name: string;
+  role: Role;
+  department: string | null;
+  profile_image: string | null;
+}
+
+/**
+ * A named room an admin created for a chosen set of people.
+ *
+ * Unlike the team channel, membership is real: `members` is who can open it. Only an
+ * admin can create or rename one, but reading and posting is decided by membership,
+ * so an admin who is not in a group does not see it here either.
+ */
+export interface ChatGroup {
+  id: number;
+  name: string;
+  created_by: number | null;
+  created_at: string;
+  updated_at: string;
+  members: ChatGroupMember[];
+  member_count: number;
+  last_message: string | null;
+  last_message_at: string | null;
+  last_sender_name: string | null;
+  last_message_mine: boolean;
+  unread: number;
+}
+
+/** A post in a group room. Carries its sender, because a room shows who is talking. */
+export interface GroupMessage {
+  id: number;
+  group_id: number;
+  sender_id: number;
+  body: string;
+  created_at: string;
+  sender_name: string;
+  sender_role: Role;
+  sender_department: string | null;
+  sender_profile_image: string | null;
+}
+
+/** What the launcher and the conversation list need to draw their badges. */
+export interface ChatUnread {
+  /** The launcher number: direct messages plus unread team posts. */
+  unread: number;
+  /** Direct messages only. */
+  direct: number;
+  threads: { user_id: number; unread: number }[];
+  team: { unread: number; mentions: number };
+  /** Unread across every group the viewer is in. */
+  groups: number;
+}
+
 export interface TicketCounts {
   total: number;
   open: number;
@@ -194,7 +314,7 @@ export interface TicketCounts {
 
 export type NotificationType =
   | 'task_assigned' | 'task_updated' | 'status_changed' | 'report_submitted'
-  | 'ticket_raised' | 'ticket_updated' | 'general';
+  | 'ticket_raised' | 'ticket_updated' | 'chat_mention' | 'general';
 
 export interface AppNotification {
   id: number;
