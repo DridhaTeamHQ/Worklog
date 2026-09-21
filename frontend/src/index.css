@@ -270,6 +270,29 @@
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-muted-foreground/50;
   }
+
+  /*
+    The messaging-app scrollbar: a 6px thumb with no padding ring, for lists where the
+    bar sits right against the content and the default 10px reads as a piece of
+    furniture. Opt in per scroll container — the page scrollbar above stays as it is.
+  */
+  .scrollbar-slim {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border) transparent;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full border-0;
+  }
+
+  .scrollbar-slim::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
 }
 
 @keyframes fade-in {

@@ -48,6 +48,17 @@ const THREAD_POLL_MS = 5_000;
 /** Below this, searching messages is more noise than signal. */
 const MIN_SEARCH = 2;
 
+/**
+ * The selected room's row in the sidebar.
+ *
+ * A translucent wash of the brand coral rather than a solid fill, so the row reads as
+ * a pane of tinted glass laid over the list: the name and subtitle underneath keep
+ * their own colours instead of being forced onto an `accent-foreground`. The inset
+ * ring is what gives it an edge at that low opacity — without it the tint alone is
+ * too faint to find at a glance in dark mode.
+ */
+const SELECTED_ROOM = 'bg-primary/10 ring-1 ring-inset ring-primary/25';
+
 /** Which room is open. `null` is the directory. */
 /** Anything that can appear in a room: a DM, a channel post, or a group post. */
 type RoomMessage = ChatMessage | TeamMessage | GroupMessage;
@@ -711,7 +722,7 @@ function DirectoryView({
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto">
+      <div className="scrollbar-slim flex-1 space-y-0.5 overflow-y-auto px-2 py-2">
         {error && <p className="px-4 py-3 text-sm text-destructive" role="alert">{error}</p>}
 
         {/*
@@ -723,16 +734,16 @@ function DirectoryView({
           type="button"
           onClick={onPickTeam}
           aria-current={active?.kind === 'team' ? 'true' : undefined}
-          className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
-            active?.kind === 'team' ? 'bg-accent' : 'bg-muted/40 hover:bg-muted'
+          className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+            active?.kind === 'team' ? SELECTED_ROOM : 'bg-muted/40 hover:bg-muted'
           }`}
         >
-          <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary-strong">
-            <Users className="h-5 w-5" />
+          <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary-strong">
+            <Users className="h-6 w-6" />
           </span>
           <span className="min-w-0 flex-1">
-            <span className="block truncate text-sm font-semibold text-foreground">Team Chat</span>
-            <span className="mt-0.5 block truncate text-xs text-muted-foreground">
+            <span className="block truncate text-[15px] font-medium text-foreground">Team Chat</span>
+            <span className="mt-0.5 block truncate text-sm text-muted-foreground">
               Everyone · tag someone with @
             </span>
           </span>
@@ -755,35 +766,35 @@ function DirectoryView({
 
         {visibleGroups.length > 0 && (
           <>
-            <p className="eyebrow flex items-center justify-between px-4 pb-1 pt-3 text-muted-foreground">
+            <p className="eyebrow flex items-center justify-between px-3 pb-1 pt-3 text-muted-foreground">
               Groups
               {groupUnread > 0 && (
                 <span className="font-semibold text-primary-strong">{groupUnread} unread</span>
               )}
             </p>
-            <ul>
+            <ul className="space-y-0.5">
             {visibleGroups.map((g) => (
               <li key={g.id}>
                 <button
                   type="button"
                   onClick={() => onPickGroup(g)}
                   aria-current={active?.kind === 'group' && active.group.id === g.id ? 'true' : undefined}
-                  className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
-                    active?.kind === 'group' && active.group.id === g.id ? 'bg-accent' : 'hover:bg-muted'
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                    active?.kind === 'group' && active.group.id === g.id ? SELECTED_ROOM : 'hover:bg-muted'
                   }`}
                 >
-                  <span className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Users className="h-5 w-5" />
+                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <Users className="h-6 w-6" />
                   </span>
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-foreground">{g.name}</span>
+                      <span className="truncate text-[15px] font-medium text-foreground">{g.name}</span>
                       {g.last_message_at && (
-                        <span className="shrink-0 text-[11px] text-muted-foreground">{relativeTime(g.last_message_at)}</span>
+                        <span className="shrink-0 text-xs text-muted-foreground">{relativeTime(g.last_message_at)}</span>
                       )}
                     </span>
                     <span className="mt-0.5 flex items-center justify-between gap-2">
-                      <span className="truncate text-xs text-muted-foreground">
+                      <span className="truncate text-sm text-muted-foreground">
                         {g.last_message
                           ? `${g.last_message_mine ? 'You' : g.last_sender_name}: ${g.last_message}`
                           : `${g.member_count} member${g.member_count === 1 ? '' : 's'}`}
@@ -804,7 +815,7 @@ function DirectoryView({
         )}
 
         {contacts.length > 0 && (
-          <p className="eyebrow px-4 pb-1 pt-3 text-muted-foreground">People</p>
+          <p className="eyebrow px-3 pb-1 pt-3 text-muted-foreground">People</p>
         )}
 
         {loading && contacts.length === 0 ? (
@@ -818,29 +829,29 @@ function DirectoryView({
               : 'People appear here as they are added to the team.'}
           />
         ) : (
-          <ul>
+          <ul className="space-y-0.5">
             {contacts.map((c) => (
               <li key={c.id}>
                 <button
                   type="button"
                   onClick={() => onPick(c)}
                   aria-current={active?.kind === 'dm' && active.contact.id === c.id ? 'true' : undefined}
-                  className={`flex w-full items-center gap-3 border-b border-border px-4 py-3 text-left transition-colors ${
-                    active?.kind === 'dm' && active.contact.id === c.id ? 'bg-accent' : 'hover:bg-muted'
+                  className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition-colors ${
+                    active?.kind === 'dm' && active.contact.id === c.id ? SELECTED_ROOM : 'hover:bg-muted'
                   }`}
                 >
-                  <Avatar name={c.name} src={c.profile_image} size="md" />
+                  <Avatar name={c.name} src={c.profile_image} size="lg" />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
-                      <span className="truncate text-sm font-semibold text-foreground">{c.name}</span>
+                      <span className="truncate text-[15px] font-medium text-foreground">{c.name}</span>
                       {c.last_message_at && (
-                        <span className="shrink-0 text-[11px] text-muted-foreground">
+                        <span className="shrink-0 text-xs text-muted-foreground">
                           {relativeTime(c.last_message_at)}
                         </span>
                       )}
                     </span>
                     <span className="mt-0.5 flex items-center justify-between gap-2">
-                      <span className="truncate text-xs text-muted-foreground">
+                      <span className="truncate text-sm text-muted-foreground">
                         {c.last_message
                           ? `${c.last_message_mine ? 'You: ' : ''}${c.last_message}`
                           : `${roleLabel(c.role)}${c.department ? ` · ${c.department}` : ''}`}
