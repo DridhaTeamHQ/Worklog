@@ -18,27 +18,29 @@ const STATUS_LABEL = {
 };
 
 const SELECT_TICKET = `
-  SELECT t.id, t.project_id, t.task_id, t.reporter_id, t.ticket_number,
+  SELECT t.id, t.project_id, t.task_id, t.reporter_id, t.assignee_id, t.ticket_number,
          t.title, t.description, t.severity, t.status,
          t.resolution_note, t.resolved_at, t.created_at, t.updated_at,
          p.name AS project_name, p.project_key,
          p.project_key || '-B' || t.ticket_number AS ticket_key,
          r.name AS reporter_name, r.email AS reporter_email,
          r.department AS reporter_department, r.profile_image AS reporter_profile_image,
+         ass.name AS assignee_name, ass.email AS assignee_email,
+         ass.department AS assignee_department, ass.profile_image AS assignee_profile_image,
          a.title AS task_title,
          CASE WHEN a.id IS NULL THEN NULL
               ELSE p.project_key || '-' || a.task_number END AS task_key
     FROM tickets t
     JOIN projects p ON p.id = t.project_id
     JOIN users r ON r.id = t.reporter_id
+    LEFT JOIN users ass ON ass.id = t.assignee_id
     LEFT JOIN assigned_tasks a ON a.id = t.task_id`;
 
 /**
- * List tickets. `reporterId` is forced by the route for team members, which is what
- * stops one person reading another's bug reports.
+ * List tickets. Supports department scoping, reporter filter, and assignee filter.
  */
 export async function listTickets({
-  reporterId, projectId, taskId, status, severity, search, department,
+  reporterId, assigneeId, projectId, taskId, status, severity, search, department,
   sort = 'created_desc', limit = 100, offset = 0,
 } = {}) {
   const db = await getDb();
@@ -46,7 +48,13 @@ export async function listTickets({
   const params = [];
 
   if (reporterId) { where.push('t.reporter_id = ?'); params.push(reporterId); }
-  // Filters on the reporter's department, which is what confines a manager to
+  if (assigneeId === 'unassigned') {
+    where.push('t.assignee_id IS NULL');
+  } else if (assigneeId) {
+    where.push('t.assignee_id = ?');
+    params.push(assigneeId);
+  }
+  // Filters on the reporter's department, which is what confines a department view to
   // the tickets their own people raised.
   if (department) { where.push('r.department = ?'); params.push(department); }
   if (projectId) { where.push('t.project_id = ?'); params.push(projectId); }
@@ -60,9 +68,10 @@ export async function listTickets({
   }
   if (search) {
     where.push(`(LOWER(t.title) LIKE ? OR LOWER(t.description) LIKE ? OR LOWER(r.name) LIKE ?
+                 OR LOWER(COALESCE(ass.name, '')) LIKE ?
                  OR LOWER(p.project_key || '-B' || t.ticket_number) LIKE ?)`);
     const like = `%${search.toLowerCase()}%`;
-    params.push(like, like, like, like);
+    params.push(like, like, like, like, like);
   }
 
   const orderBy = {
@@ -83,6 +92,7 @@ export async function listTickets({
        FROM tickets t
        JOIN projects p ON p.id = t.project_id
        JOIN users r ON r.id = t.reporter_id
+       LEFT JOIN users ass ON ass.id = t.assignee_id
        ${whereSql}`,
     params,
   );
@@ -158,20 +168,23 @@ export async function createTicket({ reporterId, projectId, taskId, title, descr
 }
 
 /**
- * Status change. A manager may move any ticket; the reporter may only close or reopen
- * their own — deciding something is *resolved* is the manager's call, not the reporter's.
+ * Status change. A manager may move any ticket; the reporter and assignee may also
+ * update tickets they are involved with.
  */
 export async function updateTicketStatus({ ticketId, status, resolutionNote, actor }) {
   const db = await getDb();
   const ticket = await db.get('SELECT * FROM tickets WHERE id = ?', [ticketId]);
   if (!ticket) throw notFound('That ticket no longer exists.');
 
+  const isReporter = ticket.reporter_id === actor.id;
+  const isAssignee = ticket.assignee_id === actor.id;
+
   if (isTeamMember(actor.role)) {
-    if (ticket.reporter_id !== actor.id) {
-      throw forbidden('You can only update tickets you raised.');
+    if (!isReporter && !isAssignee) {
+      throw forbidden('You can only update tickets you raised or are assigned to.');
     }
-    if (!['closed', 'open'].includes(status)) {
-      throw forbidden('Only your manager can mark a ticket as in progress or resolved.');
+    if (!isAssignee && !['closed', 'open'].includes(status)) {
+      throw forbidden('Only the assigned member or your manager can mark a ticket as in progress or resolved.');
     }
   }
 
@@ -190,11 +203,10 @@ export async function updateTicketStatus({ ticketId, status, resolutionNote, act
     const project = await tx.get('SELECT project_key FROM projects WHERE id = ?', [ticket.project_id]);
     const key = `${project?.project_key}-B${ticket.ticket_number}`;
 
-    // Tell the other side. A reporter closing their own ticket informs the manager;
-    // a manager moving it informs the reporter.
+    // Tell the other parties.
     if (isTeamMember(actor.role)) {
       const task = await tx.get('SELECT manager_id FROM assigned_tasks WHERE id = ?', [ticket.task_id]);
-      if (task?.manager_id) {
+      if (task?.manager_id && task.manager_id !== actor.id) {
         await createNotification({
           userId: task.manager_id,
           title: 'Ticket updated',
@@ -203,11 +215,96 @@ export async function updateTicketStatus({ ticketId, status, resolutionNote, act
           relatedTicketId: ticketId,
         }, tx);
       }
+      if (ticket.reporter_id !== actor.id) {
+        await createNotification({
+          userId: ticket.reporter_id,
+          title: 'Your ticket was updated',
+          message: `${actor.name} set ${key} to ${STATUS_LABEL[status]}.`,
+          type: 'ticket_updated',
+          relatedTicketId: ticketId,
+        }, tx);
+      }
     } else {
+      if (ticket.reporter_id !== actor.id) {
+        await createNotification({
+          userId: ticket.reporter_id,
+          title: 'Your ticket was updated',
+          message: `${actor.name} set ${key} to ${STATUS_LABEL[status]}.`,
+          type: 'ticket_updated',
+          relatedTicketId: ticketId,
+        }, tx);
+      }
+      if (ticket.assignee_id && ticket.assignee_id !== actor.id && ticket.assignee_id !== ticket.reporter_id) {
+        await createNotification({
+          userId: ticket.assignee_id,
+          title: 'Assigned ticket updated',
+          message: `${actor.name} set ${key} to ${STATUS_LABEL[status]}.`,
+          type: 'ticket_updated',
+          relatedTicketId: ticketId,
+        }, tx);
+      }
+    }
+  });
+
+  return getTicketById(ticketId);
+}
+
+/**
+ * Assign or reassign a ticket to a member of that ticket's department.
+ */
+export async function assignTicket({ ticketId, assigneeId, actor }) {
+  const db = await getDb();
+  const ticket = await db.get(
+    `SELECT t.*, p.project_key, r.name AS reporter_name, r.department AS reporter_department
+       FROM tickets t
+       JOIN projects p ON p.id = t.project_id
+       JOIN users r ON r.id = t.reporter_id
+      WHERE t.id = ?`,
+    [ticketId],
+  );
+  if (!ticket) throw notFound('That ticket no longer exists.');
+
+  let assignee = null;
+  if (assigneeId) {
+    assignee = await db.get(
+      'SELECT id, name, email, department, is_active FROM users WHERE id = ?',
+      [assigneeId],
+    );
+    if (!assignee) throw notFound('That team member could not be found.');
+    if (!assignee.is_active) throw badRequest('Cannot assign ticket to an inactive user.');
+    if (ticket.reporter_department && assignee.department && ticket.reporter_department !== assignee.department) {
+      throw badRequest(`Cannot assign ticket to a member of a different department (${assignee.department}).`);
+    }
+  }
+
+  const ts = nowIso();
+  const nextAssigneeId = assignee ? assignee.id : null;
+
+  await db.transaction(async (tx) => {
+    await tx.run(
+      'UPDATE tickets SET assignee_id = ?, updated_at = ? WHERE id = ?',
+      [nextAssigneeId, ts, ticketId],
+    );
+
+    const key = `${ticket.project_key}-B${ticket.ticket_number}`;
+
+    if (assignee && assignee.id !== actor.id) {
+      await createNotification({
+        userId: assignee.id,
+        title: 'Ticket assigned to you',
+        message: `${actor.name} assigned ticket ${key} ("${ticket.title}") to you.`,
+        type: 'ticket_updated',
+        relatedTicketId: ticketId,
+      }, tx);
+    }
+
+    if (ticket.reporter_id !== actor.id && (!assignee || assignee.id !== ticket.reporter_id)) {
       await createNotification({
         userId: ticket.reporter_id,
-        title: 'Your ticket was updated',
-        message: `${actor.name} set ${key} to ${STATUS_LABEL[status]}.`,
+        title: 'Ticket updated',
+        message: assignee
+          ? `${actor.name} assigned ${key} to ${assignee.name}.`
+          : `${actor.name} unassigned ${key}.`,
         type: 'ticket_updated',
         relatedTicketId: ticketId,
       }, tx);
@@ -255,8 +352,8 @@ export async function deleteTicket({ ticketId, actor }) {
   return true;
 }
 
-/** Counts for the dashboards. `reporterId` scopes it to one person. */
-export async function ticketCounts({ reporterId, department, from } = {}) {
+/** Counts for the dashboards. Scoped by reporter, assignee, or department. */
+export async function ticketCounts({ reporterId, assigneeId, department, from } = {}) {
   const db = await getDb();
   const where = [];
   const params = [];
@@ -264,6 +361,7 @@ export async function ticketCounts({ reporterId, department, from } = {}) {
   // same way it reaches tasks — by when they were reported.
   if (from) { where.push('substr(t.created_at, 1, 10) >= ?'); params.push(from); }
   if (reporterId) { where.push('t.reporter_id = ?'); params.push(reporterId); }
+  if (assigneeId) { where.push('t.assignee_id = ?'); params.push(assigneeId); }
   // Same rule as listTickets: a ticket belongs to the department of whoever raised it.
   if (department) { where.push('r.department = ?'); params.push(department); }
   const clause = where.length ? `WHERE ${where.join(' AND ')}` : '';

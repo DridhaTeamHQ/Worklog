@@ -151,6 +151,11 @@ export interface Ticket {
   reporter_email: string;
   reporter_department: string | null;
   reporter_profile_image: string | null;
+  assignee_id: number | null;
+  assignee_name: string | null;
+  assignee_email: string | null;
+  assignee_department: string | null;
+  assignee_profile_image: string | null;
   /** Null if the linked task was deleted after the ticket was raised. */
   task_title: string | null;
   task_key: string | null;

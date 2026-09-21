@@ -64,10 +64,10 @@ export default function App() {
                   <Route element={<RequireRole role="team_member" />}>
                     <Route path="/employee" element={<EmployeeDashboard />} />
                     <Route path="/employee/tasks-assigned" element={<TasksAssignedPage />} />
+                    <Route path="/employee/chat" element={<ChatPage />} />
                     <Route path="/employee/tasks-done" element={<TasksDonePage />} />
                     <Route path="/employee/my-day" element={<MyDayPage />} />
                     <Route path="/employee/tickets" element={<TicketsPage />} />
-                    <Route path="/employee/chat" element={<ChatPage />} />
                     <Route path="/employee/notifications" element={<NotificationsPage />} />
                     <Route path="/employee/profile" element={<ProfilePage />} />
                   </Route>

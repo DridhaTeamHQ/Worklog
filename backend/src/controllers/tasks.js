@@ -56,8 +56,8 @@ async function getTaskInScope(req, taskId) {
 
 export const getOne = asyncHandler(async (req, res) => {
   const task = await getTaskInScope(req, parseId(req.params.id));
-  if (isTeamMember(req.user.role) && task.employee_id !== req.user.id) {
-    throw forbidden('You can only view tasks assigned to you.');
+  if (isTeamMember(req.user.role) && task.employee_department !== req.user.department) {
+    throw forbidden('You can only view tasks in your department.');
   }
   return ok(res, task);
 });

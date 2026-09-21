@@ -2,7 +2,7 @@
  * Runs the API and the Vite dev server together with prefixed, colourised output.
  * Either process exiting brings the other down, so Ctrl+C always leaves a clean slate.
  */
-import { spawn } from 'node:child_process';
+import { spawn, execSync } from 'node:child_process';
 import process from 'node:process';
 
 const npm = process.platform === 'win32' ? 'npm.cmd' : 'npm';
@@ -12,6 +12,10 @@ const targets = [
   { name: 'web', color: '\x1b[35m', args: ['--prefix', 'frontend', 'run', 'dev'] },
 ];
 
+if (process.argv.includes('--mobile') || process.argv.includes('--all')) {
+  targets.push({ name: 'mobile', color: '\x1b[32m', args: ['--prefix', 'mobile', 'start'] });
+}
+
 const children = [];
 let shuttingDown = false;
 
@@ -19,7 +23,17 @@ function shutdown(code = 0) {
   if (shuttingDown) return;
   shuttingDown = true;
   for (const child of children) {
-    if (!child.killed) child.kill('SIGTERM');
+    if (!child.killed) {
+      if (process.platform === 'win32' && child.pid) {
+        try {
+          execSync(`taskkill /F /T /PID ${child.pid}`, { stdio: 'ignore' });
+        } catch {
+          // Process may have already exited
+        }
+      } else {
+        child.kill('SIGTERM');
+      }
+    }
   }
   setTimeout(() => process.exit(code), 300);
 }

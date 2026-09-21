@@ -11,7 +11,7 @@ import { isManagerLevel, isTeamMember } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
   listTickets, getTicketById, createTicket, updateTicketStatus, updateTicket, deleteTicket,
-  ticketCounts,
+  assignTicket, ticketCounts,
 } from '../models/ticket.js';
 
 const parseId = (raw) => {
@@ -24,9 +24,22 @@ export const list = asyncHandler(async (req, res) => {
   const q = req.validatedQuery;
 
   if (!isManagerLevel(req.user.role)) {
-    const own = { ...q, reporterId: req.user.id };
-    const { items, total } = await listTickets(own);
-    const counts = await ticketCounts({ reporterId: req.user.id });
+    const department = req.user.department || undefined;
+    const filter = {
+      ...q,
+      department: department || undefined,
+      reporterId: q.reporterId,
+      assigneeId: q.assigneeId,
+    };
+    if (!department) {
+      filter.reporterId = req.user.id;
+    }
+    const { items, total } = await listTickets(filter);
+    const counts = await ticketCounts({
+      department,
+      reporterId: filter.reporterId,
+      assigneeId: filter.assigneeId,
+    });
     return ok(res, items, { total, counts, limit: q.limit, offset: q.offset });
   }
 
@@ -44,7 +57,7 @@ export const list = asyncHandler(async (req, res) => {
 
   const department = scopedDepartment(scope, q.department);
   const { items, total } = await listTickets({ ...q, department });
-  const counts = await ticketCounts({ department });
+  const counts = await ticketCounts({ department, assigneeId: q.assigneeId, reporterId: q.reporterId });
   return ok(res, items, { total, counts, limit: q.limit, offset: q.offset });
 });
 
@@ -57,8 +70,12 @@ export const getOne = asyncHandler(async (req, res) => {
       && !withinScope(departmentScope(req.user), ticket.reporter_department)) {
     throw notFound('That ticket no longer exists.');
   }
-  if (isTeamMember(req.user.role) && ticket.reporter_id !== req.user.id) {
-    throw forbidden('You can only view tickets you raised.');
+  if (isTeamMember(req.user.role)) {
+    const sameDept = req.user.department && ticket.reporter_department === req.user.department;
+    const isParticipant = ticket.reporter_id === req.user.id || ticket.assignee_id === req.user.id;
+    if (!sameDept && !isParticipant) {
+      throw forbidden('You can only view tickets in your department.');
+    }
   }
   return ok(res, ticket);
 });
@@ -97,6 +114,28 @@ export const update = asyncHandler(async (req, res) => {
     patch: req.body,
   });
   return ok(res, ticket);
+});
+
+export const assign = asyncHandler(async (req, res) => {
+  if (isTeamMember(req.user.role)) {
+    throw forbidden('Only managers and admins can assign tickets.');
+  }
+  const ticketId = parseId(req.params.id);
+  const ticket = await getTicketById(ticketId);
+  if (!ticket) throw notFound('That ticket no longer exists.');
+
+  const scope = departmentScope(req.user);
+  if (!withinScope(scope, ticket.reporter_department)) {
+    throw forbidden('You can only assign tickets within your department.');
+  }
+
+  const updatedTicket = await assignTicket({
+    ticketId,
+    assigneeId: req.body.assigneeId ?? null,
+    actor: req.user,
+  });
+
+  return ok(res, updatedTicket);
 });
 
 export const remove = asyncHandler(async (req, res) => {

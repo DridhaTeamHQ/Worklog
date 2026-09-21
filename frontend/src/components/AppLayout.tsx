@@ -33,14 +33,11 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
 ];
 
-const EMPLOYEE_NAV: NavItem[] = [
-  { to: '/employee', label: 'Dashboard', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
-  { to: '/employee/tasks-assigned', label: 'Tasks Assigned', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
-  { to: '/employee/tasks-done', label: 'Tasks Done', icon: <CheckSquare className="h-[18px] w-[18px]" /> },
-  { to: '/employee/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
-  { to: '/employee/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
+  { to: '/employee', label: 'Home', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
+  { to: '/employee/tasks-assigned', label: 'Task', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { to: '/employee/chat', label: 'Chat', icon: <MessageCircle className="h-[18px] w-[18px]" />, badge: 'chat' },
-  { to: '/employee/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
+  { to: '/employee/tickets', label: 'Ticket', icon: <Bug className="h-[18px] w-[18px]" /> },
+  { to: '/employee/profile', label: 'Profile', icon: <Pencil className="h-[18px] w-[18px]" /> },
 ];
 
 /** Remembered so the choice survives a reload rather than resetting every visit. */

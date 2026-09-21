@@ -123,7 +123,7 @@ export function LoginPage() {
           <div className="absolute left-[15%] top-[5%] h-[24rem] w-[33rem] rounded-full bg-[#101724]" />
           <div
             aria-hidden
-            className="absolute bottom-0 left-[-6.5rem] z-0 h-full w-[78rem] xl:left-[-4rem] xl:w-[86rem]"
+            className="absolute bottom-0 left-[-3.5rem] z-0 h-full w-[78rem] xl:left-[-1.5rem] xl:w-[86rem]"
             style={{
               WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)',
               maskImage: 'linear-gradient(to bottom, transparent 0%, black 10%, black 100%)',

@@ -53,10 +53,20 @@ export const config = {
   env: process.env.NODE_ENV || 'development',
   port: Number(process.env.PORT || 4000),
   appName: process.env.APP_NAME || 'Taskr',
-  corsOrigins: (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean),
+  // Expo may use 8081 or 8082 when another Metro process already owns a port.
+  // Keep the configured origins and allow both local Expo ports in development.
+  corsOrigins: [...new Set([
+    ...(process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
+      .split(',')
+      .map((s) => s.trim())
+      .filter(Boolean),
+    ...(isProd ? [] : [
+      'http://localhost:8081',
+      'http://127.0.0.1:8081',
+      'http://localhost:8082',
+      'http://127.0.0.1:8082',
+    ]),
+  ])],
 
   db: {
     // "postgres" when DATABASE_URL is present, otherwise the embedded SQLite file.

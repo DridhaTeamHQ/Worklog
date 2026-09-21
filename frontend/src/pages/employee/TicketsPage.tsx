@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { Bug, Plus, LayoutGrid, List } from 'lucide-react';
 import { ticketApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
+import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../components/Toast';
 import { RaiseTicketModal } from '../../components/RaiseTicketModal';
 import { TicketList } from '../../components/TicketList';
@@ -22,12 +23,14 @@ const STATUS_TABS: { value: string; label: string }[] = [
   { value: 'closed', label: 'Closed' },
 ];
 
-/** A reporter may withdraw their own ticket or reopen it, but not declare it resolved. */
-const EMPLOYEE_STATUSES: TicketStatus[] = ['open', 'closed'];
+/** A member working on an assigned ticket or reporter can update status */
+const EMPLOYEE_STATUSES: TicketStatus[] = ['open', 'in_progress', 'resolved', 'closed'];
 
 type View = 'board' | 'list';
+type ScopeTab = 'all' | 'assigned_to_me' | 'raised_by_me';
 
 export function TicketsPage() {
+  const { user } = useAuth();
   const toast = useToast();
   const [params, setParams] = useSearchParams();
   const highlightId = Number(params.get('highlight')) || null;
@@ -35,6 +38,7 @@ export function TicketsPage() {
   const [tickets, setTickets] = useState<Ticket[]>([]);
   const [counts, setCounts] = useState<TicketCounts | null>(null);
   const [view, setView] = useState<View>('board');
+  const [scopeTab, setScopeTab] = useState<ScopeTab>('all');
   const [status, setStatus] = useState('');
   const [search, setSearch] = useState('');
   const [loading, setLoading] = useState(true);
@@ -51,6 +55,8 @@ export function TicketsPage() {
       const { data, meta } = await ticketApi.list({
         status: status || undefined,
         search: search || undefined,
+        reporterId: scopeTab === 'raised_by_me' ? user?.id : undefined,
+        assigneeId: scopeTab === 'assigned_to_me' ? user?.id : undefined,
         sort: 'created_desc',
         limit: 200,
       }, signal);
@@ -58,11 +64,11 @@ export function TicketsPage() {
       setCounts((meta?.counts as TicketCounts) ?? null);
     } catch (err) {
       if ((err as Error).name === 'AbortError') return;
-      setError(err instanceof ApiError ? err.message : 'Could not load your tickets.');
+      setError(err instanceof ApiError ? err.message : 'Could not load department tickets.');
     } finally {
       setLoading(false);
     }
-  }, [status, search]);
+  }, [status, search, scopeTab, user?.id]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -104,13 +110,13 @@ export function TicketsPage() {
     }
   };
 
-  const filtered = Boolean(search || status);
+  const filtered = Boolean(search || status || scopeTab !== 'all');
 
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Tickets"
-        subtitle="Bugs you have hit while working on your tasks."
+        title="Department Tickets"
+        subtitle={`Bugs and blockers raised across your department${user?.department ? ` (${user.department})` : ''}.`}
         actions={(
           <button type="button" onClick={() => setRaiseOpen(true)} className="btn-primary">
             <Plus className="h-4 w-4" /> Raise a ticket
@@ -128,6 +134,39 @@ export function TicketsPage() {
       )}
 
       <div className="card">
+        {/* Scope Tabs */}
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border p-3 bg-muted/30">
+          <div className="segmented" role="tablist" aria-label="Scope of tickets">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={scopeTab === 'all'}
+              onClick={() => setScopeTab('all')}
+              className={`segmented-item ${scopeTab === 'all' ? 'segmented-item-active' : ''}`}
+            >
+              All Department
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={scopeTab === 'assigned_to_me'}
+              onClick={() => setScopeTab('assigned_to_me')}
+              className={`segmented-item ${scopeTab === 'assigned_to_me' ? 'segmented-item-active' : ''}`}
+            >
+              Assigned to Me
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={scopeTab === 'raised_by_me'}
+              onClick={() => setScopeTab('raised_by_me')}
+              className={`segmented-item ${scopeTab === 'raised_by_me' ? 'segmented-item-active' : ''}`}
+            >
+              Raised by Me
+            </button>
+          </div>
+        </div>
+
         <div className="flex flex-col gap-3 border-b border-border p-3 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap items-center gap-3">
             <div className="segmented" role="tablist" aria-label="How to show tickets">
@@ -171,24 +210,24 @@ export function TicketsPage() {
               </div>
             )}
           </div>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search your tickets" className="lg:w-64" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search department tickets..." className="lg:w-64" />
         </div>
 
         {loading ? (
-          <LoadingBlock label="Loading your tickets" rows={3} />
+          <LoadingBlock label="Loading department tickets" rows={3} />
         ) : error ? (
           <ErrorState message={error} onRetry={() => void load()} />
         ) : tickets.length === 0 ? (
           <EmptyState
             icon={<Bug className="h-6 w-6" />}
-            title={filtered ? 'No matching tickets' : "You haven't raised any tickets yet."}
+            title={filtered ? 'No matching tickets' : 'No tickets in your department yet.'}
             description={
               filtered
-                ? 'Try a different search term or clear the status filter.'
-                : 'If you hit a bug while working on a task, raise a ticket so your manager knows about it.'
+                ? 'Try a different search term or clear the status/scope filter.'
+                : 'When anyone in your department hits a blocker or bug, tickets will appear here for everyone in the department.'
             }
             action={filtered ? (
-              <button type="button" onClick={() => { setSearch(''); setStatus(''); }} className="btn-secondary">
+              <button type="button" onClick={() => { setSearch(''); setStatus(''); setScopeTab('all'); }} className="btn-secondary">
                 Clear filters
               </button>
             ) : (
@@ -208,7 +247,7 @@ export function TicketsPage() {
                 allowedStatuses={EMPLOYEE_STATUSES}
                 onMove={changeStatus}
                 busyId={updatingId}
-                showReporter={false}
+                showReporter={true}
               />
             ) : (
               <TicketList
@@ -217,12 +256,11 @@ export function TicketsPage() {
                 updatingId={updatingId}
                 allowedStatuses={EMPLOYEE_STATUSES}
                 onStatusChange={changeStatus}
-                showReporter={false}
+                showReporter={true}
               />
             )}
             <p className="border-t border-border px-4 py-3 text-xs text-muted-foreground">
-              You can reopen or close your own tickets — on the board, that is the Open and
-              Closed columns. Marking one <strong>Resolved</strong> is your manager's call.
+              You can track all tickets in your department. You can update any tickets you raised or are assigned to work on.
             </p>
           </>
         )}

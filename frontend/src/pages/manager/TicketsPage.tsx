@@ -39,6 +39,7 @@ export function ManagerTicketsPage() {
   const [status, setStatus] = useState(params.get('status') ?? 'unresolved');
   const [projectId, setProjectId] = useState('');
   const [reporterId, setReporterId] = useState('');
+  const [assigneeId, setAssigneeId] = useState('');
   const [severity, setSeverity] = useState('');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('severity_desc');
@@ -46,6 +47,7 @@ export function ManagerTicketsPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [assigningId, setAssigningId] = useState<number | null>(null);
 
   const [resolving, setResolving] = useState<Ticket | null>(null);
   const [resolutionNote, setResolutionNote] = useState('');
@@ -68,6 +70,7 @@ export function ManagerTicketsPage() {
         status: status || undefined,
         projectId: projectId ? Number(projectId) : undefined,
         reporterId: reporterId ? Number(reporterId) : undefined,
+        assigneeId: assigneeId ? (assigneeId === 'unassigned' ? 'unassigned' : Number(assigneeId)) : undefined,
         severity: severity || undefined,
         search: search || undefined,
         sort,
@@ -81,7 +84,7 @@ export function ManagerTicketsPage() {
     } finally {
       setLoading(false);
     }
-  }, [status, projectId, reporterId, severity, search, sort]);
+  }, [status, projectId, reporterId, assigneeId, severity, search, sort]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -168,6 +171,25 @@ export function ManagerTicketsPage() {
     }
   };
 
+  const handleAssign = async (ticket: Ticket, nextAssigneeId: number | null) => {
+    setAssigningId(ticket.id);
+    try {
+      const { data } = await ticketApi.assign(ticket.id, nextAssigneeId);
+      setTickets((prev) => prev.map((t) => (t.id === ticket.id ? data : t)));
+      const assignedUser = members.find((m) => m.id === nextAssigneeId);
+      toast.success(
+        nextAssigneeId
+          ? `${ticket.ticket_key} assigned to ${assignedUser?.name || 'team member'}.`
+          : `${ticket.ticket_key} is now unassigned.`
+      );
+      void load();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not assign the ticket.');
+    } finally {
+      setAssigningId(null);
+    }
+  };
+
   /**
    * On the board the columns are the status filter, so a status filter on top of them
    * would silently empty three of the four columns. Switching to the board widens to
@@ -178,7 +200,7 @@ export function ManagerTicketsPage() {
     setStatus(next === 'board' ? '' : 'unresolved');
   };
 
-  const hasFilters = Boolean(search || projectId || reporterId || severity
+  const hasFilters = Boolean(search || projectId || reporterId || assigneeId || severity
     || (view === 'list' && status !== 'unresolved'));
 
   return (
@@ -250,10 +272,10 @@ export function ManagerTicketsPage() {
               </div>
             )}
           </div>
-          <SearchInput value={search} onChange={setSearch} placeholder="Search tickets, key or reporter" className="lg:w-72" />
+          <SearchInput value={search} onChange={setSearch} placeholder="Search tickets, key, reporter, or assignee" className="lg:w-72" />
         </div>
 
-        <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="label" htmlFor="tf-project">Project</label>
             <Select id="tf-project" value={projectId} onChange={(v) => setProjectId(v)} options={[{ value: '', label: `All projects` }, ...projects.map((p) => ({ value: String(p.id), label: `${p.project_key} · ${p.name}` }))]} />
@@ -261,6 +283,10 @@ export function ManagerTicketsPage() {
           <div>
             <label className="label" htmlFor="tf-reporter">Reported by</label>
             <Select id="tf-reporter" value={reporterId} onChange={(v) => setReporterId(v)} options={[{ value: '', label: `Everyone` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
+          </div>
+          <div>
+            <label className="label" htmlFor="tf-assignee">Assigned to</label>
+            <Select id="tf-assignee" value={assigneeId} onChange={(v) => setAssigneeId(v)} options={[{ value: '', label: `Everyone` }, { value: 'unassigned', label: `Unassigned` }, ...members.map((m) => ({ value: String(m.id), label: `${m.name}` }))]} />
           </div>
           <div>
             <label className="label" htmlFor="tf-severity">Severity</label>
@@ -282,14 +308,14 @@ export function ManagerTicketsPage() {
             title={hasFilters ? 'No tickets match these filters' : 'No open tickets'}
             description={
               hasFilters
-                ? 'Try another project, a different reporter, or clear the search.'
+                ? 'Try another project, a different reporter or assignee, or clear the search.'
                 : 'Nothing is currently blocking the team. Bugs raised by team members appear here.'
             }
             action={hasFilters && (
               <button
                 type="button"
                 onClick={() => {
-                  setSearch(''); setProjectId(''); setReporterId(''); setSeverity('');
+                  setSearch(''); setProjectId(''); setReporterId(''); setAssigneeId(''); setSeverity('');
                   setStatus(view === 'board' ? '' : 'unresolved');
                 }}
                 className="btn-secondary"
@@ -311,6 +337,9 @@ export function ManagerTicketsPage() {
                 onMove={changeStatus}
                 onDelete={setConfirmDelete}
                 busyId={updatingId}
+                members={members}
+                onAssign={handleAssign}
+                assigningId={assigningId}
               />
             ) : (
               <TicketList
@@ -321,6 +350,9 @@ export function ManagerTicketsPage() {
                 onStatusChange={changeStatus}
                 onDelete={setConfirmDelete}
                 linkReporter
+                members={members}
+                onAssign={handleAssign}
+                assigningId={assigningId}
               />
             )}
           </>

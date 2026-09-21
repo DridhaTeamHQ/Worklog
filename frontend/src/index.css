@@ -230,7 +230,9 @@
 }
 
 @layer base {
-  html { -webkit-text-size-adjust: 100%; }
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
 
   body {
     @apply bg-background text-foreground antialiased;
@@ -245,27 +247,52 @@
   :where(a, button, input, select, textarea, [tabindex]) {
     @apply outline-none ring-0 ring-ring/0 ring-offset-0 ring-offset-background;
     transition: box-shadow 180ms ease-out, border-color 180ms ease-out,
-                background-color 180ms ease-out, color 180ms ease-out;
+      background-color 180ms ease-out, color 180ms ease-out;
   }
+
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     @apply ring-2 ring-ring ring-offset-2;
   }
 
-  ::-webkit-scrollbar { width: 10px; height: 10px; }
-  ::-webkit-scrollbar-track { @apply bg-transparent; }
-  ::-webkit-scrollbar-thumb { @apply bg-border rounded-full border-2 border-solid border-transparent bg-clip-padding; }
-  ::-webkit-scrollbar-thumb:hover { @apply bg-muted-foreground/50; }
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-border rounded-full border-2 border-solid border-transparent bg-clip-padding;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/50;
+  }
 }
 
 @keyframes fade-in {
-  from { opacity: 0; transform: translateY(4px); }
-  to { opacity: 1; transform: none; }
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
 }
 
 /* Anyone who has asked for less motion gets the state change without the movement. */
 @media (prefers-reduced-motion: reduce) {
-  .fade-in { animation: none; }
-  *, *::before, *::after {
+  .fade-in {
+    animation: none;
+  }
+
+  *,
+  *::before,
+  *::after {
     animation-duration: 0.01ms !important;
     transition-duration: 0.01ms !important;
   }
@@ -294,21 +321,37 @@
     Tailwind v4 cannot @apply one component class inside another, so each variant
     repeats the shared base rather than extending `.btn`.
   */
-  .btn, .btn-primary, .btn-secondary, .btn-ghost, .btn-danger {
-    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium
-           transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed
-           disabled:active:scale-100 whitespace-nowrap;
+  .btn,
+  .btn-primary,
+  .btn-secondary,
+  .btn-ghost,
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-md px-4 py-2 text-sm font-medium transition-all active:scale-[0.98] disabled:opacity-50 disabled:cursor-not-allowed disabled:active:scale-100 whitespace-nowrap;
   }
-  .btn-primary { @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90; }
-  .btn-secondary { @apply bg-background text-foreground border border-border shadow-sm hover:bg-accent hover:text-accent-foreground; }
-  .btn-ghost { @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground; }
-  .btn-danger { @apply bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90; }
-  .btn-sm { @apply px-3 py-1.5 text-xs; }
 
-/* The round icon button that marks a screen. Neutral: it is chrome, not an action. */
+  .btn-primary {
+    @apply bg-primary text-primary-foreground shadow-sm hover:bg-primary/90;
+  }
+
+  .btn-secondary {
+    @apply bg-background text-foreground border border-border shadow-sm hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .btn-ghost {
+    @apply text-muted-foreground hover:bg-accent hover:text-accent-foreground;
+  }
+
+  .btn-danger {
+    @apply bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/90;
+  }
+
+  .btn-sm {
+    @apply px-3 py-1.5 text-xs;
+  }
+
+  /* The round icon button that marks a screen. Neutral: it is chrome, not an action. */
   .icon-btn {
-    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full
-           bg-foreground text-background transition-transform active:scale-95 hover:bg-foreground/90;
+    @apply inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-foreground text-background transition-transform active:scale-95 hover:bg-foreground/90;
   }
 
   /*
@@ -317,12 +360,12 @@
     three is what makes a field look like it snaps.
   */
   .input {
-    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm
-           placeholder:text-muted-foreground transition-all duration-200 ease-out
-           hover:border-muted-foreground/40 focus:border-ring
-           disabled:bg-muted disabled:text-muted-foreground disabled:hover:border-input;
+    @apply w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground shadow-sm placeholder:text-muted-foreground transition-all duration-200 ease-out hover:border-muted-foreground/40 focus:border-ring disabled:bg-muted disabled:text-muted-foreground disabled:hover:border-input;
   }
-  .input-error { @apply border-destructive focus:border-destructive; }
+
+  .input-error {
+    @apply border-destructive focus:border-destructive;
+  }
 
   /*
     A select renders the platform's own chevron, which is grey on every OS and cannot
@@ -338,18 +381,31 @@
     background-position: right 0.7rem center;
     background-size: 1.1rem 1.1rem;
   }
-  select.input:disabled { @apply cursor-not-allowed opacity-70; }
+
+  select.input:disabled {
+    @apply cursor-not-allowed opacity-70;
+  }
 
   /* Checkboxes and radios follow the primary rather than the browser default blue. */
-  input[type='checkbox'], input[type='radio'] { accent-color: var(--primary); }
+  input[type='checkbox'],
+  input[type='radio'] {
+    accent-color: var(--primary);
+  }
 
-  .label { @apply block text-sm font-medium text-foreground mb-1.5; }
-  .hint { @apply text-xs text-muted-foreground mt-1.5; }
-  .field-error { @apply text-xs text-destructive mt-1.5; }
+  .label {
+    @apply block text-sm font-medium text-foreground mb-1.5;
+  }
+
+  .hint {
+    @apply text-xs text-muted-foreground mt-1.5;
+  }
+
+  .field-error {
+    @apply text-xs text-destructive mt-1.5;
+  }
 
   .badge {
-    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium
-           border whitespace-nowrap;
+    @apply inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium border whitespace-nowrap;
   }
 
   /*
@@ -358,80 +414,116 @@
     active item in a tab list. The coral is not needed to say "this one": position and
     elevation already do.
   */
-  .segmented { @apply inline-flex gap-1 rounded-lg bg-muted p-1; }
-  .segmented-item {
-    @apply rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground
-           transition-all duration-200 ease-out hover:text-foreground;
+  .segmented {
+    @apply inline-flex gap-1 rounded-lg bg-muted p-1;
   }
+
+  .segmented-item {
+    @apply rounded-md px-3 py-1.5 text-sm font-medium text-muted-foreground transition-all duration-200 ease-out hover:text-foreground;
+  }
+
   .segmented-item-active {
     @apply bg-background text-foreground shadow-sm hover:text-foreground;
   }
 
   /* The filter strip that sits under a page's tabs. */
-  .filter-bar { @apply border-b border-border bg-muted/50 p-4; }
+  .filter-bar {
+    @apply border-b border-border bg-muted/50 p-4;
+  }
 
   .table-wrap {
     /* Tables stay readable on phones by scrolling inside their own container
        rather than stretching the page. */
     @apply overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0;
   }
-  .table { @apply w-full min-w-[640px] text-sm border-collapse; }
+
+  .table {
+    @apply w-full min-w-[640px] text-sm border-collapse;
+  }
 
   .table thead th {
-    @apply text-left text-xs font-medium text-muted-foreground
-           px-4 py-3 border-b border-border bg-muted/50 whitespace-nowrap;
+    @apply text-left text-xs font-medium text-muted-foreground px-4 py-3 border-b border-border bg-muted/50 whitespace-nowrap;
   }
-  .table thead th:first-child { @apply rounded-tl-xl; }
-  .table thead th:last-child { @apply rounded-tr-xl; }
 
-  .table tbody td { @apply px-4 py-3 border-b border-border align-middle; }
-  .table tbody tr:last-child td { @apply border-b-0; }
+  .table thead th:first-child {
+    @apply rounded-tl-xl;
+  }
+
+  .table thead th:last-child {
+    @apply rounded-tr-xl;
+  }
+
+  .table tbody td {
+    @apply px-4 py-3 border-b border-border align-middle;
+  }
+
+  .table tbody tr:last-child td {
+    @apply border-b-0;
+  }
 
   .table tbody tr {
     @apply transition-colors duration-200 ease-out;
   }
-  .table tbody tr:hover { @apply bg-muted/60; }
+
+  .table tbody tr:hover {
+    @apply bg-muted/60;
+  }
 
   /*
     The sidebar. Its own token group, so the dark surface is a decision about the
     sidebar rather than about the app being in dark mode.
   */
   .nav-link {
-    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium
-           text-sidebar-foreground transition-colors
-           hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
+    @apply flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground;
   }
+
   /*
     The one place the coral appears in the navigation: the item you are on. Its label
     is the near-black foreground, which clears the coral at 5.9:1 where white would
     manage 3.4:1.
   */
   .nav-link-active {
-    @apply bg-sidebar-primary text-sidebar-primary-foreground font-semibold
-           hover:bg-sidebar-primary hover:text-sidebar-primary-foreground;
+    @apply bg-sidebar-primary text-sidebar-primary-foreground font-semibold hover:bg-sidebar-primary hover:text-sidebar-primary-foreground;
   }
 
-  .skeleton { @apply animate-pulse rounded-md bg-muted; }
+  .skeleton {
+    @apply animate-pulse rounded-md bg-muted;
+  }
 
   /*
     Used where a list is replaced by another list of the same shape — switching
     projects, changing a filter. The content rises very slightly as it fades, which
     reads as the new set arriving rather than the old one being overwritten.
   */
-  .fade-in { animation: fade-in 220ms ease-out both; }
+  .fade-in {
+    animation: fade-in 220ms ease-out both;
+  }
 }
 
 @layer utilities {
-  .animate-in-up { animation: in-up 0.25s ease-out both; }
+  .animate-in-up {
+    animation: in-up 0.25s ease-out both;
+  }
+
   @keyframes in-up {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
+    from {
+      opacity: 0;
+      transform: translateY(6px);
+    }
+
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 
   @media print {
-    .no-print { display: none !important; }
+    .no-print {
+      display: none !important;
+    }
   }
 }
+
 /*
   ---------------------------------------------------------------------------
   Sign-in page.
@@ -447,6 +539,7 @@
 }
 
 @layer utilities {
+
   /*
     The drifting decorations. Each element sets its own duration and delay inline,
     so identical timing never has them rocking in unison.
@@ -457,23 +550,41 @@
     animation-iteration-count: infinite;
     will-change: transform;
   }
+
   @keyframes float-tilt {
-    0%, 100% { transform: translateY(0) rotate(-7deg); }
-    50% { transform: translateY(-16px) rotate(7deg); }
+
+    0%,
+    100% {
+      transform: translateY(0) rotate(-7deg);
+    }
+
+    50% {
+      transform: translateY(-16px) rotate(7deg);
+    }
   }
 
   /* A band of light crossing the sign-in card, once per cycle. */
-  .animate-sheen { animation: sheen 6s ease-in-out infinite; }
+  .animate-sheen {
+    animation: sheen 6s ease-in-out infinite;
+  }
+
   @keyframes sheen {
-    0%, 55% { transform: translateX(0) skewX(-14deg); }
-    100% { transform: translateX(460%) skewX(-14deg); }
+
+    0%,
+    55% {
+      transform: translateX(0) skewX(-14deg);
+    }
+
+    100% {
+      transform: translateX(460%) skewX(-14deg);
+    }
   }
 }
 
 /* Fix autofill in dark mode */
 input:-webkit-autofill,
-input:-webkit-autofill:hover, 
-input:-webkit-autofill:focus, 
+input:-webkit-autofill:hover,
+input:-webkit-autofill:focus,
 input:-webkit-autofill:active {
   transition: background-color 5000s ease-in-out 0s;
   -webkit-text-fill-color: #fff !important;

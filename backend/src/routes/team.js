@@ -1,15 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireManager, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText, optionalText, isoDate } from '../middleware/validate.js';
 import {
-  list, departments, create, getOne, update, memberReports, memberTasks, remove,
+  list, departments, addDepartment, create, getOne, update, memberReports, memberTasks, remove,
 } from '../controllers/team.js';
 
 const router = Router();
 
 // The whole section is manager-level; a team member hitting any of these gets a 403.
-router.use(requireAuth, requireManager);
+router.use(requireAuth);
 
 const listQuery = z.object({
   search: z.string().trim().max(200).optional(),
@@ -59,8 +59,10 @@ const reportQuery = z.object({
 router.get('/', validate(listQuery, 'query'), list);
 // Static path before '/:id', or 'departments' would be read as an id.
 router.get('/departments', departments);
-// Admin-only. A manager runs their department but does not decide who is in it.
-router.post('/', requireAdmin, validate(createSchema), create);
+router.post('/departments', validate(z.object({ name: safeText(120, 'Department name') })), addDepartment);
+// Managers may add staff to their department; the controller always creates a
+// team_member and the scope rules keep the new staff member in the manager's area.
+router.post('/', validate(createSchema), create);
 router.get('/:id', getOne);
 // Admin-only, like create and delete: a manager runs their department but does not
 // edit the accounts in it.

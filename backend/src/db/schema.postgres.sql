@@ -22,6 +22,13 @@ CREATE TABLE IF NOT EXISTS users (
 CREATE INDEX IF NOT EXISTS idx_users_role ON users (role);
 CREATE INDEX IF NOT EXISTS idx_users_department ON users (department);
 
+CREATE TABLE IF NOT EXISTS departments (
+  name TEXT PRIMARY KEY,
+  created_by INTEGER NOT NULL REFERENCES users(id),
+  created_at TEXT NOT NULL
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_departments_name ON departments (LOWER(name));
+
 CREATE TABLE IF NOT EXISTS daily_task_reports (
   id                SERIAL PRIMARY KEY,
   employee_id       INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
@@ -78,6 +85,7 @@ CREATE TABLE IF NOT EXISTS tickets (
   -- deleted task does not take the bug report down with it.
   task_id        INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL,
   reporter_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  assignee_id    INTEGER REFERENCES users (id) ON DELETE SET NULL,
   ticket_number  INTEGER NOT NULL,
   title          TEXT NOT NULL,
   description    TEXT NOT NULL,
@@ -92,6 +100,7 @@ CREATE TABLE IF NOT EXISTS tickets (
 );
 CREATE INDEX IF NOT EXISTS idx_tickets_project ON tickets (project_id, status);
 CREATE INDEX IF NOT EXISTS idx_tickets_reporter ON tickets (reporter_id, status);
+CREATE INDEX IF NOT EXISTS idx_tickets_assignee ON tickets (assignee_id);
 CREATE INDEX IF NOT EXISTS idx_tickets_task ON tickets (task_id);
 -- The ticket key (e.g. SHMOB-B3) is project_key + ticket_number, so the pair is unique.
 CREATE UNIQUE INDEX IF NOT EXISTS idx_tickets_key ON tickets (project_id, ticket_number);

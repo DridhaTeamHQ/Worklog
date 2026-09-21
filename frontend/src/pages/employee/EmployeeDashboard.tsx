@@ -1,211 +1,44 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
-import {
-  ClipboardList, CheckSquare, Clock, AlertTriangle, ArrowRight, CalendarCheck,
-  FileText, Loader2, PenLine, Bug,
-} from 'lucide-react';
-import { dashboardApi } from '../../api/endpoints';
+import { Link } from 'react-router-dom';
+import { AlertTriangle, ArrowRight, CheckCircle2, Clock3, ListTodo, Loader2 } from 'lucide-react';
+import { dashboardApi, taskApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
-import { EmptyState, ErrorState, PageLoader, StatCard } from '../../components/ui';
-import { TimelineStrip } from '../../components/TimelineStrip';
-import { formatDate, formatTime, reportLines } from '../../lib/format';
-import type { EmployeeDashboard as EmployeeDashboardData } from '../../types';
+import { EmptyState, ErrorState, PageLoader } from '../../components/ui';
+import { formatDate } from '../../lib/format';
+import type { EmployeeDashboard as DashboardData, Task } from '../../types';
 
 export function EmployeeDashboard() {
   const { user } = useAuth();
-  const navigate = useNavigate();
-  const [data, setData] = useState<EmployeeDashboardData | null>(null);
-  const [error, setError] = useState('');
+  const [data, setData] = useState<DashboardData | null>(null);
+  const [completed, setCompleted] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
   const load = useCallback(async () => {
-    setLoading(true);
-    setError('');
+    setLoading(true); setError('');
     try {
-      const res = await dashboardApi.load();
-      setData(res.data as EmployeeDashboardData);
-    } catch (err) {
-      setError(err instanceof ApiError ? err.message : 'Could not load your dashboard.');
-    } finally {
-      setLoading(false);
-    }
+      const [dashboard, done] = await Promise.all([dashboardApi.load(), taskApi.list({ status: 'completed', sort: 'created_desc', limit: 3 })]);
+      setData(dashboard.data as DashboardData); setCompleted(done.data.slice(0, 3));
+    } catch (err) { setError(err instanceof ApiError ? err.message : 'Could not load your home page.'); }
+    finally { setLoading(false); }
   }, []);
-
   useEffect(() => { void load(); }, [load]);
-
   if (loading) return <PageLoader />;
-  if (error || !data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
-
-  const { summary, upcoming_tasks: tasks, recent_reports: reports, today_report: todayReport } = data;
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <h1 className="display-title text-2xl text-foreground sm:text-4xl">
-          Welcome, {user?.name.split(' ')[0]}
-        </h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          {formatDate(new Date().toISOString())} · Here's where your work stands today.
-        </p>
-      </div>
-
-      {/* The two large cards the portal is built around. */}
-      <div className="grid gap-4 sm:grid-cols-2">
-        <button
-          type="button"
-          onClick={() => navigate('/employee/tasks-done')}
-          className="card card-hover group p-6 text-left"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-success/10 text-success">
-              <CheckSquare className="h-6 w-6" />
-            </span>
-            <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground" aria-hidden />
-          </div>
-          <h2 className="mt-4 text-lg font-bold text-foreground">Tasks Done</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Write up what you completed today.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            {summary.submitted_today ? (
-              <span className="badge border-success/25 bg-success/10 text-success">
-                <CalendarCheck className="h-3 w-3" aria-hidden /> Submitted today
-              </span>
-            ) : (
-              <span className="badge border-warning/25 bg-warning/10 text-warning">
-                <Clock className="h-3 w-3" aria-hidden /> Not submitted yet
-              </span>
-            )}
-            <span className="text-xs text-muted-foreground">
-              {summary.total_reports} report{summary.total_reports === 1 ? '' : 's'} submitted overall
-            </span>
-          </div>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => navigate('/employee/tasks-assigned')}
-          className="card card-hover group p-6 text-left"
-        >
-          <div className="flex items-start justify-between gap-4">
-            <span className="inline-flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 text-primary-strong">
-              <ClipboardList className="h-6 w-6" />
-            </span>
-            <ArrowRight className="h-5 w-5 text-muted-foreground transition-transform group-hover:translate-x-1 group-hover:text-foreground" aria-hidden />
-          </div>
-          <h2 className="mt-4 text-lg font-bold text-foreground">Tasks Assigned</h2>
-          <p className="mt-1 text-sm text-muted-foreground">Everything your manager has assigned to you.</p>
-          <div className="mt-4 flex flex-wrap items-center gap-2">
-            <span className="text-2xl font-bold tabular-nums text-foreground">{summary.total_tasks}</span>
-            <span className="text-xs text-muted-foreground">
-              {summary.pending_tasks} pending · {summary.in_progress_tasks} in progress
-            </span>
-            {summary.overdue_tasks > 0 && (
-              <span className="badge border-primary/25 bg-primary/10 text-primary-strong">
-                <AlertTriangle className="h-3 w-3" aria-hidden /> {summary.overdue_tasks} overdue
-              </span>
-            )}
-          </div>
-        </button>
-      </div>
-
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
-        <StatCard label="Pending" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
-        <StatCard label="In Progress" value={summary.in_progress_tasks} accent="blue" icon={<Loader2 className="h-5 w-5" />} />
-        <StatCard label="Completed" value={summary.completed_tasks} accent="emerald" icon={<CheckSquare className="h-5 w-5" />} hint={`${summary.completed_today} today`} />
-        <StatCard label="Overdue" value={summary.overdue_tasks} accent="red" icon={<AlertTriangle className="h-5 w-5" />} />
-      </div>
-
-      <Link
-        to="/employee/tickets"
-        className="card card-hover flex items-center gap-3 p-4 sm:p-5"
-      >
-        <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
-          summary.open_tickets > 0 ? 'bg-destructive/10 text-destructive' : 'bg-muted text-muted-foreground'
-        }`}
-        >
-          <Bug className="h-5 w-5" />
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="font-semibold text-foreground">
-            {summary.open_tickets > 0
-              ? `${summary.open_tickets} open ticket${summary.open_tickets === 1 ? '' : 's'}`
-              : 'No open tickets'}
-          </p>
-          <p className="mt-0.5 text-sm text-muted-foreground">
-            {summary.total_tickets > 0
-              ? `You have raised ${summary.total_tickets} in total.`
-              : 'Hit a bug while working on a task? Raise a ticket so your manager knows.'}
-          </p>
-        </div>
-        <ArrowRight className="h-5 w-5 shrink-0 text-muted-foreground" aria-hidden />
-      </Link>
-
-      {!summary.submitted_today && (
-        <div className="card flex flex-col gap-3 border-warning/25 bg-warning/10 p-5 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-start gap-3">
-            <Clock className="mt-0.5 h-5 w-5 shrink-0 text-warning" aria-hidden />
-            <div>
-              <p className="font-semibold text-warning">You haven't submitted your task report for today.</p>
-              <p className="mt-0.5 text-sm text-warning">Take a minute to log what you got done.</p>
-            </div>
-          </div>
-          <Link to="/employee/tasks-done" className="btn-primary shrink-0">
-            <PenLine className="h-4 w-4" /> Write today's report
-          </Link>
-        </div>
-      )}
-
-      <TimelineStrip
-        tasks={tasks}
-        taskHref={(task) => `/employee/tasks-assigned?highlight=${task.id}`}
-      />
-
-
-      <section className="card">
-        <header className="flex items-center justify-between border-b border-border px-5 py-4">
-          <h2 className="font-semibold text-foreground">Recent task reports</h2>
-          <Link to="/employee/tasks-done" className="text-sm font-semibold text-primary-strong hover:text-primary-strong">
-            View all
-          </Link>
-        </header>
-        {reports.length === 0 ? (
-          <EmptyState
-            icon={<FileText className="h-6 w-6" />}
-            title="No reports yet"
-            description="Your daily task reports will be listed here once you submit one."
-          />
-        ) : (
-          <ul className="divide-y divide-border">
-            {reports.map((report) => (
-              <li key={report.id} className="px-5 py-4">
-                <div className="flex items-baseline justify-between gap-3">
-                  <p className="font-medium text-foreground">{formatDate(report.report_date)}</p>
-                  <p className="shrink-0 text-xs text-muted-foreground">{formatTime(report.created_at)}</p>
-                </div>
-                <ul className="mt-2 space-y-1">
-                  {reportLines(report.task_description).slice(0, 3).map((line, i) => (
-                    <li key={i} className="flex items-start gap-2 text-sm text-muted-foreground">
-                      <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-muted-foreground/40" aria-hidden />
-                      <span className="min-w-0">{line}</span>
-                    </li>
-                  ))}
-                  {reportLines(report.task_description).length > 3 && (
-                    <li className="pl-3.5 text-xs text-muted-foreground">
-                      +{reportLines(report.task_description).length - 3} more
-                    </li>
-                  )}
-                </ul>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-
-
-      {todayReport && (
-        <p className="text-center text-xs text-muted-foreground">
-          Today's report last updated {formatTime(todayReport.updated_at)}
-        </p>
-      )}
-    </div>
-  );
+  if (!data) return <ErrorState message={error || 'No data available.'} onRetry={load} />;
+  const { summary, upcoming_tasks } = data;
+  const stats = [
+    { label: 'My tasks', value: summary.total_tasks, icon: <ListTodo />, tone: 'brand', href: '/employee/tasks-assigned' },
+    { label: 'Completed', value: summary.completed_tasks, icon: <CheckCircle2 />, tone: 'success', href: '/employee/tasks-assigned?status=completed' },
+    { label: 'In progress', value: summary.in_progress_tasks, icon: <Loader2 />, tone: 'info', href: '/employee/tasks-assigned?status=in_progress' },
+    { label: 'Overdue', value: summary.overdue_tasks, icon: <AlertTriangle />, tone: 'danger', href: '/employee/tasks-assigned?status=overdue' },
+  ];
+  return <div className="space-y-7">
+    <div className="flex items-end justify-between gap-4"><div><p className="text-sm font-medium text-primary-strong">{formatDate(new Date().toISOString())}</p><h1 className="display-title mt-1 text-3xl text-foreground sm:text-4xl">Good morning, {user?.name.split(' ')[0]}</h1><p className="mt-2 text-sm text-muted-foreground">Here’s your work at a glance.</p></div><Link to="/employee/tasks-assigned" className="btn-secondary hidden sm:inline-flex">View all tasks <ArrowRight className="h-4 w-4" /></Link></div>
+    <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">{stats.map((s) => <Link key={s.label} to={s.href} className="card card-hover p-4"><span className={`inline-flex h-9 w-9 items-center justify-center rounded-lg ${s.tone === 'danger' ? 'bg-destructive/10 text-destructive' : s.tone === 'success' ? 'bg-success/10 text-success' : s.tone === 'info' ? 'bg-info/10 text-info' : 'bg-primary/10 text-primary-strong'}`}>{s.icon}</span><p className="mt-4 text-sm text-muted-foreground">{s.label}</p><p className="mt-1 text-3xl font-bold text-foreground">{s.value}</p></Link>)}</div>
+    <div className="grid gap-5 lg:grid-cols-2">
+      <section className="card"><header className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold text-foreground">Latest tasks</h2><p className="text-xs text-muted-foreground">Your next three items</p></div><Clock3 className="h-5 w-5 text-muted-foreground" /></header>{upcoming_tasks.length ? <ul className="divide-y divide-border">{upcoming_tasks.slice(0, 3).map((task) => <li key={task.id}><Link to={`/employee/tasks-assigned?highlight=${task.id}`} className="flex items-center gap-3 px-5 py-4 hover:bg-muted"><span className="min-w-0 flex-1"><span className="block truncate font-medium text-foreground">{task.title}</span><span className="mt-1 block text-xs text-muted-foreground">{task.deadline ? `Due ${formatDate(task.deadline)}` : 'No deadline'}</span></span><span className="badge bg-muted text-muted-foreground">{task.effective_status === 'overdue' ? 'Overdue' : task.status === 'in_progress' ? 'In progress' : 'New'}</span></Link></li>)}</ul> : <EmptyState title="No active tasks" description="New work assigned to you will appear here." />}</section>
+      <section className="card"><header className="flex items-center justify-between border-b border-border px-5 py-4"><div><h2 className="font-semibold text-foreground">Last completed</h2><p className="text-xs text-muted-foreground">Your most recent wins</p></div><CheckCircle2 className="h-5 w-5 text-success" /></header>{completed.length ? <ul className="divide-y divide-border">{completed.map((task) => <li key={task.id} className="flex items-center gap-3 px-5 py-4"><span className="inline-flex h-9 w-9 items-center justify-center rounded-full bg-success/10 text-success"><CheckCircle2 className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate font-medium text-foreground">{task.title}</span><span className="mt-1 block text-xs text-muted-foreground">Completed {task.completed_at ? formatDate(task.completed_at) : 'recently'}</span></span></li>)}</ul> : <EmptyState title="Nothing completed yet" description="Completed tasks will be listed here." />}</section>
+    </div>{error && <p className="text-sm text-destructive">{error}</p>}
+  </div>;
 }
+

@@ -200,9 +200,25 @@ export async function listDepartments() {
   const rows = await db.query(
     `SELECT DISTINCT department FROM users
       WHERE role = 'team_member' AND department IS NOT NULL AND department <> ''
+      UNION SELECT name AS department FROM departments
       ORDER BY department`,
   );
   return rows.map((r) => r.department);
+}
+
+export async function createDepartment(name, actorId) {
+  const db = await getDb();
+  const existing = await listDepartments();
+  if (existing.some(value => value.toLowerCase() === name.toLowerCase())) {
+    throw conflict('A department with this name already exists.');
+  }
+  try {
+    await db.run('INSERT INTO departments (name, created_by, created_at) VALUES (?, ?, ?)', [name, actorId, nowIso()]);
+  } catch (error) {
+    if (error.code === '23505' || String(error.message).includes('UNIQUE constraint')) throw conflict('A department with this name already exists.');
+    throw error;
+  }
+  return { name };
 }
 
 /**

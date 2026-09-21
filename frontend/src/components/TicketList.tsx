@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ChevronRight, Trash2, CheckCircle2, Clock } from 'lucide-react';
+import { ChevronRight, Trash2, CheckCircle2, Clock, UserCheck } from 'lucide-react';
 import { Avatar, Spinner, Select } from './ui';
 import { SeverityBadge, TicketStatusBadge, TICKET_STATUS_LABEL } from './Badges';
 import { formatDateTime, relativeTime } from '../lib/format';
-import type { Ticket, TicketStatus } from '../types';
+import type { TeamMember, Ticket, TicketStatus } from '../types';
 
 interface Props {
   tickets: Ticket[];
@@ -18,11 +18,15 @@ interface Props {
   showReporter?: boolean;
   /** Link the reporter through to their detail page (managers only). */
   linkReporter?: boolean;
+  /** Department members available for manager assignment */
+  members?: TeamMember[];
+  onAssign?: (ticket: Ticket, assigneeId: number | null) => void;
+  assigningId?: number | null;
 }
 
 export function TicketList({
   tickets, highlightId, updatingId, allowedStatuses, onStatusChange, onDelete,
-  showReporter = true, linkReporter = false,
+  showReporter = true, linkReporter = false, members, onAssign, assigningId,
 }: Props) {
   const [expanded, setExpanded] = useState<Set<number>>(new Set());
 
@@ -91,24 +95,65 @@ export function TicketList({
                   </span>
                 </div>
 
-                {showReporter && (
-                  <div className="mt-2 flex items-center gap-2 text-sm">
-                    <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
-                    {linkReporter ? (
-                      <Link
-                        to={`/manager/team/${ticket.reporter_id}`}
-                        className="text-foreground hover:text-primary-strong"
-                      >
-                        {ticket.reporter_name}
-                      </Link>
-                    ) : (
-                      <span className="text-foreground">{ticket.reporter_name}</span>
-                    )}
-                    {ticket.reporter_department && (
-                      <span className="text-xs text-muted-foreground">· {ticket.reporter_department}</span>
-                    )}
-                  </div>
-                )}
+                <div className="mt-2.5 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                  {showReporter && (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Reporter:</span>
+                      <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />
+                      {linkReporter ? (
+                        <Link
+                          to={`/manager/team/${ticket.reporter_id}`}
+                          className="text-foreground hover:text-primary-strong"
+                        >
+                          {ticket.reporter_name}
+                        </Link>
+                      ) : (
+                        <span className="text-foreground">{ticket.reporter_name}</span>
+                      )}
+                      {ticket.reporter_department && (
+                        <span className="text-xs text-muted-foreground">({ticket.reporter_department})</span>
+                      )}
+                    </div>
+                  )}
+
+                  {onAssign ? (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground flex items-center gap-1">
+                        <UserCheck className="h-3.5 w-3.5" /> Assigned to:
+                      </span>
+                      <div className="relative">
+                        <Select
+                          value={ticket.assignee_id ? String(ticket.assignee_id) : ''}
+                          disabled={assigningId === ticket.id}
+                          ariaLabel={`Assignee for ${ticket.ticket_key}`}
+                          onChange={(v) => onAssign(ticket, v ? Number(v) : null)}
+                          className="w-48 text-xs py-1"
+                          options={[
+                            { value: '', label: 'Unassigned' },
+                            ...(members || []).map((m) => ({ value: String(m.id), label: m.name })),
+                          ]}
+                        />
+                        {assigningId === ticket.id && (
+                          <span className="absolute right-7 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <Spinner className="h-3 w-3" />
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs text-muted-foreground">Assigned to:</span>
+                      {ticket.assignee_name ? (
+                        <span className="inline-flex items-center gap-1.5 font-medium text-foreground text-xs">
+                          <Avatar name={ticket.assignee_name} src={ticket.assignee_profile_image} size="sm" />
+                          {ticket.assignee_name}
+                        </span>
+                      ) : (
+                        <span className="text-xs italic text-muted-foreground">Unassigned</span>
+                      )}
+                    </div>
+                  )}
+                </div>
 
                 {isOpen && (
                   <div className="mt-3 space-y-3">

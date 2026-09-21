@@ -12,9 +12,9 @@ import type { Project, Task, TaskStatus } from '../../types';
 
 const STATUS_TABS: { value: string; label: string }[] = [
   { value: '', label: 'All' },
-  { value: 'pending', label: 'Pending' },
-  { value: 'in_progress', label: 'In Progress' },
-  { value: 'completed', label: 'Completed' },
+  { value: 'pending', label: 'New task' },
+  { value: 'in_progress', label: 'Progress' },
+  { value: 'completed', label: 'Completed task' },
   { value: 'overdue', label: 'Overdue' },
 ];
 
@@ -28,7 +28,7 @@ export function TasksAssignedPage() {
   const [projectId, setProjectId] = useState<number | null>(
     params.get('projectId') ? Number(params.get('projectId')) : null,
   );
-  const [status, setStatus] = useState('');
+  const [status, setStatus] = useState(() => params.get('status') || '');
   const [search, setSearch] = useState('');
   const [sort, setSort] = useState('deadline_asc');
   const [loading, setLoading] = useState(true);
@@ -129,8 +129,8 @@ export function TasksAssignedPage() {
   return (
     <div className="space-y-5">
       <PageHeader
-        title="Tasks Assigned"
-        subtitle="Everything your manager has assigned to you. Update the status as you go."
+        title="Task"
+        subtitle="All your work, organized by status. Update the status as you go."
       />
 
       {myProjects.length > 1 && (

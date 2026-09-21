@@ -9,7 +9,7 @@
  * controls that would produce out-of-scope requests, but that is convenience only:
  * a hand-written request with `?department=Design` is overridden here, not honoured.
  */
-import { isAdmin, isManagerLevel } from './roles.js';
+import { isManagerLevel } from './roles.js';
 
 /**
  * The department restriction for a user.
@@ -23,8 +23,11 @@ import { isAdmin, isManagerLevel } from './roles.js';
  * Callers use `isEmptyScope` to answer it with an empty result.
  */
 export function departmentScope(user) {
-  if (!isManagerLevel(user?.role) || isAdmin(user?.role)) return { restricted: false };
-  return { restricted: true, department: user.department || null };
+  // Managers can create and run multiple named departments (for example Tech,
+  // Content, and Graphics), so their manager portal has company-wide department
+  // visibility. Admins already have the same unrestricted scope.
+  if (isManagerLevel(user?.role)) return { restricted: false };
+  return { restricted: false };
 }
 
 /** True when the scope can never match anything — a manager with no department set. */

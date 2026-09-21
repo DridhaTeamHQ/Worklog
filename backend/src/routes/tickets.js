@@ -3,13 +3,14 @@ import { z } from 'zod';
 import { requireAuth } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { SEVERITIES, TICKET_STATUSES } from '../utils/constants.js';
-import { list, getOne, create, setStatus, update, remove } from '../controllers/tickets.js';
+import { list, getOne, create, setStatus, update, assign, remove } from '../controllers/tickets.js';
 
 const router = Router();
 router.use(requireAuth);
 
 const listQuery = z.object({
   reporterId: z.coerce.number().int().positive().optional(),
+  assigneeId: z.union([z.coerce.number().int().positive(), z.literal('unassigned')]).optional(),
   projectId: z.coerce.number().int().positive().optional(),
   taskId: z.coerce.number().int().positive().optional(),
   status: z.enum([...TICKET_STATUSES, 'unresolved']).optional(),
@@ -33,16 +34,22 @@ const statusSchema = z.object({
   resolutionNote: optionalText(2000),
 });
 
+const assignSchema = z.object({
+  assigneeId: z.coerce.number().int().positive().nullable(),
+});
+
 const patchSchema = z.object({
   title: safeText(160, 'Ticket title').optional(),
   description: safeText(6000, 'Bug description').optional(),
   severity: z.enum(SEVERITIES).optional(),
+  assigneeId: z.coerce.number().int().positive().nullable().optional(),
 });
 
 router.get('/', validate(listQuery, 'query'), list);
 router.get('/:id', getOne);
 router.post('/', validate(createSchema), create);
 router.patch('/:id/status', validate(statusSchema), setStatus);
+router.patch('/:id/assign', validate(assignSchema), assign);
 router.patch('/:id', validate(patchSchema), update);
 router.delete('/:id', remove);
 

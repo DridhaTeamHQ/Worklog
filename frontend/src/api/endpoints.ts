@@ -224,6 +224,7 @@ export const projectApi = {
 
 export interface TicketFilters {
   reporterId?: number;
+  assigneeId?: number | string;
   projectId?: number;
   taskId?: number;
   status?: string;
@@ -241,9 +242,11 @@ export const ticketApi = {
   create: (input: {
     projectId: number; taskId: number; title: string; description: string; severity: TicketSeverity;
   }) => api.post<{ ticket: Ticket; message: string }>('/tickets', input),
+  assign: (id: number, assigneeId: number | null) =>
+    api.patch<Ticket>(`/tickets/${id}/assign`, { assigneeId }),
   updateStatus: (id: number, status: TicketStatus, resolutionNote?: string) =>
     api.patch<Ticket>(`/tickets/${id}/status`, { status, resolutionNote }),
-  update: (id: number, patch: { title?: string; description?: string; severity?: TicketSeverity }) =>
+  update: (id: number, patch: { title?: string; description?: string; severity?: TicketSeverity; assigneeId?: number | null }) =>
     api.patch<Ticket>(`/tickets/${id}`, patch),
   remove: (id: number) => api.delete<{ message: string }>(`/tickets/${id}`),
 };

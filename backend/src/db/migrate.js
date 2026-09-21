@@ -24,6 +24,7 @@ const TABLES = [
   'team_channel_reads',
   'team_messages',
   'chat_messages',
+  'departments',
   'personal_todos',
   'password_reset_tokens',
   'notifications',
@@ -256,6 +257,9 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'notifications', 'related_ticket_id', 'INTEGER REFERENCES tickets (id) ON DELETE CASCADE')) {
     added.push('notifications.related_ticket_id');
+  }
+  if (await ensureColumn(db, 'tickets', 'assignee_id', 'INTEGER REFERENCES users (id) ON DELETE SET NULL')) {
+    added.push('tickets.assignee_id');
   }
   // Personal to-dos gained optional project/task context after the table shipped.
   if (await ensureColumn(db, 'personal_todos', 'project_id', 'INTEGER REFERENCES projects (id) ON DELETE SET NULL')) {

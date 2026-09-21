@@ -1,9 +1,9 @@
-import { Trash2 } from 'lucide-react';
-import { Avatar } from './ui';
+import { Trash2, UserCheck } from 'lucide-react';
+import { Avatar, Select, Spinner } from './ui';
 import { SeverityBadge } from './Badges';
 import { Board, type BoardColumn } from './Board';
 import { formatDateTime, relativeTime } from '../lib/format';
-import type { Ticket, TicketStatus } from '../types';
+import type { TeamMember, Ticket, TicketStatus } from '../types';
 
 const COLUMNS: { key: TicketStatus; label: string; dot: string }[] = [
   { key: 'open', label: 'Open', dot: 'bg-destructive' },
@@ -21,11 +21,22 @@ interface Props {
   busyId?: number | null;
   /** Hide the reporter where every card is the same person. */
   showReporter?: boolean;
+  members?: TeamMember[];
+  onAssign?: (ticket: Ticket, assigneeId: number | null) => void;
+  assigningId?: number | null;
 }
 
 /** Tickets as a board, one column per status, dragged to change status. */
 export function TicketBoard({
-  tickets, allowedStatuses, onMove, onDelete, busyId = null, showReporter = true,
+  tickets,
+  allowedStatuses,
+  onMove,
+  onDelete,
+  busyId = null,
+  showReporter = true,
+  members = [],
+  onAssign,
+  assigningId = null,
 }: Props) {
   const columns: BoardColumn<Ticket>[] = COLUMNS.map((column) => ({
     ...column,
@@ -67,7 +78,60 @@ export function TicketBoard({
             </p>
           )}
 
-          <div className="mt-3 flex items-center justify-between gap-2 border-t border-border pt-2.5">
+          {/* Assignee section: editable for managers if onAssign provided, or badge if read-only */}
+          {onAssign ? (
+            <div
+              className="mt-2.5 rounded-lg border border-border bg-muted/40 p-2 text-xs"
+              onPointerDown={(e) => e.stopPropagation()}
+              onMouseDown={(e) => e.stopPropagation()}
+            >
+              <div className="mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1 text-[11px] font-medium text-muted-foreground">
+                  <UserCheck className="h-3.5 w-3.5 text-primary" /> Assign to:
+                </span>
+                {ticket.assignee_department && (
+                  <span className="text-[10px] text-muted-foreground">
+                    {ticket.assignee_department}
+                  </span>
+                )}
+              </div>
+              <div className="relative">
+                <Select
+                  value={ticket.assignee_id ? String(ticket.assignee_id) : ''}
+                  disabled={assigningId === ticket.id}
+                  ariaLabel={`Assign ticket ${ticket.ticket_key}`}
+                  onChange={(v) => onAssign(ticket, v ? Number(v) : null)}
+                  className="w-full text-xs py-1"
+                  options={[
+                    { value: '', label: 'Unassigned' },
+                    ...(members || []).map((m) => ({
+                      value: String(m.id),
+                      label: m.job_title ? `${m.name} (${m.job_title})` : m.name,
+                    })),
+                  ]}
+                />
+                {assigningId === ticket.id && (
+                  <span className="absolute right-7 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <Spinner className="h-3 w-3" />
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : (
+            <div className="mt-2 flex items-center justify-between text-[11px] text-muted-foreground">
+              <span className="truncate flex items-center gap-1.5">
+                <UserCheck className="h-3.5 w-3.5 text-primary" />
+                <span className="text-muted-foreground">Assignee:</span>
+                {ticket.assignee_name ? (
+                  <span className="font-medium text-foreground">{ticket.assignee_name}</span>
+                ) : (
+                  <span className="italic text-muted-foreground">Unassigned</span>
+                )}
+              </span>
+            </div>
+          )}
+
+          <div className="mt-2.5 flex items-center justify-between gap-2 border-t border-border pt-2.5">
             {showReporter ? (
               <span className="flex min-w-0 items-center gap-1.5">
                 <Avatar name={ticket.reporter_name} src={ticket.reporter_profile_image} size="sm" />

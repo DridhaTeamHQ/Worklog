@@ -7,10 +7,10 @@
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest, notFound } from '../utils/errors.js';
 import { resolveRange } from '../utils/dates.js';
-import { ROLES } from '../utils/roles.js';
+import { ROLES, isManagerLevel } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
-  listTeamMembers, getTeamMember, listDepartments, createUser, deleteTeamMember, updateTeamMember,
+  listTeamMembers, getTeamMember, listDepartments, createDepartment, createUser, deleteTeamMember, updateTeamMember,
 } from '../models/user.js';
 import { listTasks } from '../models/task.js';
 import { listReports } from '../models/report.js';
@@ -22,6 +22,10 @@ const parseId = (raw) => {
   return id;
 };
 
+export const addDepartment = asyncHandler(async (req, res) => {
+  return created(res, await createDepartment(req.body.name, req.user.id));
+});
+
 /**
  * The roster. A manager sees only their own department; an admin sees everyone.
  * The department is taken from the signed-in user rather than the query string, so
@@ -32,7 +36,9 @@ export const list = asyncHandler(async (req, res) => {
   if (isEmptyScope(scope)) return ok(res, [], { total: 0, scope: null });
 
   const q = req.validatedQuery;
-  const department = scopedDepartment(scope, q.department);
+  const department = isManagerLevel(req.user.role)
+    ? scopedDepartment(scope, q.department)
+    : req.user.department || undefined;
   const members = await listTeamMembers({ ...q, department });
   return ok(res, members, {
     total: members.length,
@@ -66,7 +72,8 @@ export const departments = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/team — invite a team member.
+ * POST /api/team — invite a team member. Managers can use this to grow their
+ * department; the role is deliberately fixed to team_member.
  *
  * No password is set here, by anyone. The account is created without one and the new
  * joiner chooses their own by claiming the invite from the sign-in page, so a
@@ -75,7 +82,9 @@ export const departments = asyncHandler(async (req, res) => {
  * can never be used to mint a manager or an admin.
  */
 export const create = asyncHandler(async (req, res) => {
-  const user = await createUser({ ...req.body, role: ROLES.TEAM_MEMBER });
+  const department = req.body.department;
+  if (!department) throw badRequest('Department is required.');
+  const user = await createUser({ ...req.body, department, role: ROLES.TEAM_MEMBER });
 
   // The invite email is best-effort. The account already exists, so a mail failure
   // must not fail the request — it is reported instead, and the manager is told to
