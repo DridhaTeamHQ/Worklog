@@ -32,7 +32,7 @@ const MANAGER_NAV: NavItem[] = [
   { to: '/manager/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/manager/notifications', label: 'Notifications', icon: <Bell className="h-[18px] w-[18px]" /> },
 ];
-
+const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee', label: 'Home', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
   { to: '/employee/tasks-assigned', label: 'Task', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
   { to: '/employee/chat', label: 'Chat', icon: <MessageCircle className="h-[18px] w-[18px]" />, badge: 'chat' },
