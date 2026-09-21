@@ -130,7 +130,9 @@ export function TicketList({
                           className="w-48 text-xs py-1"
                           options={[
                             { value: '', label: 'Unassigned' },
-                            ...(members || []).map((m) => ({ value: String(m.id), label: m.name })),
+                            ...(members || [])
+                              .filter((m) => !ticket.reporter_department || (m.department && m.department.trim().toLowerCase() === ticket.reporter_department.trim().toLowerCase()) || m.id === ticket.assignee_id)
+                              .map((m) => ({ value: String(m.id), label: m.name })),
                           ]}
                         />
                         {assigningId === ticket.id && (

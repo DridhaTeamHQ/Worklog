@@ -16,6 +16,7 @@
  * requests instead of rebuilding both every time.
  */
 import { createApp } from '../backend/src/app.js';
+import { migrate } from '../backend/src/db/migrate.js';
 
 /*
  * Fail loudly rather than quietly wrong.
@@ -35,6 +36,14 @@ if (process.env.NODE_ENV === 'production' && !process.env.DATABASE_URL) {
 }
 
 const app = createApp();
+
+// Vercel does not run backend/src/server.js, so its normal startup migration is
+// otherwise skipped. Run it once per warm function and keep the rejected promise so
+// every request gets a controlled 503 instead of an opaque 500.
+const databaseReady = migrate().catch((error) => {
+  console.error('[api] database initialization failed:', error);
+  throw error;
+});
 
 /**
  * Rebuilds the path Express should see.
@@ -59,7 +68,15 @@ export function restorePath(url) {
   return `/api${path ? `/${path}` : ''}${query ? `?${query}` : ''}`;
 }
 
-export default function handler(req, res) {
+export default async function handler(req, res) {
+  try {
+    await databaseReady;
+  } catch {
+    return res.status(503).json({
+      success: false,
+      error: { message: 'The API database is temporarily unavailable. Please try again.' },
+    });
+  }
   req.url = restorePath(req.url);
   return app(req, res);
 }

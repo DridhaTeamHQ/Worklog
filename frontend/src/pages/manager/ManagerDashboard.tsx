@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
-  Users, ClipboardCheck, CheckCircle2, Clock, AlertTriangle, FileText, ArrowRight, Bug,
+  Users, ClipboardCheck, CheckCircle2, Clock, AlertTriangle, FileText, ArrowRight,
 } from 'lucide-react';
 import {
   ResponsiveContainer, AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -43,7 +43,6 @@ export function ManagerDashboard() {
   const {
     CHART, STATUS_COLORS, TOOLTIP_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_ITEM_STYLE,
   } = useChartTheme();
-  const navigate = useNavigate();
   const toast = useToast();
   const [data, setData] = useState<ManagerDashboardData | null>(null);
   const [error, setError] = useState('');
@@ -144,26 +143,11 @@ export function ManagerDashboard() {
         </div>
       </div>
 
-      <div className="grid gap-4 grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
         <StatCard label="Total Team Members" value={summary.total_team_members} accent="brand" icon={<Users className="h-5 w-5" />} />
         <StatCard label="Assigned" value={summary.tasks_assigned_today} accent="blush" icon={<ClipboardCheck className="h-5 w-5" />} />
         <StatCard label="Completed" value={summary.tasks_completed_today} accent="emerald" icon={<CheckCircle2 className="h-5 w-5" />} />
         <StatCard label="Pending" value={summary.pending_tasks} accent="amber" icon={<Clock className="h-5 w-5" />} />
-        {/*
-          Tickets take the fifth slot, and the card is the whole of their presence on
-          this page now — so it is a button through to the list, and it says how many
-          are critical, which is the part that decides whether the number is urgent.
-        */}
-        <StatCard
-          label="Tickets raised"
-          value={summary.open_tickets}
-          accent="red"
-          icon={<Bug className="h-5 w-5" />}
-          hint={summary.critical_tickets > 0
-            ? `${summary.critical_tickets} critical`
-            : undefined}
-          onClick={() => navigate('/manager/tickets')}
-        />
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2">

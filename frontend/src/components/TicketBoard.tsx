@@ -104,10 +104,12 @@ export function TicketBoard({
                   className="w-full text-xs py-1"
                   options={[
                     { value: '', label: 'Unassigned' },
-                    ...(members || []).map((m) => ({
-                      value: String(m.id),
-                      label: m.job_title ? `${m.name} (${m.job_title})` : m.name,
-                    })),
+                    ...(members || [])
+                      .filter((m) => !ticket.reporter_department || (m.department && m.department.trim().toLowerCase() === ticket.reporter_department.trim().toLowerCase()) || m.id === ticket.assignee_id)
+                      .map((m) => ({
+                        value: String(m.id),
+                        label: m.job_title ? `${m.name} (${m.job_title})` : m.name,
+                      })),
                   ]}
                 />
                 {assigningId === ticket.id && (

@@ -1,0 +1,42 @@
+{
+  "expo": {
+    "name": "Taskr",
+    "slug": "worklog-mobile",
+    "version": "1.0.0",
+    "sdkVersion": "57.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./assets/splash.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#090d16"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "com.taskr.mobile"
+    },
+    "android": {
+      "package": "com.taskr.mobile",
+      "softwareKeyboardLayoutMode": "resize",
+      "adaptiveIcon": {
+        "foregroundImage": "./assets/adaptive-icon.png",
+        "backgroundColor": "#090d16"
+      }
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "plugins": [
+      "expo-font",
+      "expo-notifications",
+      "expo-dev-client"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "e1232c1e-49ed-47d6-80a2-292a22924bea"
+      }
+    },
+    "owner": "akash92321"
+  }
+}
