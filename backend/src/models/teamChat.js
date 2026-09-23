@@ -271,6 +271,18 @@ export async function updateTeamMessage(userId, messageId, body, mentionIds) {
     if (!row) throw notFound('That message no longer exists.');
     if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only edit your own messages.');
 
+    const trimmed = (row.body || '').trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed?.type && parsed.type !== 'text') {
+          throw badRequest('Photos, videos, and documents cannot be edited.');
+        }
+      } catch (e) {
+        if (e.status === 400) throw e;
+      }
+    }
+
     await tx.run('UPDATE team_messages SET body = ? WHERE id = ?', [body, messageId]);
 
     if (mentionIds !== undefined) {

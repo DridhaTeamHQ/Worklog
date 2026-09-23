@@ -1604,6 +1604,7 @@ function RoomView({
                 const isEditing = editingId === m.id;
                 const parsedMsg = parseMessageBody(m.body);
                 const isImageOnly = parsedMsg.type === 'image' && !parsedMsg.caption;
+                const isEditable = parsedMsg.type === 'text';
 
                 return (
                   <div
@@ -1613,14 +1614,16 @@ function RoomView({
                   >
                     {mine && !isEditing && (
                       <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
-                        <button
-                          type="button"
-                          title="Edit message"
-                          onClick={() => startEdit(m)}
-                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
+                        {isEditable && (
+                          <button
+                            type="button"
+                            title="Edit message"
+                            onClick={() => startEdit(m)}
+                            className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                         <button
                           type="button"
                           title="Delete message"

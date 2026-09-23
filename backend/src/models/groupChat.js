@@ -376,6 +376,18 @@ export async function updateGroupMessage(userId, groupId, messageId, body) {
   if (!row) throw notFound('That message no longer exists.');
   if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only edit your own messages.');
 
+  const trimmed = (row.body || '').trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed?.type && parsed.type !== 'text') {
+        throw badRequest('Photos, videos, and documents cannot be edited.');
+      }
+    } catch (e) {
+      if (e.status === 400) throw e;
+    }
+  }
+
   await db.run('UPDATE chat_group_messages SET body = ? WHERE id = ?', [body, messageId]);
   return db.get(
     `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}

@@ -390,40 +390,47 @@ export function ChatThreadScreen({ route, navigation }: any) {
   const onMessageLongPress = (item: RoomMessage) => {
     if (item.sender_id !== user?.id) return;
     const parsed = parseMessageBody(item.body);
-    const initialText = parsed.text ?? parsed.caption ?? (parsed.type === 'text' ? item.body : '');
+    const isEditable = parsed.type === 'text';
+    const initialText = parsed.text ?? (parsed.type === 'text' ? item.body : '');
+
+    const actions = [];
+
+    if (isEditable) {
+      actions.push({
+        text: 'Edit Message',
+        onPress: () => {
+          setEditingMessage(item);
+          setEditText(initialText || '');
+          setEditModalVisible(true);
+        },
+      });
+    }
+
+    actions.push({
+      text: 'Delete Message',
+      style: 'destructive' as const,
+      onPress: () => {
+        Alert.alert(
+          'Delete Message',
+          'Are you sure you want to delete this message? This cannot be undone.',
+          [
+            { text: 'Cancel', style: 'cancel' },
+            {
+              text: 'Delete',
+              style: 'destructive',
+              onPress: () => void handleDeleteMessage(item.id),
+            },
+          ]
+        );
+      },
+    });
+
+    actions.push({ text: 'Cancel', style: 'cancel' as const });
 
     Alert.alert(
       'Message Options',
       'Choose an action for your message:',
-      [
-        {
-          text: 'Edit Message',
-          onPress: () => {
-            setEditingMessage(item);
-            setEditText(initialText || '');
-            setEditModalVisible(true);
-          },
-        },
-        {
-          text: 'Delete Message',
-          style: 'destructive',
-          onPress: () => {
-            Alert.alert(
-              'Delete Message',
-              'Are you sure you want to delete this message? This cannot be undone.',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                {
-                  text: 'Delete',
-                  style: 'destructive',
-                  onPress: () => void handleDeleteMessage(item.id),
-                },
-              ]
-            );
-          },
-        },
-        { text: 'Cancel', style: 'cancel' },
-      ]
+      actions
     );
   };
 
