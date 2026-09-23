@@ -209,28 +209,6 @@ const STICKER_PACKS = [
   },
 ];
 
-const SELECTABLE_PHOTOS = [
-  { label: 'Work Analytics Dashboard', url: 'https://images.unsplash.com/photo-1551288049-bebda4e38f71?w=800&auto=format&fit=crop&q=80', caption: 'Monthly analytics & team progress report' },
-  { label: 'Site Inspection Photo', url: 'https://images.unsplash.com/photo-1504307651254-35680f356dfd?w=800&auto=format&fit=crop&q=80', caption: 'On-site progress update' },
-  { label: 'Whiteboard Architecture', url: 'https://images.unsplash.com/photo-1531403009284-440f080d1e12?w=800&auto=format&fit=crop&q=80', caption: 'Sprint planning whiteboard diagram' },
-  { label: 'Invoice & Expense Receipt', url: 'https://images.unsplash.com/photo-1554224155-8d04cb21cd6c?w=800&auto=format&fit=crop&q=80', caption: 'Project expense receipt' },
-  { label: 'Office Presentation Slide', url: 'https://images.unsplash.com/photo-1460925895917-afdab827c52f?w=800&auto=format&fit=crop&q=80', caption: 'Quarterly review presentation' },
-  { label: 'Team Workplace Photo', url: 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=800&auto=format&fit=crop&q=80', caption: 'Team collaboration session' },
-];
-
-const SELECTABLE_DOCUMENTS = [
-  { name: 'Project_Specification_v2.pdf', size: '1.4 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { name: 'Weekly_Worklog_Timesheet.xlsx', size: '420 KB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { name: 'System_Architecture_Report.pdf', size: '2.8 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { name: 'Employee_Contract_Summary.docx', size: '890 KB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-  { name: 'Project_Assets_Archive.zip', size: '4.1 MB', url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' },
-];
-
-const SELECTABLE_VIDEOS = [
-  { name: 'Task_Demo_Walkthrough.mp4', caption: 'Feature walkthrough demo video', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4' },
-  { name: 'Sprint_Review_Preview.mp4', caption: 'Sprint progress recap video', url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4' },
-];
-
 function getInitials(name?: string) {
   if (!name) return '?';
   const parts = name.trim().split(/\s+/);
@@ -278,13 +256,6 @@ export function ChatThreadScreen({ route, navigation }: any) {
   const [stickerTrayOpen, setStickerTrayOpen] = useState(false);
   const [activeStickerTab, setActiveStickerTab] = useState(0);
   const [attachmentModalOpen, setAttachmentModalOpen] = useState(false);
-  const [activeChooserTab, setActiveChooserTab] = useState<'photos' | 'docs' | 'videos'>('photos');
-
-  // Manual URL option toggle
-  const [showUrlInputs, setShowUrlInputs] = useState(false);
-  const [mediaUrl, setMediaUrl] = useState('');
-  const [mediaCaption, setMediaCaption] = useState('');
-  const [mediaFileName, setMediaFileName] = useState('');
 
   // In-app Fullscreen Photo Viewer
   const [previewImage, setPreviewImage] = useState<{ url: string; caption?: string; name?: string } | null>(null);
@@ -602,37 +573,6 @@ export function ChatThreadScreen({ route, navigation }: any) {
     }
   };
 
-  /* Direct One-Tap Sending from Chooser */
-  const selectAndSendPhoto = (photo: typeof SELECTABLE_PHOTOS[0]) => {
-    setAttachmentModalOpen(false);
-    void sendMessage(JSON.stringify({
-      type: 'image',
-      url: photo.url,
-      caption: photo.caption,
-      name: photo.label,
-    }));
-  };
-
-  const selectAndSendDocument = (doc: typeof SELECTABLE_DOCUMENTS[0]) => {
-    setAttachmentModalOpen(false);
-    void sendMessage(JSON.stringify({
-      type: 'file',
-      url: doc.url,
-      name: doc.name,
-      size: doc.size,
-    }));
-  };
-
-  const selectAndSendVideo = (video: typeof SELECTABLE_VIDEOS[0]) => {
-    setAttachmentModalOpen(false);
-    void sendMessage(JSON.stringify({
-      type: 'video',
-      url: video.url,
-      name: video.name,
-      caption: video.caption,
-    }));
-  };
-
   const sendSticker = (emoji: string, label: string) => {
     const payload = JSON.stringify({
       type: 'sticker',
@@ -641,28 +581,6 @@ export function ChatThreadScreen({ route, navigation }: any) {
       label,
     });
     setStickerTrayOpen(false);
-    void sendMessage(payload);
-  };
-
-  const handleSendManualUrlAttachment = () => {
-    const url = mediaUrl.trim();
-    if (!url) {
-      showError('Please enter a valid URL.');
-      return;
-    }
-
-    const payload = JSON.stringify({
-      type: activeChooserTab === 'photos' ? 'image' : activeChooserTab === 'videos' ? 'video' : 'file',
-      url,
-      name: mediaFileName.trim() || undefined,
-      caption: mediaCaption.trim() || undefined,
-    });
-
-    setAttachmentModalOpen(false);
-    setShowUrlInputs(false);
-    setMediaUrl('');
-    setMediaCaption('');
-    setMediaFileName('');
     void sendMessage(payload);
   };
 
@@ -690,6 +608,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
       : contact?.department || 'Direct message';
 
   const androidClearance = insets.bottom > 20 ? insets.bottom + 12 : 58;
+  const stickerBottomPadding = Math.max(insets.bottom, Platform.OS === 'android' ? 36 : 20);
   const bottomInsetPadding = keyboardVisible
     ? (Platform.OS === 'ios' ? 10 : 12)
     : stickerTrayOpen
@@ -977,7 +896,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
 
         {/* Sticker Tray */}
         {stickerTrayOpen && (
-          <View style={styles.stickerDrawer}>
+          <View style={[styles.stickerDrawer, { height: 260 + stickerBottomPadding, paddingBottom: stickerBottomPadding }]}>
             <View style={styles.stickerTabBar}>
               {STICKER_PACKS.map((pack, index) => (
                 <TouchableOpacity
@@ -1001,7 +920,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
             </View>
 
             <ScrollView
-              contentContainerStyle={styles.stickerGrid}
+              contentContainerStyle={[styles.stickerGrid, { paddingBottom: stickerBottomPadding + 28 }]}
               showsVerticalScrollIndicator={false}
             >
               {STICKER_PACKS[activeStickerTab].stickers.map((s, idx) => (
@@ -1021,7 +940,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
         )}
       </KeyboardAvoidingView>
 
-      {/* WhatsApp-Style File, Photo & Video Chooser Modal */}
+      {/* Clean File, Photo & Video Chooser Modal */}
       <Modal
         visible={attachmentModalOpen}
         animationType="slide"
@@ -1030,7 +949,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
       >
         <View style={styles.modalOverlay}>
           <Pressable style={styles.modalBackdrop} onPress={() => setAttachmentModalOpen(false)} />
-          <View style={styles.actionSheetCard}>
+          <View style={[styles.actionSheetCard, { paddingBottom: Math.max(insets.bottom, 24) + 12 }]}>
             <View style={styles.sheetHandleBar} />
             <View style={styles.modalHeader}>
               <Text style={styles.modalTitle}>Choose Media or File</Text>
@@ -1088,139 +1007,6 @@ export function ChatThreadScreen({ route, navigation }: any) {
                 <Text style={styles.actionCircleLabel}>Files</Text>
               </TouchableOpacity>
             </View>
-
-            {/* In-App Visual Chooser Category Tabs */}
-            <View style={styles.segmentRow}>
-              <TouchableOpacity
-                onPress={() => setActiveChooserTab('photos')}
-                style={[styles.segmentBtn, activeChooserTab === 'photos' && styles.segmentBtnActive]}
-              >
-                <Icon name="image" size={14} color={activeChooserTab === 'photos' ? '#ffffff' : '#a1a1aa'} />
-                <Text style={[styles.segmentText, activeChooserTab === 'photos' && styles.segmentTextActive]}>
-                  Photos ({SELECTABLE_PHOTOS.length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setActiveChooserTab('docs')}
-                style={[styles.segmentBtn, activeChooserTab === 'docs' && styles.segmentBtnActive]}
-              >
-                <Icon name="document-text" size={14} color={activeChooserTab === 'docs' ? '#ffffff' : '#a1a1aa'} />
-                <Text style={[styles.segmentText, activeChooserTab === 'docs' && styles.segmentTextActive]}>
-                  Documents ({SELECTABLE_DOCUMENTS.length})
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={() => setActiveChooserTab('videos')}
-                style={[styles.segmentBtn, activeChooserTab === 'videos' && styles.segmentBtnActive]}
-              >
-                <Icon name="videocam" size={14} color={activeChooserTab === 'videos' ? '#ffffff' : '#a1a1aa'} />
-                <Text style={[styles.segmentText, activeChooserTab === 'videos' && styles.segmentTextActive]}>
-                  Videos ({SELECTABLE_VIDEOS.length})
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Visual File / Photo Selection Grid (1-Tap Send) */}
-            <ScrollView showsVerticalScrollIndicator={false} style={{ maxHeight: 250 }}>
-              {/* Photo Options */}
-              {activeChooserTab === 'photos' && (
-                <View style={styles.photoGrid}>
-                  {SELECTABLE_PHOTOS.map((photo, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.photoGridCard}
-                      onPress={() => selectAndSendPhoto(photo)}
-                      activeOpacity={0.8}
-                    >
-                      <Image source={{ uri: photo.url }} style={styles.photoGridThumb} resizeMode="cover" />
-                      <Text numberOfLines={1} style={styles.photoGridTitle}>{photo.label}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Document Options */}
-              {activeChooserTab === 'docs' && (
-                <View style={styles.docList}>
-                  {SELECTABLE_DOCUMENTS.map((doc, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.docListItem}
-                      onPress={() => selectAndSendDocument(doc)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.docListIconCircle}>
-                        <Icon name="document-text" size={18} color="#10b981" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text numberOfLines={1} style={styles.docListName}>{doc.name}</Text>
-                        <Text style={styles.docListSize}>{doc.size} · Tap to send</Text>
-                      </View>
-                      <Icon name="arrow-forward-circle" size={18} color="#f4553c" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Video Options */}
-              {activeChooserTab === 'videos' && (
-                <View style={styles.docList}>
-                  {SELECTABLE_VIDEOS.map((v, idx) => (
-                    <TouchableOpacity
-                      key={idx}
-                      style={styles.docListItem}
-                      onPress={() => selectAndSendVideo(v)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={[styles.docListIconCircle, { backgroundColor: 'rgba(59, 130, 246, 0.15)' }]}>
-                        <Icon name="videocam" size={18} color="#3b82f6" />
-                      </View>
-                      <View style={{ flex: 1 }}>
-                        <Text numberOfLines={1} style={styles.docListName}>{v.name}</Text>
-                        <Text style={styles.docListSize}>{v.caption} · Tap to send</Text>
-                      </View>
-                      <Icon name="arrow-forward-circle" size={18} color="#f4553c" />
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-            </ScrollView>
-
-            {/* Optional Web Link Input Toggle */}
-            <TouchableOpacity
-              onPress={() => setShowUrlInputs(prev => !prev)}
-              style={styles.toggleLinkRow}
-              activeOpacity={0.7}
-            >
-              <Icon name="link-outline" size={15} color="#a1a1aa" />
-              <Text style={styles.toggleLinkText}>
-                {showUrlInputs ? 'Hide link input ▲' : 'Or paste a direct web URL ▼'}
-              </Text>
-            </TouchableOpacity>
-
-            {showUrlInputs && (
-              <View style={{ marginTop: 6 }}>
-                <TextInput
-                  style={styles.modalInput}
-                  placeholder="https://..."
-                  placeholderTextColor="#71717a"
-                  value={mediaUrl}
-                  onChangeText={setMediaUrl}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                />
-                <TouchableOpacity
-                  style={[styles.modalSubmitBtn, !mediaUrl.trim() && styles.modalSubmitBtnDisabled]}
-                  disabled={!mediaUrl.trim()}
-                  onPress={handleSendManualUrlAttachment}
-                >
-                  <Icon name="send" size={14} color="#ffffff" />
-                  <Text style={styles.modalSubmitBtnText}>Send Link</Text>
-                </TouchableOpacity>
-              </View>
-            )}
           </View>
         </View>
       </Modal>
@@ -1697,7 +1483,6 @@ const styles = StyleSheet.create({
 
   /* Sticker Drawer */
   stickerDrawer: {
-    height: 220,
     backgroundColor: '#141417',
     borderTopWidth: 1,
     borderTopColor: '#222226',
@@ -1830,141 +1615,7 @@ const styles = StyleSheet.create({
     fontSize: 11.5,
     fontWeight: '600',
   },
-  segmentRow: {
-    flexDirection: 'row',
-    backgroundColor: '#111114',
-    padding: 3,
-    borderRadius: 10,
-    marginBottom: 10,
-    gap: 4,
-  },
-  segmentBtn: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 6,
-    borderRadius: 8,
-    gap: 5,
-  },
-  segmentBtnActive: {
-    backgroundColor: '#f4553c',
-  },
-  segmentText: {
-    color: '#a1a1aa',
-    fontSize: 11,
-    fontWeight: '600',
-  },
-  segmentTextActive: {
-    color: '#ffffff',
-  },
 
-  /* Visual Photo Grid */
-  photoGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-    justifyContent: 'space-between',
-    paddingVertical: 4,
-  },
-  photoGridCard: {
-    width: '48%',
-    backgroundColor: '#222226',
-    borderRadius: 10,
-    overflow: 'hidden',
-    borderWidth: 1,
-    borderColor: '#2e2e33',
-  },
-  photoGridThumb: {
-    width: '100%',
-    height: 85,
-    backgroundColor: '#27272a',
-  },
-  photoGridTitle: {
-    color: '#f4f4f5',
-    fontSize: 11,
-    fontWeight: '600',
-    padding: 6,
-  },
-
-  /* Document List */
-  docList: {
-    gap: 8,
-    paddingVertical: 4,
-  },
-  docListItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    backgroundColor: '#222226',
-    padding: 10,
-    borderRadius: 10,
-    borderWidth: 1,
-    borderColor: '#2e2e33',
-  },
-  docListIconCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
-    backgroundColor: 'rgba(16, 185, 129, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  docListName: {
-    color: '#fafafa',
-    fontSize: 12,
-    fontWeight: '600',
-  },
-  docListSize: {
-    color: '#a1a1aa',
-    fontSize: 10,
-    marginTop: 2,
-  },
-
-  toggleLinkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 6,
-    borderTopWidth: 1,
-    borderTopColor: '#27272a',
-    marginTop: 8,
-  },
-  toggleLinkText: {
-    color: '#a1a1aa',
-    fontSize: 11.5,
-    fontWeight: '500',
-  },
-  modalInput: {
-    backgroundColor: '#111114',
-    borderWidth: 1,
-    borderColor: '#2e2e33',
-    borderRadius: 8,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    color: '#fafafa',
-    fontSize: 12,
-    marginBottom: 6,
-  },
-  modalSubmitBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    backgroundColor: '#f4553c',
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 8,
-  },
-  modalSubmitBtnDisabled: {
-    backgroundColor: 'rgba(244, 85, 60, 0.3)',
-  },
-  modalSubmitBtnText: {
-    color: '#ffffff',
-    fontSize: 12,
-    fontWeight: '700',
-  },
   /* Fullscreen Image Preview Styles */
   imageViewerOverlay: {
     flex: 1,
