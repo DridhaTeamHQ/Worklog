@@ -1,11 +1,13 @@
 import {
   useCallback, useEffect, useMemo, useRef, useState,
   type KeyboardEvent as ReactKeyboardEvent, type ReactNode,
+  type ChangeEvent as ReactChangeEvent, type ClipboardEvent as ReactClipboardEvent,
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send,
   Users, UserRound, Trash2, Check, X,
+  Paperclip, FileText, Download, ExternalLink, Film, Image as ImageIcon,
 } from 'lucide-react';
 import { chatApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
@@ -20,6 +22,84 @@ import {
   type ChatContact, type ChatGroup, type ChatMessage, type ChatSearchHit,
   type GroupMessage, type TeamMessage,
 } from '../types';
+
+export interface ParsedMessage {
+  type: 'text' | 'image' | 'video' | 'file' | 'sticker';
+  text?: string;
+  url?: string;
+  name?: string;
+  size?: string;
+  caption?: string;
+  sticker?: string;
+  code?: string;
+  label?: string;
+}
+
+export function parseMessageBody(body?: string | null): ParsedMessage {
+  if (!body) return { type: 'text', text: '' };
+  const trimmed = body.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed && typeof parsed === 'object' && parsed.type) {
+        return parsed as ParsedMessage;
+      }
+    } catch {}
+  }
+  if (/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(trimmed)) {
+    return { type: 'image', url: trimmed };
+  }
+  if (/^https?:\/\/.*\.(mp4|mov|webm)(\?.*)?$/i.test(trimmed)) {
+    return { type: 'video', url: trimmed, name: 'Video attachment' };
+  }
+  if (/^https?:\/\/.*\.(pdf|docx?|xlsx?|pptx?|zip|rar|csv|txt)(\?.*)?$/i.test(trimmed)) {
+    const filename = trimmed.split('/').pop()?.split('?')[0] || 'Document';
+    return { type: 'file', url: trimmed, name: filename };
+  }
+  return { type: 'text', text: body };
+}
+
+function formatFileSize(bytes: number): string {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+async function uploadFileToCloud(file: File): Promise<string> {
+  const formData = new FormData();
+  formData.append('file', file);
+  try {
+    const res = await fetch('https://tmpfiles.org/api/v1/upload', {
+      method: 'POST',
+      body: formData,
+    });
+    const json = await res.json();
+    if (json?.status === 'success' && json?.data?.url) {
+      return json.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+    }
+  } catch (e) {
+    console.warn('tmpfiles upload failed, trying fallback:', e);
+  }
+
+  // Fallback host (Catbox)
+  try {
+    const cbData = new FormData();
+    cbData.append('reqtype', 'fileupload');
+    cbData.append('fileToUpload', file);
+    const cbRes = await fetch('https://catbox.moe/user/api.php', {
+      method: 'POST',
+      body: cbData,
+    });
+    if (cbRes.ok) {
+      const text = (await cbRes.text()).trim();
+      if (text.startsWith('http')) return text;
+    }
+  } catch (cbErr) {
+    console.warn('Catbox upload failed:', cbErr);
+  }
+
+  throw new Error('Upload failed. Please check your network connection.');
+}
 
 /**
  * The chat page — reached from the sidebar, like every other section.
@@ -384,8 +464,8 @@ export function ChatPage() {
 
   /* --------------------------------------------------------------- composing */
 
-  const send = useCallback(async () => {
-    const body = draft.trim();
+  const send = useCallback(async (customPayload?: string) => {
+    const body = (customPayload ?? draft).trim();
     if (!body || !active || sending) return;
     setSending(true);
     setError(null);
@@ -412,7 +492,9 @@ export function ChatPage() {
         setTeamMessages((prev) => [...prev, data]);
         lastIdRef.current = Math.max(lastIdRef.current, data.id);
       }
-      setDraft('');
+      if (!customPayload) {
+        setDraft('');
+      }
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Your message could not be sent.');
     } finally {
@@ -574,7 +656,7 @@ export function ChatPage() {
             composerRef={composerRef}
             onBack={openDirectory}
             onDraft={setDraft}
-            onSend={() => void send()}
+            onSend={(customBody?: string) => send(customBody)}
             canRenameGroup={isAdmin(user.role)}
             onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
             onEditMessage={handleEditMessage}
@@ -665,56 +747,98 @@ function renderBody(body: string, mentions: { id: number; name: string }[], meId
 }
 
 function renderChatMessage(body: string, mentions?: { id: number; name: string }[], meId?: number, mine?: boolean): ReactNode {
-  const trimmed = body.trim();
-  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
-    try {
-      const parsed = JSON.parse(trimmed);
-      if (parsed?.type === 'image' && parsed.url) {
-        return (
-          <div className="space-y-1">
-            <a href={parsed.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
-              <img src={parsed.url} alt="Attachment" className="max-h-60 max-w-xs rounded-lg object-cover hover:opacity-90 transition-opacity" />
-            </a>
-            {parsed.caption && <p className="text-xs opacity-90 mt-1">{parsed.caption}</p>}
-          </div>
-        );
-      }
-      if (parsed?.type === 'video' && parsed.url) {
-        return (
-          <div className="space-y-1">
-            <a href={parsed.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2.5 p-2 rounded-lg border ${mine ? 'bg-black/15 border-white/20' : 'bg-muted/60 border-border'} hover:opacity-80 transition-opacity`}>
-              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary-strong font-bold">▶</span>
-              <span className="flex-1 min-w-0">
-                <span className="block truncate text-xs font-semibold">{parsed.name || 'Video attachment'}</span>
-                <span className="block text-[10px] opacity-75">Click to play video</span>
-              </span>
-            </a>
-            {parsed.caption && <p className="text-xs opacity-90 mt-1">{parsed.caption}</p>}
-          </div>
-        );
-      }
-      if (parsed?.type === 'file' && parsed.url) {
-        return (
-          <a href={parsed.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2.5 p-2 rounded-lg border ${mine ? 'bg-black/15 border-white/20' : 'bg-muted/60 border-border'} hover:opacity-80 transition-opacity`}>
-            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary-strong text-lg">📄</span>
-            <span className="flex-1 min-w-0">
-              <span className="block truncate text-xs font-semibold">{parsed.name || 'Document'}</span>
-              <span className="block text-[10px] opacity-75">{parsed.size || 'Download file'}</span>
-            </span>
-          </a>
-        );
-      }
-      if (parsed?.type === 'sticker') {
-        return (
-          <div className="flex flex-col items-center py-1">
-            <span className="text-4xl">{parsed.sticker || parsed.code || '🚀'}</span>
-            {parsed.label && <span className="mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80">{parsed.label}</span>}
-          </div>
-        );
-      }
-    } catch {}
+  const parsed = parseMessageBody(body);
+
+  if (parsed.type === 'image' && parsed.url) {
+    return (
+      <div className="space-y-1.5">
+        <a
+          href={parsed.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block overflow-hidden rounded-xl border border-black/10 dark:border-white/10 group cursor-pointer max-w-sm"
+          title="Click to view full image"
+        >
+          <img
+            src={parsed.url}
+            alt={parsed.name || 'Photo'}
+            className="max-h-72 w-auto max-w-full rounded-xl object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+            loading="lazy"
+          />
+        </a>
+        {parsed.caption && (
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{parsed.caption}</p>
+        )}
+      </div>
+    );
   }
-  return mentions && mentions.length ? renderBody(body, mentions, meId ?? 0) : body;
+
+  if (parsed.type === 'video' && parsed.url) {
+    return (
+      <div className="space-y-1.5 max-w-md">
+        <video
+          src={parsed.url}
+          controls
+          className="max-h-72 w-full rounded-xl bg-black object-contain shadow border border-border"
+          preload="metadata"
+        />
+        {parsed.caption && (
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{parsed.caption}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (parsed.type === 'file' && parsed.url) {
+    return (
+      <div className="space-y-1.5">
+        <a
+          href={parsed.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          download={parsed.name || 'attachment'}
+          className={`flex items-center gap-3 rounded-xl p-2.5 transition-colors ${
+            mine
+              ? 'bg-black/15 hover:bg-black/25 text-primary-foreground'
+              : 'bg-muted/70 hover:bg-muted text-foreground border border-border'
+          }`}
+        >
+          <div
+            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${
+              mine ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+            }`}
+          >
+            <FileText className="h-5 w-5" />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold">{parsed.name || 'Document'}</p>
+            <p className={`text-[10px] ${mine ? 'text-primary-foreground/75' : 'text-muted-foreground'}`}>
+              {parsed.size || 'Attachment'} · Click to download
+            </p>
+          </div>
+          <Download className="h-4 w-4 shrink-0 opacity-80" />
+        </a>
+        {parsed.caption && (
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{parsed.caption}</p>
+        )}
+      </div>
+    );
+  }
+
+  if (parsed.type === 'sticker') {
+    return (
+      <div className="flex flex-col items-center py-1">
+        <span className="text-4xl leading-none">{parsed.sticker || parsed.code || '🚀'}</span>
+        {parsed.label && (
+          <span className="mt-1 rounded-full bg-black/15 px-2 py-0.5 text-[10px] font-medium text-inherit">
+            {parsed.label}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return mentions && mentions.length ? renderBody(parsed.text || body, mentions, meId ?? 0) : (parsed.text || body);
 }
 
 /** The matched part of a snippet, marked so the eye finds it in a wall of text. */
@@ -1033,7 +1157,7 @@ function RoomView({
   composerRef: React.RefObject<HTMLTextAreaElement>;
   onBack: () => void;
   onDraft: (v: string) => void;
-  onSend: () => void;
+  onSend: (customBody?: string) => Promise<void> | void;
   canRenameGroup: boolean;
   onRenameGroup: (g: ChatGroup) => void;
   onEditMessage: (messageId: number, body: string) => Promise<void>;
@@ -1047,6 +1171,81 @@ function RoomView({
   const [savingEdit, setSavingEdit] = useState(false);
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
   const [deletingMessage, setDeletingMessage] = useState(false);
+
+  // File attachment states
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [filePreview, setFilePreview] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const toast = useToast();
+
+  const onFileChange = (e: ReactChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setSelectedFile(file);
+    if (file.type.startsWith('image/')) {
+      setFilePreview(URL.createObjectURL(file));
+    } else {
+      setFilePreview(null);
+    }
+  };
+
+  const removeSelectedFile = () => {
+    if (filePreview) URL.revokeObjectURL(filePreview);
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
+
+  const onPaste = (e: ReactClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (let i = 0; i < items.length; i++) {
+      if (items[i].kind === 'file') {
+        const file = items[i].getAsFile();
+        if (file) {
+          e.preventDefault();
+          setSelectedFile(file);
+          if (file.type.startsWith('image/')) {
+            setFilePreview(URL.createObjectURL(file));
+          }
+          break;
+        }
+      }
+    }
+  };
+
+  const handleComposerSend = async () => {
+    if (uploading || sending) return;
+    if (selectedFile) {
+      setUploading(true);
+      try {
+        const cloudUrl = await uploadFileToCloud(selectedFile);
+        let type: 'image' | 'video' | 'file' = 'file';
+        if (selectedFile.type.startsWith('image/')) type = 'image';
+        else if (selectedFile.type.startsWith('video/')) type = 'video';
+
+        const payload = JSON.stringify({
+          type,
+          url: cloudUrl,
+          name: selectedFile.name,
+          size: formatFileSize(selectedFile.size),
+          caption: draft.trim() || undefined,
+        });
+
+        removeSelectedFile();
+        onDraft('');
+        await onSend(payload);
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Could not upload file.');
+      } finally {
+        setUploading(false);
+      }
+    } else {
+      if (!draft.trim()) return;
+      await onSend();
+    }
+  };
 
   const startEdit = (m: ChatMessage | TeamMessage | GroupMessage) => {
     const trimmed = m.body.trim();
@@ -1163,7 +1362,7 @@ function RoomView({
     }
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
-      onSend();
+      void handleComposerSend();
     }
   };
 
@@ -1367,6 +1566,30 @@ function RoomView({
         </p>
       )}
 
+      {selectedFile && (
+        <div className="flex items-center gap-3 border-t border-border bg-muted/60 px-3 py-2">
+          {filePreview ? (
+            <img src={filePreview} alt="Preview" className="h-11 w-11 shrink-0 rounded-lg object-cover border border-border" />
+          ) : (
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              {selectedFile.type.startsWith('video/') ? <Film className="h-5 w-5" /> : <FileText className="h-5 w-5" />}
+            </div>
+          )}
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-xs font-semibold text-foreground">{selectedFile.name}</p>
+            <p className="text-[11px] text-muted-foreground">{formatFileSize(selectedFile.size)} · Type a message to send as caption</p>
+          </div>
+          <button
+            type="button"
+            onClick={removeSelectedFile}
+            className="rounded-full p-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+            title="Remove attachment"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
       <div className="relative flex shrink-0 items-end gap-2 border-t border-border p-3">
         {/* The mention picker. Sits above the composer so it never covers what is
             being typed, and is dismissed by Escape or by typing past the name. */}
@@ -1395,6 +1618,25 @@ function RoomView({
           </ul>
         )}
 
+        <input
+          type="file"
+          ref={fileInputRef}
+          onChange={onFileChange}
+          className="hidden"
+          accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip,.rar"
+        />
+
+        <button
+          type="button"
+          onClick={() => fileInputRef.current?.click()}
+          disabled={uploading || sending}
+          aria-label="Attach photo, video or document"
+          title="Attach photo, video or document"
+          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground transition-colors disabled:opacity-50"
+        >
+          <Paperclip className="h-5 w-5" />
+        </button>
+
         <textarea
           ref={composerRef}
           value={draft}
@@ -1402,11 +1644,18 @@ function RoomView({
           onKeyUp={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
           onClick={(e) => syncMention(e.currentTarget.value, e.currentTarget.selectionStart ?? 0)}
           onKeyDown={onComposerKey}
+          onPaste={onPaste}
           rows={1}
           maxLength={4000}
-          placeholder={isTeam ? 'Message the team… use @ to tag'
-            : isGroup ? `Message ${room.group.name}…`
-              : `Message ${room.contact.name.split(' ')[0]}…`}
+          placeholder={
+            selectedFile
+              ? 'Add a caption…'
+              : isTeam
+                ? 'Message the team… use @ to tag'
+                : isGroup
+                  ? `Message ${room.group.name}…`
+                  : `Message ${room.contact.name.split(' ')[0]}…`
+          }
           aria-label={isTeam ? 'Message the team'
             : isGroup ? `Message ${room.group.name}`
               : `Message ${room.contact.name}`}
@@ -1414,12 +1663,12 @@ function RoomView({
         />
         <button
           type="button"
-          onClick={onSend}
-          disabled={!draft.trim() || sending}
+          onClick={() => void handleComposerSend()}
+          disabled={(!draft.trim() && !selectedFile) || sending || uploading}
           aria-label="Send message"
-          className="btn-primary h-10 w-10 shrink-0 rounded-full p-0"
+          className="btn-primary flex h-10 w-10 shrink-0 items-center justify-center rounded-full p-0 disabled:opacity-50"
         >
-          {sending ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
+          {sending || uploading ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
 
