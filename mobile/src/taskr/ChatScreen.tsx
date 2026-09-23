@@ -47,6 +47,24 @@ function formatChatTime(dateString?: string | null): string {
   }
 }
 
+function formatChatSnippet(msg?: string | null): string {
+  if (!msg) return '';
+  const trimmed = msg.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed?.type === 'image') return parsed.caption ? `📷 ${parsed.caption}` : '📷 Photo';
+      if (parsed?.type === 'video') return parsed.caption || parsed.name ? `🎥 ${parsed.caption || parsed.name}` : '🎥 Video';
+      if (parsed?.type === 'file') return `📄 ${parsed.name || 'Document'}`;
+      if (parsed?.type === 'sticker') return `${parsed.sticker || parsed.code || '🎭'} Sticker (${parsed.label || 'Reaction'})`;
+    } catch {}
+  }
+  if (/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)/i.test(trimmed)) return '📷 Photo';
+  if (/^https?:\/\/.*\.(mp4|mov|webm)/i.test(trimmed)) return '🎥 Video';
+  if (/^https?:\/\/.*\.(pdf|docx?|xlsx?|zip)/i.test(trimmed)) return '📄 Document';
+  return msg;
+}
+
 export function ChatScreen({ navigation }: any) {
   const [contacts, setContacts] = useState<ChatContact[]>([]);
   const [groups, setGroups] = useState<ChatGroup[]>([]);
@@ -252,7 +270,7 @@ export function ChatScreen({ navigation }: any) {
                             )}
                           </View>
                           <Text numberOfLines={1} style={styles.itemSnippet}>
-                            {group.last_message || `${group.member_count} team members`}
+                            {formatChatSnippet(group.last_message) || `${group.member_count} team members`}
                           </Text>
                         </View>
                       </Pressable>
@@ -305,7 +323,7 @@ export function ChatScreen({ navigation }: any) {
                                   Boolean(contact.unread > 0) && { color: '#fafafa', fontWeight: '600' },
                                 ]}
                               >
-                                {contact.last_message || contact.department || 'Tap to send message'}
+                                {formatChatSnippet(contact.last_message) || contact.department || 'Tap to send message'}
                               </Text>
                               {contact.unread > 0 && (
                                 <View style={styles.unreadBadge}>

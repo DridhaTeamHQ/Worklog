@@ -4,3 +4,14 @@ dist/
 backend/data/
 *.log
 *.tsbuildinfo
+
+# Mobile & build artifacts
+*.apk
+*.aab
+mobile/android/
+mobile/ios/
+.expo/
+mobile/.expo/web/
+mobile/.expo/cache/
+*.jks
+*.keystore

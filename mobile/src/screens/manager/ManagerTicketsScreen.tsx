@@ -28,6 +28,8 @@ import {
   Search,
   Trash2,
 } from '../../components/Icon';
+import { AttachmentList } from '../../components/AttachmentPicker';
+import { extractAttachments } from '../../utils/fileUpload';
 
 const STATUS_OPTIONS = [
   { label: 'All', value: '' },
@@ -289,7 +291,15 @@ export function ManagerTicketsScreen() {
             </View>
 
             <Text style={styles.modalSectionLabel}>Description</Text>
-            <Text style={styles.modalDescText}>{selectedTicket.description}</Text>
+            {(() => {
+              const { cleanDescription, attachments } = extractAttachments(selectedTicket.description);
+              return (
+                <>
+                  <Text style={styles.modalDescText}>{cleanDescription || 'No description provided.'}</Text>
+                  <AttachmentList attachments={attachments} />
+                </>
+              );
+            })()}
 
             <Text style={styles.modalSectionLabel}>
               Assign Department Member{selectedTicket.reporter_department ? ` (${selectedTicket.reporter_department})` : ''}

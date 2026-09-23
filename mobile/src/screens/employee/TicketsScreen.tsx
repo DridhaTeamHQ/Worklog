@@ -29,6 +29,8 @@ import {
   Plus,
   CheckCircle2,
 } from '../../components/Icon';
+import { AttachmentPicker, AttachmentList } from '../../components/AttachmentPicker';
+import { AttachedFile, serializeAttachments, extractAttachments } from '../../utils/fileUpload';
 
 const SEVERITY_OPTIONS = [
   { label: 'Low', value: 'low' as TicketSeverity },
@@ -64,6 +66,7 @@ export function TicketsScreen() {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [severity, setSeverity] = useState<TicketSeverity>('medium');
+  const [attachments, setAttachments] = useState<AttachedFile[]>([]);
   const [submitting, setSubmitting] = useState(false);
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
@@ -99,6 +102,7 @@ export function TicketsScreen() {
     setSelectedProjectId(null);
     setSelectedTaskId(null);
     setSeverity('medium');
+    setAttachments([]);
     setFieldErrors({});
     setRaiseModal(true);
 
@@ -141,11 +145,12 @@ export function TicketsScreen() {
         projectId: selectedProjectId,
         taskId: selectedTaskId,
         title: title.trim(),
-        description: description.trim(),
+        description: serializeAttachments(description.trim(), attachments),
         severity,
       });
       toastSuccess(res.data?.message || 'Ticket submitted successfully');
       setRaiseModal(false);
+      setAttachments([]);
       loadTickets();
     } catch (err: any) {
       if (err instanceof ApiError) {
@@ -366,6 +371,11 @@ export function TicketsScreen() {
           style={{ minHeight: 90, textAlignVertical: 'top' }}
         />
 
+        <AttachmentPicker
+          attachments={attachments}
+          onChange={setAttachments}
+        />
+
         <Button
           title="Submit Ticket"
           onPress={handleRaiseTicket}
@@ -414,7 +424,15 @@ export function TicketsScreen() {
             </View>
 
             <Text style={styles.modalSectionLabel}>Description</Text>
-            <Text style={styles.modalDescText}>{selectedTicket.description}</Text>
+            {(() => {
+              const { cleanDescription, attachments: ticketAttachments } = extractAttachments(selectedTicket.description);
+              return (
+                <>
+                  <Text style={styles.modalDescText}>{cleanDescription || 'No description provided.'}</Text>
+                  <AttachmentList attachments={ticketAttachments} />
+                </>
+              );
+            })()}
 
             {selectedTicket.resolution_note && (
               <View style={styles.resolutionBox}>

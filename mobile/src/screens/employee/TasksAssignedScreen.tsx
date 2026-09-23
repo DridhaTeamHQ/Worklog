@@ -30,6 +30,8 @@ import {
   Play,
   Clock,
 } from '../../components/Icon';
+import { AttachmentList } from '../../components/AttachmentPicker';
+import { extractAttachments } from '../../utils/fileUpload';
 
 const STATUS_FILTERS = [
   { label: 'Active', value: '' },
@@ -238,10 +240,18 @@ export function TasksAssignedScreen() {
             </View>
 
             {/* Description */}
-            <Text style={styles.modalSectionLabel}>Description</Text>
-            <Text style={styles.modalDescription}>
-              {selectedTask.description || 'No description provided.'}
-            </Text>
+            {(() => {
+              const { cleanDescription, attachments } = extractAttachments(selectedTask.description);
+              return (
+                <>
+                  <Text style={styles.modalSectionLabel}>Description</Text>
+                  <Text style={styles.modalDescription}>
+                    {cleanDescription || 'No description provided.'}
+                  </Text>
+                  <AttachmentList attachments={attachments} />
+                </>
+              );
+            })()}
 
             {/* Notes if any */}
             {selectedTask.notes && (

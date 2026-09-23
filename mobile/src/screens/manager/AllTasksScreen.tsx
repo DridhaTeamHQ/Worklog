@@ -31,9 +31,10 @@ import {
   Folder,
   Calendar,
   Trash2,
-  Edit2,
   FileText,
 } from '../../components/Icon';
+import { AttachmentPicker, AttachmentList } from '../../components/AttachmentPicker';
+import { AttachedFile, serializeAttachments, extractAttachments } from '../../utils/fileUpload';
 
 const PRIORITY_OPTIONS = [
   { label: 'Low', value: 'low' as Priority },
@@ -66,6 +67,7 @@ export function AllTasksScreen({ route }: any) {
   const [assignNotes, setAssignNotes] = useState('');
   const [assignPriority, setAssignPriority] = useState<Priority>('medium');
   const [assignDeadline, setAssignDeadline] = useState('');
+  const [assignAttachments, setAssignAttachments] = useState<AttachedFile[]>([]);
   const [submittingAssign, setSubmittingAssign] = useState(false);
 
   // Task Details / Edit Modal
@@ -112,7 +114,7 @@ export function AllTasksScreen({ route }: any) {
         employeeId: assignEmployeeId,
         projectId: assignProjectId,
         title: assignTitle.trim(),
-        description: assignDescription.trim(),
+        description: serializeAttachments(assignDescription.trim(), assignAttachments),
         notes: assignNotes.trim() || undefined,
         priority: assignPriority,
         deadline: assignDeadline.trim() || null,
@@ -123,6 +125,7 @@ export function AllTasksScreen({ route }: any) {
       setAssignDescription('');
       setAssignNotes('');
       setAssignDeadline('');
+      setAssignAttachments([]);
       loadData();
     } catch (err: any) {
       toastError(err.message || 'Failed to assign task');
@@ -332,6 +335,11 @@ export function AllTasksScreen({ route }: any) {
           style={{ minHeight: 70, textAlignVertical: 'top' }}
         />
 
+        <AttachmentPicker
+          attachments={assignAttachments}
+          onChange={setAssignAttachments}
+        />
+
         <Input
           label="Deadline (YYYY-MM-DD)"
           placeholder="e.g. 2026-10-15"
@@ -384,10 +392,18 @@ export function AllTasksScreen({ route }: any) {
               )}
             </View>
 
-            <Text style={styles.modalSectionLabel}>Description</Text>
-            <Text style={styles.modalDescription}>
-              {selectedTask.description || 'No description provided.'}
-            </Text>
+            {(() => {
+              const { cleanDescription, attachments } = extractAttachments(selectedTask.description);
+              return (
+                <>
+                  <Text style={styles.modalSectionLabel}>Description</Text>
+                  <Text style={styles.modalDescription}>
+                    {cleanDescription || 'No description provided.'}
+                  </Text>
+                  <AttachmentList attachments={attachments} />
+                </>
+              );
+            })()}
 
             {selectedTask.notes && (
               <>

@@ -619,6 +619,59 @@ function renderBody(body: string, mentions: { id: number; name: string }[], meId
   return out;
 }
 
+function renderChatMessage(body: string, mentions?: { id: number; name: string }[], meId?: number, mine?: boolean): ReactNode {
+  const trimmed = body.trim();
+  if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+    try {
+      const parsed = JSON.parse(trimmed);
+      if (parsed?.type === 'image' && parsed.url) {
+        return (
+          <div className="space-y-1">
+            <a href={parsed.url} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-lg">
+              <img src={parsed.url} alt="Attachment" className="max-h-60 max-w-xs rounded-lg object-cover hover:opacity-90 transition-opacity" />
+            </a>
+            {parsed.caption && <p className="text-xs opacity-90 mt-1">{parsed.caption}</p>}
+          </div>
+        );
+      }
+      if (parsed?.type === 'video' && parsed.url) {
+        return (
+          <div className="space-y-1">
+            <a href={parsed.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2.5 p-2 rounded-lg border ${mine ? 'bg-black/15 border-white/20' : 'bg-muted/60 border-border'} hover:opacity-80 transition-opacity`}>
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-primary-strong font-bold">▶</span>
+              <span className="flex-1 min-w-0">
+                <span className="block truncate text-xs font-semibold">{parsed.name || 'Video attachment'}</span>
+                <span className="block text-[10px] opacity-75">Click to play video</span>
+              </span>
+            </a>
+            {parsed.caption && <p className="text-xs opacity-90 mt-1">{parsed.caption}</p>}
+          </div>
+        );
+      }
+      if (parsed?.type === 'file' && parsed.url) {
+        return (
+          <a href={parsed.url} target="_blank" rel="noopener noreferrer" className={`flex items-center gap-2.5 p-2 rounded-lg border ${mine ? 'bg-black/15 border-white/20' : 'bg-muted/60 border-border'} hover:opacity-80 transition-opacity`}>
+            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/15 text-primary-strong text-lg">📄</span>
+            <span className="flex-1 min-w-0">
+              <span className="block truncate text-xs font-semibold">{parsed.name || 'Document'}</span>
+              <span className="block text-[10px] opacity-75">{parsed.size || 'Download file'}</span>
+            </span>
+          </a>
+        );
+      }
+      if (parsed?.type === 'sticker') {
+        return (
+          <div className="flex flex-col items-center py-1">
+            <span className="text-4xl">{parsed.sticker || parsed.code || '🚀'}</span>
+            {parsed.label && <span className="mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-muted/80">{parsed.label}</span>}
+          </div>
+        );
+      }
+    } catch {}
+  }
+  return mentions && mentions.length ? renderBody(body, mentions, meId ?? 0) : body;
+}
+
 /** The matched part of a snippet, marked so the eye finds it in a wall of text. */
 function markTerm(text: string, term: string) {
   const needle = term.trim();
@@ -1123,9 +1176,9 @@ function RoomView({
                           {named.sender_name}
                         </p>
                       )}
-                      <p className="whitespace-pre-wrap break-words text-sm">
-                        {team ? renderBody(team.body, team.mentions, me) : m.body}
-                      </p>
+                      <div className="whitespace-pre-wrap break-words text-sm">
+                        {renderChatMessage(m.body, team?.mentions, me, mine)}
+                      </div>
                       <p className={`mt-1 text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                         {formatTime(m.created_at)}
                         {!team && mine && (m as ChatMessage).is_read && <span className="ml-1">· Read</span>}
