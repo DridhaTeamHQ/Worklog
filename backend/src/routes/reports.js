@@ -14,7 +14,7 @@ const listQuery = z.object({
   to: isoDate.optional(),
   department: z.string().trim().min(1).optional(),
   search: z.string().trim().max(200).optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(60),
+  limit: z.coerce.number().int().min(1).max(1000).default(60),
   offset: z.coerce.number().int().min(0).default(0),
 });
 

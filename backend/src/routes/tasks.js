@@ -20,7 +20,7 @@ const listQuery = z.object({
   deadlineFrom: isoDate.optional(),
   deadlineTo: isoDate.optional(),
   sort: z.enum(['created_desc', 'created_asc', 'deadline_asc', 'deadline_desc', 'priority_desc']).optional(),
-  limit: z.coerce.number().int().min(1).max(200).default(100),
+  limit: z.coerce.number().int().min(1).max(1000).default(100),
   offset: z.coerce.number().int().min(0).default(0),
 });
 

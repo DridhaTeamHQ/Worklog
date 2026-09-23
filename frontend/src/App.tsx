@@ -18,6 +18,7 @@ import { EmployeeDashboard } from './pages/employee/EmployeeDashboard';
 import { TasksDonePage } from './pages/employee/TasksDonePage';
 import { TasksAssignedPage } from './pages/employee/TasksAssignedPage';
 import { TicketsPage } from './pages/employee/TicketsPage';
+import { EmployeeAnalyticsPage } from './pages/employee/EmployeeAnalyticsPage';
 
 import { ManagerDashboard } from './pages/manager/ManagerDashboard';
 import { TeamMembersPage } from './pages/manager/TeamMembersPage';
@@ -60,17 +61,18 @@ export default function App() {
                     <Route path="/manager/profile" element={<ProfilePage />} />
                   </Route>
 
-                  {/* Team member portal */}
-                  <Route element={<RequireRole role="team_member" />}>
-                    <Route path="/employee" element={<EmployeeDashboard />} />
-                    <Route path="/employee/tasks-assigned" element={<TasksAssignedPage />} />
-                    <Route path="/employee/chat" element={<ChatPage />} />
-                    <Route path="/employee/tasks-done" element={<TasksDonePage />} />
-                    <Route path="/employee/my-day" element={<MyDayPage />} />
-                    <Route path="/employee/tickets" element={<TicketsPage />} />
-                    <Route path="/employee/notifications" element={<NotificationsPage />} />
-                    <Route path="/employee/profile" element={<ProfilePage />} />
-                  </Route>
+                    {/* Team member portal */}
+                    <Route element={<RequireRole role="team_member" />}>
+                      <Route path="/employee" element={<EmployeeDashboard />} />
+                      <Route path="/employee/tasks-assigned" element={<TasksAssignedPage />} />
+                      <Route path="/employee/chat" element={<ChatPage />} />
+                      <Route path="/employee/tasks-done" element={<TasksDonePage />} />
+                      <Route path="/employee/my-day" element={<MyDayPage />} />
+                      <Route path="/employee/analytics" element={<EmployeeAnalyticsPage />} />
+                      <Route path="/employee/tickets" element={<TicketsPage />} />
+                      <Route path="/employee/notifications" element={<NotificationsPage />} />
+                      <Route path="/employee/profile" element={<ProfilePage />} />
+                    </Route>
                 </Route>
               </Route>
 

@@ -34,9 +34,12 @@ const MANAGER_NAV: NavItem[] = [
 ];
 const EMPLOYEE_NAV: NavItem[] = [
   { to: '/employee', label: 'Home', icon: <LayoutDashboard className="h-[18px] w-[18px]" />, end: true },
-  { to: '/employee/tasks-assigned', label: 'Task', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
+  { to: '/employee/tasks-assigned', label: 'Tasks', icon: <ClipboardList className="h-[18px] w-[18px]" /> },
+  { to: '/employee/tasks-done', label: 'Tasks Done', icon: <CheckSquare className="h-[18px] w-[18px]" /> },
+  { to: '/employee/my-day', label: 'My Day', icon: <NotebookPen className="h-[18px] w-[18px]" /> },
+  { to: '/employee/analytics', label: 'Analytics', icon: <BarChart3 className="h-[18px] w-[18px]" /> },
   { to: '/employee/chat', label: 'Chat', icon: <MessageCircle className="h-[18px] w-[18px]" />, badge: 'chat' },
-  { to: '/employee/tickets', label: 'Ticket', icon: <Bug className="h-[18px] w-[18px]" /> },
+  { to: '/employee/tickets', label: 'Tickets', icon: <Bug className="h-[18px] w-[18px]" /> },
   { to: '/employee/profile', label: 'Profile', icon: <Pencil className="h-[18px] w-[18px]" /> },
 ];
 

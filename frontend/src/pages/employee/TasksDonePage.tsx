@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { CalendarDays, Save, RefreshCw, FileText, CheckCircle2, Search } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { CalendarDays, Save, RefreshCw, FileText, CheckCircle2, Search, BarChart3 } from 'lucide-react';
 import { reportApi } from '../../api/endpoints';
 import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
@@ -106,10 +107,19 @@ export function TasksDonePage() {
 
   return (
     <div className="space-y-6">
-      <PageHeader
-        title="Tasks Done"
-        subtitle="Log the work you completed today. Your manager sees this straight away."
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <PageHeader
+          title="Tasks Done"
+          subtitle="Log the work you completed today. Your manager sees this straight away."
+        />
+        <Link
+          to="/employee/analytics"
+          className="inline-flex items-center gap-2 rounded-xl bg-card border border-border px-4 py-2.5 text-sm font-semibold text-foreground hover:bg-muted transition-colors self-start sm:self-auto shadow-sm"
+        >
+          <BarChart3 className="h-4 w-4 text-primary" />
+          View Analytics & History (7d, 15d, 30d, 6m, 1y)
+        </Link>
+      </div>
 
       <section className="card overflow-hidden">
         <header className="flex flex-col gap-2 border-b border-border bg-muted px-5 py-4 sm:flex-row sm:items-center sm:justify-between">
