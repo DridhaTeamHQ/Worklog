@@ -788,48 +788,114 @@ function renderBody(body: string, mentions: { id: number; name: string }[], meId
 
 function ChatImage({ url, name, caption, mine }: { url: string; name?: string; caption?: string; mine?: boolean }) {
   const [error, setError] = useState(false);
+  const [lightboxOpen, setLightboxOpen] = useState(false);
+
+  // Close lightbox on Escape
+  useEffect(() => {
+    if (!lightboxOpen) return;
+    const onKey = (e: globalThis.KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxOpen(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxOpen]);
 
   return (
-    <div className="space-y-1.5">
-      <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10 group max-w-sm">
-        {!error ? (
-          <a
-            href={url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="block cursor-pointer"
-            title="Click to view full image"
-          >
+    <>
+      <div className="space-y-1.5">
+        <div
+          onClick={() => !error && setLightboxOpen(true)}
+          className={`relative group overflow-hidden rounded-xl max-w-sm cursor-pointer select-none transition-all duration-200 ${
+            mine ? 'bg-black/10' : 'bg-muted/60 border border-border'
+          }`}
+          title="Click to view full photo"
+        >
+          {!error ? (
             <img
               src={url}
               alt={name || 'Photo'}
               referrerPolicy="no-referrer"
               crossOrigin="anonymous"
               onError={() => setError(true)}
-              className="max-h-72 w-auto max-w-full rounded-xl object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+              className="max-h-80 w-auto max-w-full rounded-xl object-cover transition-transform duration-200 group-hover:scale-[1.01]"
               loading="lazy"
             />
-          </a>
-        ) : (
-          <div className={`flex flex-col items-center justify-center p-4 text-center rounded-xl ${mine ? 'bg-black/20 text-white' : 'bg-muted text-foreground'}`}>
-            <ImageIcon className="h-8 w-8 mb-1.5 opacity-60" />
-            <p className="text-xs font-semibold truncate max-w-xs">{name || 'Image attachment'}</p>
-            <p className="text-[11px] opacity-75 mt-0.5 mb-2.5">Image cannot be loaded directly</p>
-            <a
-              href={url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
-            >
-              Open original link <ExternalLink className="h-3 w-3" />
-            </a>
-          </div>
+          ) : (
+            <div className="flex items-center gap-2 p-3 text-xs opacity-75">
+              <ImageIcon className="h-5 w-5 shrink-0" />
+              <span className="truncate">{name || 'Photo'}</span>
+            </div>
+          )}
+        </div>
+        {caption && (
+          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{caption}</p>
         )}
       </div>
-      {caption && (
-        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{caption}</p>
+
+      {/* WhatsApp-style Fullscreen Image Lightbox */}
+      {lightboxOpen && (
+        <div
+          role="dialog"
+          aria-modal="true"
+          onClick={() => setLightboxOpen(false)}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center bg-black/95 backdrop-blur-md p-4 animate-in fade-in duration-150"
+        >
+          {/* Top Bar with details & actions */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="absolute top-0 inset-x-0 flex items-center justify-between p-4 bg-gradient-to-b from-black/80 to-transparent text-white z-10"
+          >
+            <div className="min-w-0 pr-4">
+              <p className="truncate text-sm font-medium">{name || 'Photo'}</p>
+              {caption && <p className="truncate text-xs text-white/70">{caption}</p>}
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <a
+                href={url}
+                download={name || 'photo.jpg'}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Download image"
+                className="p-2 rounded-full hover:bg-white/20 transition-colors text-white"
+              >
+                <Download className="h-5 w-5" />
+              </a>
+              <button
+                type="button"
+                onClick={() => setLightboxOpen(false)}
+                title="Close (Esc)"
+                className="p-2 rounded-full hover:bg-white/20 transition-colors text-white"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+          </div>
+
+          {/* Full Image */}
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="relative flex max-h-[85vh] max-w-[90vw] items-center justify-center"
+          >
+            <img
+              src={url}
+              alt={name || 'Full photo'}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              className="max-h-[85vh] max-w-[90vw] rounded-lg object-contain shadow-2xl"
+            />
+          </div>
+
+          {caption && (
+            <div
+              onClick={(e) => e.stopPropagation()}
+              className="absolute bottom-6 max-w-xl px-4 py-2 rounded-xl bg-black/70 backdrop-blur text-white text-sm text-center"
+            >
+              {caption}
+            </div>
+          )}
+        </div>
       )}
-    </div>
+    </>
   );
 }
 
@@ -1536,6 +1602,8 @@ function RoomView({
 
                 const found = m.id === highlightId;
                 const isEditing = editingId === m.id;
+                const parsedMsg = parseMessageBody(m.body);
+                const isImageOnly = parsedMsg.type === 'image' && !parsedMsg.caption;
 
                 return (
                   <div
@@ -1565,7 +1633,7 @@ function RoomView({
                     )}
 
                     <div
-                      className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${
+                      className={`max-w-[85%] rounded-2xl shadow-sm ${isImageOnly ? 'p-1.5' : 'px-3 py-2'} ${
                         found ? 'ring-2 ring-ring ring-offset-2 ring-offset-muted' : ''
                       } ${
                         mine
@@ -1621,9 +1689,9 @@ function RoomView({
                           {renderChatMessage(m.body, team?.mentions, me, mine)}
                         </div>
                       )}
-                      <p className={`mt-1 text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
+                      <p className={`mt-1 text-[10px] ${isImageOnly ? 'px-1 text-right' : ''} ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                         {formatTime(m.created_at)}
-                        {!team && mine && (m as ChatMessage).is_read && <span className="ml-1">· Read</span>}
+                        {!team && mine && (m as ChatMessage).is_read && <span className="ml-1">✓✓</span>}
                       </p>
                     </div>
                   </div>
