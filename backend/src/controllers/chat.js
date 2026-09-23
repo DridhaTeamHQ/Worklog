@@ -9,8 +9,14 @@
  * app that is deliberately flat: an admin, a manager and a team member reach the same
  * endpoints and see the same directory.
  */
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest } from '../utils/errors.js';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 import {
   listContacts, findPartner, listConversation, sendMessage,
   markConversationRead, unreadTotal, unreadByPartner, searchDirect,
@@ -241,4 +247,92 @@ export const removeGroupMessage = asyncHandler(async (req, res) => {
   const messageId = parseId(req.params.messageId, 'message id');
   await deleteGroupMessage(req.user.id, groupId, messageId);
   return ok(res, { message: 'Message deleted.' });
+});
+
+export const uploadFile = asyncHandler(async (req, res) => {
+  const uploadsDir = path.resolve(__dirname, '../../uploads');
+  if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+  }
+
+  let buffer = null;
+  let originalName = 'upload';
+  const contentType = req.headers['content-type'] || '';
+
+  // 1. JSON payload with base64 data ({ name, type, data })
+  if (req.body && typeof req.body === 'object' && req.body.data) {
+    const rawData = String(req.body.data);
+    const base64Str = rawData.includes(';base64,') ? rawData.split(';base64,')[1] : rawData;
+    buffer = Buffer.from(base64Str, 'base64');
+    if (req.body.name) {
+      originalName = String(req.body.name);
+    }
+  } else if (Buffer.isBuffer(req.body) && req.body.length > 0) {
+    // 2. Multipart form data
+    if (contentType.includes('multipart/form-data')) {
+      const match = contentType.match(/boundary=(?:"([^"]+)"|([^;]+))/i);
+      const boundary = match ? (match[1] || match[2]) : null;
+      if (boundary) {
+        const boundaryBuf = Buffer.from(`--${boundary}`);
+        let start = 0;
+        while (start < req.body.length) {
+          const idx = req.body.indexOf(boundaryBuf, start);
+          if (idx === -1) break;
+          const nextIdx = req.body.indexOf(boundaryBuf, idx + boundaryBuf.length);
+          const part = nextIdx !== -1 ? req.body.subarray(idx + boundaryBuf.length, nextIdx) : req.body.subarray(idx + boundaryBuf.length);
+          const headerEnd = part.indexOf(Buffer.from('\r\n\r\n'));
+          if (headerEnd !== -1) {
+            const headerStr = part.subarray(0, headerEnd).toString('utf-8');
+            const fnMatch = headerStr.match(/filename="?([^";\r\n]+)"?/i);
+            if (fnMatch) {
+              originalName = fnMatch[1].trim();
+              let bodySlice = part.subarray(headerEnd + 4);
+              if (bodySlice.subarray(bodySlice.length - 2).toString() === '\r\n') {
+                bodySlice = bodySlice.subarray(0, bodySlice.length - 2);
+              }
+              buffer = bodySlice;
+              break;
+            }
+          }
+          start = idx + boundaryBuf.length;
+        }
+      }
+    }
+    // 3. Raw binary buffer
+    if (!buffer) {
+      buffer = req.body;
+      const rawName = req.headers['x-filename'] || req.query.filename;
+      if (rawName) {
+        try {
+          originalName = decodeURIComponent(String(rawName));
+        } catch {
+          originalName = String(rawName);
+        }
+      }
+    }
+  }
+
+  if (!buffer || buffer.length === 0) {
+    throw badRequest('No file uploaded or file is empty.');
+  }
+
+  const ext = path.extname(originalName) || '.bin';
+  const cleanBase = path.basename(originalName, ext).replace(/[^a-zA-Z0-9_-]/g, '_').slice(0, 50) || 'file';
+  const uniqueName = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${cleanBase}${ext}`;
+  const destPath = path.join(uploadsDir, uniqueName);
+
+  await fs.promises.writeFile(destPath, buffer);
+
+  const sizeStr = buffer.length < 1024
+    ? `${buffer.length} B`
+    : buffer.length < 1024 * 1024
+      ? `${(buffer.length / 1024).toFixed(1)} KB`
+      : `${(buffer.length / (1024 * 1024)).toFixed(1)} MB`;
+
+  return created(res, {
+    url: `/uploads/${uniqueName}`,
+    name: originalName,
+    size: sizeStr,
+    bytes: buffer.length,
+  });
 });

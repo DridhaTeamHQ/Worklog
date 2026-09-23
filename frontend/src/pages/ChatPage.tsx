@@ -46,17 +46,27 @@ export function parseMessageBody(body?: string | null): ParsedMessage {
       }
     } catch {}
   }
-  if (/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(trimmed)) {
+  if (/^https?:\/\/.*\.(png|jpg|jpeg|gif|webp)(\?.*)?$/i.test(trimmed) || /^\/uploads\/.*\.(png|jpg|jpeg|gif|webp)$/i.test(trimmed)) {
     return { type: 'image', url: trimmed };
   }
-  if (/^https?:\/\/.*\.(mp4|mov|webm)(\?.*)?$/i.test(trimmed)) {
+  if (/^https?:\/\/.*\.(mp4|mov|webm)(\?.*)?$/i.test(trimmed) || /^\/uploads\/.*\.(mp4|mov|webm)$/i.test(trimmed)) {
     return { type: 'video', url: trimmed, name: 'Video attachment' };
   }
-  if (/^https?:\/\/.*\.(pdf|docx?|xlsx?|pptx?|zip|rar|csv|txt)(\?.*)?$/i.test(trimmed)) {
+  if (/^https?:\/\/.*\.(pdf|docx?|xlsx?|pptx?|zip|rar|csv|txt)(\?.*)?$/i.test(trimmed) || /^\/uploads\/.*$/i.test(trimmed)) {
     const filename = trimmed.split('/').pop()?.split('?')[0] || 'Document';
     return { type: 'file', url: trimmed, name: filename };
   }
   return { type: 'text', text: body };
+}
+
+export function getMessagePreview(body?: string | null): string {
+  if (!body) return '';
+  const parsed = parseMessageBody(body);
+  if (parsed.type === 'image') return '📷 Photo';
+  if (parsed.type === 'video') return '🎥 Video';
+  if (parsed.type === 'file') return `📄 ${parsed.name || 'Document'}`;
+  if (parsed.type === 'sticker') return '🎨 Sticker';
+  return parsed.text || body;
 }
 
 function formatFileSize(bytes: number): string {
@@ -66,39 +76,69 @@ function formatFileSize(bytes: number): string {
 }
 
 async function uploadFileToCloud(file: File): Promise<string> {
-  const formData = new FormData();
-  formData.append('file', file);
+  // 1. Direct binary upload to backend server
   try {
-    const res = await fetch('https://tmpfiles.org/api/v1/upload', {
+    const res = await fetch('/api/chat/upload', {
       method: 'POST',
-      body: formData,
+      headers: {
+        'x-filename': encodeURIComponent(file.name),
+        'content-type': file.type || 'application/octet-stream',
+      },
+      body: file,
+      credentials: 'include',
     });
-    const json = await res.json();
-    if (json?.status === 'success' && json?.data?.url) {
-      return json.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.url) {
+        return json.data.url;
+      }
     }
-  } catch (e) {
-    console.warn('tmpfiles upload failed, trying fallback:', e);
+  } catch (err) {
+    console.warn('Backend binary upload failed, trying base64 fallback:', err);
   }
 
-  // Fallback host (Catbox)
+  // 2. Base64 JSON upload to backend server
   try {
-    const cbData = new FormData();
-    cbData.append('reqtype', 'fileupload');
-    cbData.append('fileToUpload', file);
-    const cbRes = await fetch('https://catbox.moe/user/api.php', {
-      method: 'POST',
-      body: cbData,
+    const base64 = await new Promise<string>((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
     });
-    if (cbRes.ok) {
-      const text = (await cbRes.text()).trim();
-      if (text.startsWith('http')) return text;
+
+    const res = await fetch('/api/chat/upload', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        name: file.name,
+        type: file.type,
+        data: base64,
+      }),
+      credentials: 'include',
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.url) {
+        return json.data.url;
+      }
     }
-  } catch (cbErr) {
-    console.warn('Catbox upload failed:', cbErr);
+  } catch (err) {
+    console.warn('Backend base64 upload failed:', err);
   }
 
-  throw new Error('Upload failed. Please check your network connection.');
+  // 3. Fallback to inline Data URL for small files (< 4MB) so user is never blocked
+  if (file.size < 4 * 1024 * 1024) {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+  }
+
+  throw new Error('Upload failed. Please check your network connection and try again.');
 }
 
 /**
@@ -746,30 +786,64 @@ function renderBody(body: string, mentions: { id: number; name: string }[], meId
   return out;
 }
 
+function ChatImage({ url, name, caption, mine }: { url: string; name?: string; caption?: string; mine?: boolean }) {
+  const [error, setError] = useState(false);
+
+  return (
+    <div className="space-y-1.5">
+      <div className="overflow-hidden rounded-xl border border-black/10 dark:border-white/10 group max-w-sm">
+        {!error ? (
+          <a
+            href={url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="block cursor-pointer"
+            title="Click to view full image"
+          >
+            <img
+              src={url}
+              alt={name || 'Photo'}
+              referrerPolicy="no-referrer"
+              crossOrigin="anonymous"
+              onError={() => setError(true)}
+              className="max-h-72 w-auto max-w-full rounded-xl object-contain transition-transform duration-200 group-hover:scale-[1.02]"
+              loading="lazy"
+            />
+          </a>
+        ) : (
+          <div className={`flex flex-col items-center justify-center p-4 text-center rounded-xl ${mine ? 'bg-black/20 text-white' : 'bg-muted text-foreground'}`}>
+            <ImageIcon className="h-8 w-8 mb-1.5 opacity-60" />
+            <p className="text-xs font-semibold truncate max-w-xs">{name || 'Image attachment'}</p>
+            <p className="text-[11px] opacity-75 mt-0.5 mb-2.5">Image cannot be loaded directly</p>
+            <a
+              href={url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 rounded-md px-2.5 py-1 text-xs font-medium bg-primary text-primary-foreground hover:opacity-90 transition-opacity"
+            >
+              Open original link <ExternalLink className="h-3 w-3" />
+            </a>
+          </div>
+        )}
+      </div>
+      {caption && (
+        <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{caption}</p>
+      )}
+    </div>
+  );
+}
+
 function renderChatMessage(body: string, mentions?: { id: number; name: string }[], meId?: number, mine?: boolean): ReactNode {
   const parsed = parseMessageBody(body);
 
   if (parsed.type === 'image' && parsed.url) {
     return (
-      <div className="space-y-1.5">
-        <a
-          href={parsed.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block overflow-hidden rounded-xl border border-black/10 dark:border-white/10 group cursor-pointer max-w-sm"
-          title="Click to view full image"
-        >
-          <img
-            src={parsed.url}
-            alt={parsed.name || 'Photo'}
-            className="max-h-72 w-auto max-w-full rounded-xl object-contain transition-transform duration-200 group-hover:scale-[1.02]"
-            loading="lazy"
-          />
-        </a>
-        {parsed.caption && (
-          <p className="whitespace-pre-wrap break-words text-sm leading-relaxed">{parsed.caption}</p>
-        )}
-      </div>
+      <ChatImage
+        url={parsed.url}
+        name={parsed.name}
+        caption={parsed.caption}
+        mine={mine}
+      />
     );
   }
 
@@ -1018,7 +1092,7 @@ function DirectoryView({
                     <span className="mt-0.5 flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-muted-foreground">
                         {g.last_message
-                          ? `${g.last_message_mine ? 'You' : g.last_sender_name}: ${g.last_message}`
+                          ? `${g.last_message_mine ? 'You' : g.last_sender_name}: ${getMessagePreview(g.last_message)}`
                           : `${g.member_count} member${g.member_count === 1 ? '' : 's'}`}
                       </span>
                       {g.unread > 0 && (
@@ -1075,7 +1149,7 @@ function DirectoryView({
                     <span className="mt-0.5 flex items-center justify-between gap-2">
                       <span className="truncate text-sm text-muted-foreground">
                         {c.last_message
-                          ? `${c.last_message_mine ? 'You: ' : ''}${c.last_message}`
+                          ? `${c.last_message_mine ? 'You: ' : ''}${getMessagePreview(c.last_message)}`
                           : `${roleLabel(c.role)}${c.department ? ` · ${c.department}` : ''}`}
                       </span>
                       {c.unread > 0 && (

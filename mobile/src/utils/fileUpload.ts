@@ -1,5 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as DocumentPicker from 'expo-document-picker';
+import { getServerUrl, tokenStore } from '../api/client';
 
 export interface AttachedFile {
   name: string;
@@ -11,87 +12,59 @@ export interface AttachedFile {
 export async function uploadToCloud(uri: string, name: string, mimeType?: string): Promise<string> {
   const cleanName = name || `upload_${Date.now()}.jpg`;
   const cleanType = mimeType || 'image/jpeg';
+  const serverBase = getServerUrl();
+  const token = await tokenStore.get();
 
-  // 1. Fetch file as Blob & File (compliant with modern React Native / Expo fetch)
+  // 1. Direct upload to local Worklog backend
   try {
-    const fileRes = await fetch(uri);
-    const blob = await fileRes.blob();
-    const fileObj = typeof File !== 'undefined'
-      ? new File([blob], cleanName, { type: cleanType })
-      : blob;
-
     const formData = new FormData();
-    formData.append('file', fileObj as any);
+    formData.append('file', {
+      uri,
+      name: cleanName,
+      type: cleanType,
+    } as any);
 
-    const res = await fetch('https://tmpfiles.org/api/v1/upload', {
+    const res = await fetch(`${serverBase}/chat/upload`, {
       method: 'POST',
-      body: formData,
-    });
-    const json = await res.json();
-    if (json?.status === 'success' && json?.data?.url) {
-      return json.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/');
-    }
-  } catch (e) {
-    console.warn('Fetch blob upload error:', e);
-  }
-
-  // 2. XMLHttpRequest upload fallback
-  try {
-    const uploadWithXhr = (): Promise<string> => {
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', 'https://tmpfiles.org/api/v1/upload');
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const json = JSON.parse(xhr.responseText);
-              if (json?.status === 'success' && json?.data?.url) {
-                resolve(json.data.url.replace('https://tmpfiles.org/', 'https://tmpfiles.org/dl/'));
-                return;
-              }
-            } catch {}
-          }
-          reject(new Error(`XHR failed: ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error('XHR network error'));
-
-        const data = new FormData();
-        data.append('file', {
-          uri,
-          name: cleanName,
-          type: cleanType,
-        } as any);
-        xhr.send(data);
-      });
-    };
-    const xhrUrl = await uploadWithXhr();
-    if (xhrUrl) return xhrUrl;
-  } catch (xhrErr) {
-    console.warn('XHR upload error:', xhrErr);
-  }
-
-  // 3. Catbox upload fallback
-  try {
-    const fileRes = await fetch(uri);
-    const blob = await fileRes.blob();
-    const fileObj = typeof File !== 'undefined'
-      ? new File([blob], cleanName, { type: cleanType })
-      : blob;
-
-    const formData = new FormData();
-    formData.append('reqtype', 'fileupload');
-    formData.append('fileToUpload', fileObj as any);
-
-    const res = await fetch('https://catbox.moe/user/api.php', {
-      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
       body: formData,
     });
     if (res.ok) {
-      const text = (await res.text()).trim();
-      if (text.startsWith('http')) return text;
+      const json = await res.json();
+      if (json?.data?.url) {
+        const fileUrl = json.data.url;
+        return fileUrl.startsWith('/') ? `${serverBase.replace(/\/api\/?$/, '')}${fileUrl}` : fileUrl;
+      }
     }
-  } catch (cbErr) {
-    console.warn('Catbox fallback error:', cbErr);
+  } catch (err) {
+    console.warn('Backend upload failed on mobile:', err);
+  }
+
+  // 2. Fetch blob fallback
+  try {
+    const fileRes = await fetch(uri);
+    const blob = await fileRes.blob();
+    const res = await fetch(`${serverBase}/chat/upload`, {
+      method: 'POST',
+      headers: {
+        'x-filename': encodeURIComponent(cleanName),
+        'content-type': cleanType,
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      },
+      body: blob,
+    });
+    if (res.ok) {
+      const json = await res.json();
+      if (json?.data?.url) {
+        const fileUrl = json.data.url;
+        return fileUrl.startsWith('/') ? `${serverBase.replace(/\/api\/?$/, '')}${fileUrl}` : fileUrl;
+      }
+    }
+  } catch (blobErr) {
+    console.warn('Blob upload failed:', blobErr);
   }
 
   return uri;

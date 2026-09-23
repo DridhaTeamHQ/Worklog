@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import express, { Router } from 'express';
 import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText } from '../middleware/validate.js';
@@ -8,6 +8,7 @@ import {
   groups, createGroupRoom, renameGroupRoom, groupMessages, postToGroup, markGroupRoomRead,
   search,
   editMessage, removeMessage, editTeamMessage, removeTeamMessage, editGroupMessage, removeGroupMessage,
+  uploadFile,
 } from '../controllers/chat.js';
 
 const router = Router();
@@ -114,7 +115,10 @@ router.patch('/team/read', markTeamChannelRead);
 router.patch('/messages/:messageId', validate(sendSchema), editMessage);
 router.delete('/messages/:messageId', removeMessage);
 
-// Static paths first, or 'contacts', 'unread-count', 'team' and 'groups' would be
+// Upload endpoint for chat attachments (photos, videos, documents)
+router.post('/upload', express.raw({ type: '*/*', limit: '50mb' }), uploadFile);
+
+// Static paths first, or 'contacts', 'unread-count', 'team', 'groups', and 'upload' would be
 // read as user ids.
 router.get('/:userId/messages', validate(conversationQuery, 'query'), conversation);
 router.post('/:userId/messages', validate(sendSchema), send);
