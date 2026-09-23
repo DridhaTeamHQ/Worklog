@@ -54,13 +54,18 @@ const assignSchema = z.object({
 const statusSchema = z.object({ status: z.enum(STATUSES) });
 
 const patchSchema = z.object({
-  title: optionalText(160).transform((v) => v ?? ''),
-  description: optionalText(4000).transform((v) => v ?? ''),
+  employeeId: z.coerce.number().int().positive().optional(),
+  title: optionalText(160).optional(),
+  description: optionalText(4000).optional(),
   notes: optionalText(2000),
   priority: z.enum(PRIORITIES).optional(),
+  status: z.enum(STATUSES).optional(),
   startDate: isoDate.optional().nullable(),
   deadline: isoDate.optional().nullable(),
-});
+}).refine(
+  (v) => !v.startDate || !v.deadline || v.startDate <= v.deadline,
+  { path: ['deadline'], message: 'The deadline cannot be earlier than the start date.' },
+);
 
 router.get('/', validate(listQuery, 'query'), list);
 router.get('/:id', getOne);

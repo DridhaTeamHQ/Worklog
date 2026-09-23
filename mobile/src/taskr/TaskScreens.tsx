@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Alert, KeyboardAvoidingView, Modal, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { taskApi, todoApi } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
@@ -70,6 +70,70 @@ export function TaskDetailsScreen({ navigation, route }: { navigation: Nav; rout
   const [busy, setBusy] = useState(false);
   const [itemBusy, setItemBusy] = useState<number | null>(null);
   const ownTask = task?.employee_id === user?.id;
+  const isManager = isManagerLevel(user?.role) || task?.manager_id === user?.id;
+  const [editOpen, setEditOpen] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDesc, setEditDesc] = useState('');
+  const [editPriority, setEditPriority] = useState<Priority>('medium');
+  const [editDeadline, setEditDeadline] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editAttachments, setEditAttachments] = useState<AttachedFile[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const startEdit = () => {
+    if (!task) return;
+    const { cleanDescription, attachments } = extractAttachments(task.description);
+    setEditTitle(task.title);
+    setEditDesc(cleanDescription);
+    setEditPriority(task.priority);
+    setEditDeadline(task.deadline ? task.deadline.slice(0, 10) : '');
+    setEditNotes(task.notes || '');
+    setEditAttachments(attachments);
+    setEditOpen(true);
+  };
+
+  const saveEdit = async () => {
+    if (!task || !editTitle.trim()) return;
+    setSavingEdit(true);
+    try {
+      const serialized = serializeAttachments(editDesc.trim(), editAttachments);
+      const res = await taskApi.update(task.id, {
+        title: editTitle.trim(),
+        description: serialized,
+        priority: editPriority,
+        deadline: editDeadline || null,
+        notes: editNotes.trim() || undefined,
+      });
+      putTask(res.data);
+      success('Task updated');
+      setEditOpen(false);
+    } catch (e) {
+      error(message(e));
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const confirmDelete = () => {
+    if (!task) return;
+    Alert.alert('Delete Task', `Are you sure you want to delete "${task.title}"?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            await taskApi.remove(task.id);
+            success('Task deleted');
+            navigation.goBack();
+          } catch (e) {
+            error(message(e));
+          }
+        },
+      },
+    ]);
+  };
+
   useEffect(() => { let live = true; taskApi.get(route.params.id).then(result => { if (live) putTask(result.data); }).catch(e => { if (live) setLoadError(message(e)); }).finally(() => { if (live) setLoading(false); }); return () => { live = false; }; }, [route.params.id]);
   useEffect(() => { if (!ownTask) return; let live = true; todoApi.list().then(result => { if (live) setItems(result.data.filter(todo => todo.task_id === route.params.id)); }).catch(e => { if (live) setCheckError(message(e)); }); return () => { live = false; }; }, [route.params.id, ownTask]);
   const update = async () => { if (!task || busy) return; setBusy(true); try { await setStatus(task, task.status === 'completed' ? 'pending' : 'completed'); success(task.status === 'completed' ? 'Task reopened' : 'Task completed'); } catch (e) { error(message(e)); } finally { setBusy(false); } };
@@ -78,7 +142,18 @@ export function TaskDetailsScreen({ navigation, route }: { navigation: Nav; rout
   if (loading && !task) return <View style={[s.screen, s.empty]}><ActivityIndicator color={p.blue} /></View>;
   if (!task) return <View style={s.screen}><IconButton name="chevron-back" label="Back" onPress={() => navigation.goBack()} /><Empty title="Task unavailable" detail={loadError || 'This task is no longer available.'} /></View>;
   const team = task.employee_department || task.project_name || 'My team';
-  return <SafeAreaView style={s.screen} edges={['top', 'bottom', 'left', 'right']}><View style={[s.row, { paddingHorizontal: 18, paddingVertical: 12 }]}><IconButton name="chevron-back" label="Back" bg={p.line} tint={p.ink} onPress={() => navigation.goBack()} /><Text style={[s.heading, s.grow]}>Task Details</Text></View><ScrollView contentContainerStyle={[s.content, { gap: 27, paddingTop: 15 }]} keyboardShouldPersistTaps="handled">
+  return <SafeAreaView style={s.screen} edges={['top', 'bottom', 'left', 'right']}>
+    <View style={[s.row, { paddingHorizontal: 18, paddingVertical: 12, gap: 10 }]}>
+      <IconButton name="chevron-back" label="Back" bg={p.line} tint={p.ink} onPress={() => navigation.goBack()} />
+      <Text style={[s.heading, s.grow]}>Task Details</Text>
+      {isManager && (
+        <View style={[s.row, { gap: 6 }]}>
+          <IconButton name="pencil" label="Edit task" bg={p.line} tint={p.blue} onPress={startEdit} />
+          <IconButton name="trash-outline" label="Delete task" bg={p.line} tint={p.red} onPress={confirmDelete} />
+        </View>
+      )}
+    </View>
+    <ScrollView contentContainerStyle={[s.content, { gap: 27, paddingTop: 15 }]} keyboardShouldPersistTaps="handled">
     {loadError && <Text style={{ color: p.red }}>{loadError}</Text>}
     {ownTask && <View style={{ gap: 10 }}>
       <View style={s.between}><Text style={s.heading}>Task Status</Text>{busy && <ActivityIndicator color={p.blue} accessibilityLabel="Saving task status" />}</View>
@@ -121,5 +196,29 @@ export function TaskDetailsScreen({ navigation, route }: { navigation: Nav; rout
     })()}
     <View style={s.section}><View style={s.between}><Text style={s.heading}>Checklist ({items.filter(i => i.is_done).length}/{items.length})</Text>{ownTask && <Pressable accessibilityRole="button" onPress={() => setAdding(!adding)} style={[s.row, { gap: 4, minHeight: 44 }]}><Icon name="add" color={p.blue} /><Text style={s.link}>Add</Text></Pressable>}</View><Text style={[s.muted, { fontSize: 12 }]}>{ownTask ? 'Your personal checklist for today' : 'Personal checklists are available to the task’s assignee.'}</Text>{checkError && <Text style={{ color: p.red }}>{checkError}</Text>}{items.map(item => <View key={item.id} style={s.row}><CheckButton checked={item.is_done} busy={itemBusy === item.id} label={item.title} onPress={() => void toggleItem(item)} /><Text style={[s.body, s.grow, item.is_done && { textDecorationLine: 'line-through', color: p.muted }]}>{item.title}</Text></View>)}{adding && <View style={s.row}><TextInput accessibilityLabel="Checklist item" style={[s.input, s.grow]} placeholder="Add a checklist item" placeholderTextColor={p.muted} value={text} onChangeText={setText} onSubmitEditing={() => void addItem()} maxLength={200} autoFocus /><IconButton name="add-circle" label="Save checklist item" tint={p.blue} onPress={() => void addItem()} /></View>}</View>
     {ownTask && <Pressable accessibilityRole="button" disabled={busy} onPress={() => void update()} style={[s.primary, { marginTop: 15, opacity: busy ? 0.6 : 1 }]}>{busy ? <ActivityIndicator color="#fff" /> : <Text style={s.primaryText}>{task.status === 'completed' ? 'Reopen Task' : 'Mark as Complete'}</Text>}</Pressable>}
-  </ScrollView></SafeAreaView>;
+  </ScrollView>
+
+  {/* Edit Task Modal */}
+  <Modal visible={editOpen} animationType="slide" onRequestClose={() => setEditOpen(false)}>
+    <SafeAreaView style={s.screen} edges={['top', 'bottom', 'left', 'right']}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        <View style={[s.between, { padding: 12, gap: 6 }]}>
+          <IconButton name="close" label="Close" bg={p.line} tint={p.ink} onPress={() => setEditOpen(false)} />
+          <Text style={[s.heading, s.grow, { fontSize: 16 }]}>Edit Task</Text>
+          <Pressable accessibilityRole="button" disabled={savingEdit} onPress={() => void saveEdit()} style={[s.primary, { minHeight: 34, paddingHorizontal: 12, opacity: savingEdit ? 0.6 : 1 }]}>
+            {savingEdit ? <ActivityIndicator color="#fff" size="small" /> : <Text style={s.primaryText}>Save</Text>}
+          </Pressable>
+        </View>
+        <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={[s.content, { paddingTop: 8, gap: 14 }]}>
+          <View><Text style={s.label}>Task Title</Text><TextInput accessibilityLabel="Task title" style={s.input} placeholder="e.g. Design home screen UI" placeholderTextColor={p.muted} value={editTitle} onChangeText={setEditTitle} maxLength={200} /></View>
+          <View><Text style={s.label}>Description</Text><TextInput accessibilityLabel="Description" style={[s.input, { minHeight: 75, textAlignVertical: 'top' }]} multiline placeholder="Add details..." placeholderTextColor={p.muted} value={editDesc} onChangeText={setEditDesc} /></View>
+          <View><Text style={s.label}>Due Date</Text><DatePicker value={editDeadline} onChange={setEditDeadline} /></View>
+          <View><Text style={s.label}>Priority</Text><View style={[s.row, { gap: 8 }]}>{(['low', 'medium', 'high', 'urgent'] as Priority[]).map(value => <Pressable accessibilityRole="radio" accessibilityState={{ checked: value === editPriority }} key={value} onPress={() => setEditPriority(value)} style={{ padding: 2, borderWidth: 1.5, borderColor: editPriority === value ? p.blue : 'transparent', borderRadius: 8 }}><PriorityBadge priority={value} /></Pressable>)}</View></View>
+          <View><Text style={s.label}>Manager Notes</Text><TextInput accessibilityLabel="Notes" style={s.input} placeholder="Optional notes for assignee..." placeholderTextColor={p.muted} value={editNotes} onChangeText={setEditNotes} /></View>
+          <AttachmentPicker attachments={editAttachments} onChange={setEditAttachments} />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </SafeAreaView>
+  </Modal>
+</SafeAreaView>;
 }

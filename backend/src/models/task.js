@@ -220,7 +220,15 @@ export async function updateTask({ taskId, actor, patch }) {
     priority: patch.priority,
     start_date: patch.startDate,
     deadline: patch.deadline,
+    status: patch.status,
+    employee_id: patch.employeeId,
   };
+  if (patch.status === 'completed' && !task.completed_at) {
+    columns.completed_at = nowIso();
+  } else if (patch.status && patch.status !== 'completed') {
+    columns.completed_at = null;
+  }
+
   const sets = [];
   const params = [];
   for (const [col, val] of Object.entries(columns)) {
@@ -233,7 +241,7 @@ export async function updateTask({ taskId, actor, patch }) {
   await db.run(`UPDATE assigned_tasks SET ${sets.join(', ')} WHERE id = ?`, params);
 
   await createNotification({
-    userId: task.employee_id,
+    userId: patch.employeeId || task.employee_id,
     title: 'Task updated',
     message: `Your task "${patch.title || task.title}" was updated by your manager.`,
     type: 'task_updated',

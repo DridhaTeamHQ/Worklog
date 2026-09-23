@@ -8,8 +8,9 @@ import { taskApi, teamApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
 import { useToast } from '../../components/Toast';
 import { AssignTaskModal } from '../../components/AssignTaskModal';
+import { EditTaskModal } from '../../components/EditTaskModal';
 import { TaskTable } from '../../components/TaskTable';
-import { Avatar, EmptyState, ErrorState, PageLoader, SearchInput, StatCard } from '../../components/ui';
+import { Avatar, EmptyState, ErrorState, PageLoader, SearchInput, StatCard, Modal, Spinner } from '../../components/ui';
 import { formatDate, formatTime, reportLines, todayIso, STATUS_LABEL } from '../../lib/format';
 import type { DailyReport, Task, TaskStatus, TeamMemberDetail } from '../../types';
 
@@ -42,6 +43,32 @@ export function EmployeeDetailPage() {
   const [search, setSearch] = useState('');
   const [reportsLoading, setReportsLoading] = useState(false);
   const [updatingId, setUpdatingId] = useState<number | null>(null);
+  const [editTask, setEditTask] = useState<Task | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<Task | null>(null);
+  const [deleting, setDeleting] = useState(false);
+
+  const removeTask = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await taskApi.remove(confirmDelete.id);
+      setTasks((prev) => prev.filter((t) => t.id !== confirmDelete.id));
+      setEmployee((prev) => prev && {
+        ...prev,
+        counts: {
+          ...prev.counts,
+          total: Math.max(0, prev.counts.total - 1),
+          [confirmDelete.status]: Math.max(0, ((prev.counts as any)[confirmDelete.status] || 1) - 1),
+        },
+      });
+      toast.success(`${confirmDelete.task_key ?? confirmDelete.title} was deleted.`);
+      setConfirmDelete(null);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not delete the task.');
+    } finally {
+      setDeleting(false);
+    }
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -279,6 +306,8 @@ export function EmployeeDetailPage() {
                 updatingId={updatingId}
                 onStatusChange={changeStatus}
                 showAssignee={false}
+                onEdit={setEditTask}
+                onDelete={setConfirmDelete}
               />
             )}
           </div>
@@ -299,6 +328,32 @@ export function EmployeeDetailPage() {
           setTab('tasks');
         }}
       />
+
+      <EditTaskModal
+        open={!!editTask}
+        onClose={() => setEditTask(null)}
+        task={editTask}
+        onSaved={(updated) => {
+          setTasks((prev) => prev.map((t) => (t.id === updated.id ? updated : t)));
+        }}
+      />
+
+      <Modal
+        open={!!confirmDelete}
+        onClose={() => setConfirmDelete(null)}
+        title="Delete task"
+        description={confirmDelete ? `Delete ${confirmDelete.task_key ?? confirmDelete.title}? This cannot be undone.` : undefined}
+        footer={(
+          <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
+            <button type="button" onClick={() => setConfirmDelete(null)} className="btn-secondary">Cancel</button>
+            <button type="button" disabled={deleting} onClick={() => void removeTask()} className="btn-danger">
+              {deleting ? <><Spinner className="h-4 w-4" /> Deleting…</> : 'Delete task'}
+            </button>
+          </div>
+        )}
+      >
+        <p className="text-sm text-muted-foreground">The task will be permanently removed. Any logged hours will remain intact.</p>
+      </Modal>
     </div>
   );
 }

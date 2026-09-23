@@ -75,6 +75,55 @@ export function AllTasksScreen({ route }: any) {
   const [detailModal, setDetailModal] = useState(false);
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
+  // Edit Task Modal
+  const [editModal, setEditModal] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editNotes, setEditNotes] = useState('');
+  const [editPriority, setEditPriority] = useState<Priority>('medium');
+  const [editDeadline, setEditDeadline] = useState('');
+  const [editAttachments, setEditAttachments] = useState<AttachedFile[]>([]);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const openEditModal = (task: Task) => {
+    const { cleanDescription, attachments } = extractAttachments(task.description);
+    setEditTitle(task.title);
+    setEditDescription(cleanDescription);
+    setEditNotes(task.notes || '');
+    setEditPriority(task.priority);
+    setEditDeadline(task.deadline ? task.deadline.slice(0, 10) : '');
+    setEditAttachments(attachments);
+    setDetailModal(false);
+    setEditModal(true);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!selectedTask) return;
+    if (!editTitle.trim()) {
+      toastError('Please enter a task title');
+      return;
+    }
+    setSavingEdit(true);
+    try {
+      const serializedDesc = serializeAttachments(editDescription.trim(), editAttachments);
+      const res = await taskApi.update(selectedTask.id, {
+        title: editTitle.trim(),
+        description: serializedDesc,
+        notes: editNotes.trim() || undefined,
+        priority: editPriority,
+        deadline: editDeadline.trim() || null,
+      });
+      toastSuccess('Task updated successfully');
+      setEditModal(false);
+      setSelectedTask(res.data);
+      loadData();
+    } catch (err: any) {
+      toastError(err.message || 'Failed to update task');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
   const loadData = useCallback(async () => {
     try {
       const [tasksRes, teamRes, projRes] = await Promise.all([
@@ -440,16 +489,94 @@ export function AllTasksScreen({ route }: any) {
               />
             </View>
 
-            <Button
-              title="Delete Task"
-              variant="danger"
-              size="sm"
-              icon={<Trash2 size={16} color={colors.white} />}
-              onPress={() => handleDeleteTask(selectedTask)}
-              style={{ marginTop: spacing.xl }}
-            />
+            <View style={{ flexDirection: 'row', gap: spacing.md, marginTop: spacing.xl }}>
+              <Button
+                title="Edit Task"
+                variant="primary"
+                size="sm"
+                icon={<FileText size={16} color={colors.white} />}
+                onPress={() => openEditModal(selectedTask)}
+                style={{ flex: 1 }}
+              />
+              <Button
+                title="Delete Task"
+                variant="danger"
+                size="sm"
+                icon={<Trash2 size={16} color={colors.white} />}
+                onPress={() => handleDeleteTask(selectedTask)}
+                style={{ flex: 1 }}
+              />
+            </View>
           </View>
         )}
+      </Modal>
+
+      {/* Edit Task Modal */}
+      <Modal
+        visible={editModal}
+        onClose={() => setEditModal(false)}
+        title={selectedTask?.task_key ? `Edit ${selectedTask.task_key}` : 'Edit Task'}
+        footer={
+          <View style={styles.modalFooter}>
+            <Button
+              title="Cancel"
+              variant="outline"
+              size="sm"
+              onPress={() => setEditModal(false)}
+              style={{ flex: 1, marginRight: spacing.sm }}
+            />
+            <Button
+              title="Save Changes"
+              size="sm"
+              loading={savingEdit}
+              onPress={handleSaveEdit}
+              style={{ flex: 1 }}
+            />
+          </View>
+        }
+      >
+        <SelectPicker
+          label="Priority"
+          options={PRIORITY_OPTIONS}
+          value={editPriority}
+          onChange={(val) => setEditPriority(val as Priority)}
+        />
+
+        <Input
+          label="Task Title"
+          placeholder="e.g. Implement authentication screens"
+          value={editTitle}
+          onChangeText={setEditTitle}
+        />
+
+        <Input
+          label="Task Description"
+          placeholder="Detailed task description..."
+          value={editDescription}
+          onChangeText={setEditDescription}
+          multiline
+          numberOfLines={3}
+          style={{ minHeight: 70, textAlignVertical: 'top' }}
+        />
+
+        <AttachmentPicker
+          attachments={editAttachments}
+          onChange={setEditAttachments}
+        />
+
+        <Input
+          label="Deadline (YYYY-MM-DD)"
+          placeholder="e.g. 2026-10-15"
+          value={editDeadline}
+          onChangeText={setEditDeadline}
+        />
+
+        <Input
+          label="Manager Notes (Optional)"
+          placeholder="Special notes or links for the assignee..."
+          value={editNotes}
+          onChangeText={setEditNotes}
+        />
       </Modal>
     </SafeAreaView>
   );

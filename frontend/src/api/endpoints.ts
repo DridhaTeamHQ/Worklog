@@ -320,6 +320,12 @@ export const chatApi = {
   send: (userId: number, body: string) =>
     api.post<ChatMessage>(`/chat/${userId}/messages`, { body }),
 
+  edit: (messageId: number, body: string) =>
+    api.patch<ChatMessage>(`/chat/messages/${messageId}`, { body }),
+
+  remove: (messageId: number) =>
+    api.delete<{ message: string }>(`/chat/messages/${messageId}`),
+
   markRead: (userId: number) =>
     api.patch<{ marked: number; unread: number }>(`/chat/${userId}/read`, {}),
 
@@ -356,6 +362,12 @@ export const chatApi = {
     post: (groupId: number, body: string) =>
       api.post<GroupMessage>(`/chat/groups/${groupId}/messages`, { body }),
 
+    edit: (groupId: number, messageId: number, body: string) =>
+      api.patch<GroupMessage>(`/chat/groups/${groupId}/messages/${messageId}`, { body }),
+
+    remove: (groupId: number, messageId: number) =>
+      api.delete<{ message: string }>(`/chat/groups/${groupId}/messages/${messageId}`),
+
     markRead: (groupId: number) =>
       api.patch<{ lastReadId: number; unread: number }>(`/chat/groups/${groupId}/read`, {}),
   },
@@ -373,6 +385,12 @@ export const chatApi = {
 
     post: (body: string, mentions: number[] = []) =>
       api.post<TeamMessage>('/chat/team/messages', { body, mentions }),
+
+    edit: (messageId: number, body: string, mentions: number[] = []) =>
+      api.patch<TeamMessage>(`/chat/team/messages/${messageId}`, { body, mentions }),
+
+    remove: (messageId: number) =>
+      api.delete<{ message: string }>(`/chat/team/messages/${messageId}`),
 
     markRead: () =>
       api.patch<{ lastReadId: number; unread: number }>('/chat/team/read', {}),

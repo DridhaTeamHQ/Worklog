@@ -5,14 +5,15 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send,
-  Users, UserRound,
+  Users, UserRound, Trash2, Check, X,
 } from 'lucide-react';
 import { chatApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useChatUnread } from '../context/ChatContext';
+import { useToast } from '../components/Toast';
 import { formatDate, formatTime, relativeTime, todayIso } from '../lib/format';
-import { Avatar, EmptyState, Spinner } from '../components/ui';
+import { Avatar, EmptyState, Spinner, Modal } from '../components/ui';
 import { GroupModal } from '../components/GroupModal';
 import {
   isAdmin, roleLabel,
@@ -452,6 +453,48 @@ export function ChatPage() {
     }
   }, [groupDialog, openGroup]);
 
+  const toast = useToast();
+
+  const handleEditMessage = useCallback(async (messageId: number, newBody: string) => {
+    if (!active || !newBody.trim()) return;
+    try {
+      if (active.kind === 'dm') {
+        const { data } = await chatApi.edit(messageId, newBody.trim());
+        setMessages((prev) => prev.map((m) => (m.id === messageId ? data : m)));
+      } else if (active.kind === 'team') {
+        const { data } = await chatApi.team.edit(messageId, newBody.trim(), findMentions(newBody.trim(), contacts));
+        setTeamMessages((prev) => prev.map((m) => (m.id === messageId ? data : m)));
+      } else if (active.kind === 'group') {
+        const { data } = await chatApi.groups.edit(active.group.id, messageId, newBody.trim());
+        setGroupMessages((prev) => prev.map((m) => (m.id === messageId ? data : m)));
+      }
+      toast.success('Message updated.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not edit message.');
+      throw err;
+    }
+  }, [active, contacts, toast]);
+
+  const handleDeleteMessage = useCallback(async (messageId: number) => {
+    if (!active) return;
+    try {
+      if (active.kind === 'dm') {
+        await chatApi.remove(messageId);
+        setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } else if (active.kind === 'team') {
+        await chatApi.team.remove(messageId);
+        setTeamMessages((prev) => prev.filter((m) => m.id !== messageId));
+      } else if (active.kind === 'group') {
+        await chatApi.groups.remove(active.group.id, messageId);
+        setGroupMessages((prev) => prev.filter((m) => m.id !== messageId));
+      }
+      toast.success('Message deleted.');
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not delete message.');
+      throw err;
+    }
+  }, [active, toast]);
+
   /* ---------------------------------------------------------------- behaviour */
 
   // Escape backs out of a room to the list, which is the only level there is now.
@@ -534,6 +577,8 @@ export function ChatPage() {
             onSend={() => void send()}
             canRenameGroup={isAdmin(user.role)}
             onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
+            onEditMessage={handleEditMessage}
+            onDeleteMessage={handleDeleteMessage}
           />
         ) : (
           <div className="flex flex-1 items-center justify-center">
@@ -971,6 +1016,7 @@ function DirectoryView({
 function RoomView({
   me, room, messages, teamMessages, groupMessages, contacts, loading, error, draft, sending,
   highlightId, scrollRef, composerRef, onBack, onDraft, onSend, canRenameGroup, onRenameGroup,
+  onEditMessage, onDeleteMessage,
 }: {
   me: number;
   room: NonNullable<ActiveRoom>;
@@ -990,9 +1036,73 @@ function RoomView({
   onSend: () => void;
   canRenameGroup: boolean;
   onRenameGroup: (g: ChatGroup) => void;
+  onEditMessage: (messageId: number, body: string) => Promise<void>;
+  onDeleteMessage: (messageId: number) => Promise<void>;
 }) {
   const isTeam = room.kind === 'team';
   const isGroup = room.kind === 'group';
+
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
+  const [deletingMessage, setDeletingMessage] = useState(false);
+
+  const startEdit = (m: ChatMessage | TeamMessage | GroupMessage) => {
+    const trimmed = m.body.trim();
+    if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+      try {
+        const parsed = JSON.parse(trimmed);
+        if (parsed?.caption !== undefined) {
+          setEditText(parsed.caption);
+        } else if (parsed?.text !== undefined) {
+          setEditText(parsed.text);
+        } else {
+          setEditText(m.body);
+        }
+      } catch {
+        setEditText(m.body);
+      }
+    } else {
+      setEditText(m.body);
+    }
+    setEditingId(m.id);
+  };
+
+  const submitEdit = async (message: ChatMessage | TeamMessage | GroupMessage) => {
+    if (!editText.trim()) return;
+    setSavingEdit(true);
+    try {
+      let finalBody = editText.trim();
+      const trimmed = message.body.trim();
+      if (trimmed.startsWith('{') && trimmed.endsWith('}')) {
+        try {
+          const parsed = JSON.parse(trimmed);
+          if (parsed?.caption !== undefined) {
+            parsed.caption = finalBody;
+            finalBody = JSON.stringify(parsed);
+          } else if (parsed?.text !== undefined) {
+            parsed.text = finalBody;
+            finalBody = JSON.stringify(parsed);
+          }
+        } catch {}
+      }
+      await onEditMessage(message.id, finalBody);
+      setEditingId(null);
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const submitDelete = async (messageId: number) => {
+    setDeletingMessage(true);
+    try {
+      await onDeleteMessage(messageId);
+      setConfirmDeleteId(null);
+    } finally {
+      setDeletingMessage(false);
+    }
+  };
 
   /** The `@…` being typed right now, if the caret is inside one. */
   const [mentionQuery, setMentionQuery] = useState<{ from: number; text: string } | null>(null);
@@ -1152,13 +1262,35 @@ function RoomView({
                 const taggedMe = !!team?.mentions.some((x) => x.id === me);
 
                 const found = m.id === highlightId;
+                const isEditing = editingId === m.id;
 
                 return (
                   <div
                     key={m.id}
                     data-message-id={m.id}
-                    className={`flex ${mine ? 'justify-end' : 'justify-start'}`}
+                    className={`group relative flex items-center gap-1.5 ${mine ? 'justify-end' : 'justify-start'}`}
                   >
+                    {mine && !isEditing && (
+                      <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-0.5 shrink-0">
+                        <button
+                          type="button"
+                          title="Edit message"
+                          onClick={() => startEdit(m)}
+                          className="p-1.5 rounded-lg hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                        <button
+                          type="button"
+                          title="Delete message"
+                          onClick={() => setConfirmDeleteId(m.id)}
+                          className="p-1.5 rounded-lg hover:bg-destructive/10 text-muted-foreground hover:text-destructive transition-colors"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      </div>
+                    )}
+
                     <div
                       className={`max-w-[85%] rounded-2xl px-3 py-2 shadow-sm ${
                         found ? 'ring-2 ring-ring ring-offset-2 ring-offset-muted' : ''
@@ -1176,9 +1308,46 @@ function RoomView({
                           {named.sender_name}
                         </p>
                       )}
-                      <div className="whitespace-pre-wrap break-words text-sm">
-                        {renderChatMessage(m.body, team?.mentions, me, mine)}
-                      </div>
+                      {isEditing ? (
+                        <div className="space-y-2 min-w-[200px]">
+                          <textarea
+                            value={editText}
+                            onChange={(e) => setEditText(e.target.value)}
+                            className="w-full rounded bg-black/20 text-primary-foreground placeholder-primary-foreground/60 p-2 text-sm resize-none focus:outline-none focus:ring-1 focus:ring-primary-foreground/40 border border-primary-foreground/30"
+                            rows={2}
+                            autoFocus
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault();
+                                void submitEdit(m);
+                              } else if (e.key === 'Escape') {
+                                setEditingId(null);
+                              }
+                            }}
+                          />
+                          <div className="flex items-center justify-end gap-1.5 text-xs">
+                            <button
+                              type="button"
+                              onClick={() => setEditingId(null)}
+                              className="px-2 py-0.5 rounded bg-black/20 hover:bg-black/30 text-primary-foreground transition-colors"
+                            >
+                              Cancel
+                            </button>
+                            <button
+                              type="button"
+                              disabled={savingEdit || !editText.trim()}
+                              onClick={() => void submitEdit(m)}
+                              className="px-2.5 py-0.5 rounded bg-white text-primary font-semibold hover:bg-white/90 transition-colors disabled:opacity-50"
+                            >
+                              {savingEdit ? 'Saving…' : 'Save'}
+                            </button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="whitespace-pre-wrap break-words text-sm">
+                          {renderChatMessage(m.body, team?.mentions, me, mine)}
+                        </div>
+                      )}
                       <p className={`mt-1 text-[10px] ${mine ? 'text-primary-foreground/70' : 'text-muted-foreground'}`}>
                         {formatTime(m.created_at)}
                         {!team && mine && (m as ChatMessage).is_read && <span className="ml-1">· Read</span>}
@@ -1253,6 +1422,30 @@ function RoomView({
           {sending ? <Spinner className="h-4 w-4" /> : <Send className="h-4 w-4" />}
         </button>
       </div>
+
+      <Modal
+        open={confirmDeleteId !== null}
+        onClose={() => setConfirmDeleteId(null)}
+        title="Delete message"
+        description="Are you sure you want to delete this message? This cannot be undone."
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmDeleteId(null)} className="btn-secondary">
+              Cancel
+            </button>
+            <button
+              type="button"
+              disabled={deletingMessage}
+              onClick={() => confirmDeleteId && void submitDelete(confirmDeleteId)}
+              className="btn-danger"
+            >
+              {deletingMessage ? <><Spinner className="h-4 w-4" /> Deleting…</> : 'Delete'}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">The message will be permanently removed for everyone in this chat.</p>
+      </Modal>
     </>
   );
 }

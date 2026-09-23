@@ -7,6 +7,7 @@ import {
   teamMessages, postToTeam, markTeamChannelRead,
   groups, createGroupRoom, renameGroupRoom, groupMessages, postToGroup, markGroupRoomRead,
   search,
+  editMessage, removeMessage, editTeamMessage, removeTeamMessage, editGroupMessage, removeGroupMessage,
 } from '../controllers/chat.js';
 
 const router = Router();
@@ -97,6 +98,8 @@ router.post('/groups', requireAdmin, validate(createGroupSchema), createGroupRoo
 router.patch('/groups/:groupId', requireAdmin, validate(renameGroupSchema), renameGroupRoom);
 router.get('/groups/:groupId/messages', validate(conversationQuery, 'query'), groupMessages);
 router.post('/groups/:groupId/messages', validate(sendSchema), postToGroup);
+router.patch('/groups/:groupId/messages/:messageId', validate(sendSchema), editGroupMessage);
+router.delete('/groups/:groupId/messages/:messageId', removeGroupMessage);
 router.patch('/groups/:groupId/read', markGroupRoomRead);
 
 router.get('/search', validate(searchQuery, 'query'), search);
@@ -104,7 +107,13 @@ router.get('/contacts', validate(contactsQuery, 'query'), contacts);
 router.get('/unread-count', unread);
 router.get('/team/messages', validate(conversationQuery, 'query'), teamMessages);
 router.post('/team/messages', validate(teamPostSchema), postToTeam);
+router.patch('/team/messages/:messageId', validate(teamPostSchema), editTeamMessage);
+router.delete('/team/messages/:messageId', removeTeamMessage);
 router.patch('/team/read', markTeamChannelRead);
+
+router.patch('/messages/:messageId', validate(sendSchema), editMessage);
+router.delete('/messages/:messageId', removeMessage);
+
 // Static paths first, or 'contacts', 'unread-count', 'team' and 'groups' would be
 // read as user ids.
 router.get('/:userId/messages', validate(conversationQuery, 'query'), conversation);

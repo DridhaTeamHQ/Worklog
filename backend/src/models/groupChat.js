@@ -368,3 +368,31 @@ export async function groupsUnreadTotal(userId) {
   );
   return Number(row?.c || 0);
 }
+
+export async function updateGroupMessage(userId, groupId, messageId, body) {
+  const db = await getDb();
+  if (!(await isMember(db, groupId, userId))) throw forbidden('You are not in that group.');
+  const row = await db.get('SELECT * FROM chat_group_messages WHERE id = ? AND group_id = ?', [messageId, groupId]);
+  if (!row) throw notFound('That message no longer exists.');
+  if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only edit your own messages.');
+
+  await db.run('UPDATE chat_group_messages SET body = ? WHERE id = ?', [body, messageId]);
+  return db.get(
+    `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
+       FROM chat_group_messages c
+       JOIN users u ON u.id = c.sender_id
+      WHERE c.id = ?`,
+    [messageId],
+  );
+}
+
+export async function deleteGroupMessage(userId, groupId, messageId) {
+  const db = await getDb();
+  if (!(await isMember(db, groupId, userId))) throw forbidden('You are not in that group.');
+  const row = await db.get('SELECT * FROM chat_group_messages WHERE id = ? AND group_id = ?', [messageId, groupId]);
+  if (!row) throw notFound('That message no longer exists.');
+  if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only delete your own messages.');
+
+  await db.run('DELETE FROM chat_group_messages WHERE id = ?', [messageId]);
+  return true;
+}

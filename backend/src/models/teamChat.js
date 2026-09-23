@@ -18,6 +18,7 @@ import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
 import { createNotification } from './notification.js';
 import { escapeLike } from '../utils/http.js';
+import { notFound, forbidden } from '../utils/errors.js';
 
 /** The sender fields every message carries, so the channel can show who is talking. */
 const SENDER_COLUMNS = `u.name AS sender_name, u.role AS sender_role,
@@ -261,4 +262,56 @@ export async function markTeamRead(userId) {
     }
   }
   return target;
+}
+
+export async function updateTeamMessage(userId, messageId, body, mentionIds) {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    const row = await tx.get('SELECT * FROM team_messages WHERE id = ?', [messageId]);
+    if (!row) throw notFound('That message no longer exists.');
+    if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only edit your own messages.');
+
+    await tx.run('UPDATE team_messages SET body = ? WHERE id = ?', [body, messageId]);
+
+    if (mentionIds !== undefined) {
+      await tx.run('DELETE FROM team_message_mentions WHERE message_id = ?', [messageId]);
+      const mentions = await resolveMentions(tx, body, mentionIds);
+      const sender = await tx.get('SELECT name FROM users WHERE id = ?', [userId]);
+      for (const person of mentions) {
+        await tx.run(
+          'INSERT INTO team_message_mentions (message_id, user_id) VALUES (?, ?)',
+          [messageId, person.id],
+        );
+        if (Number(person.id) === Number(userId)) continue;
+        await createNotification({
+          userId: person.id,
+          title: `${sender?.name || 'Someone'} mentioned you in Team Chat`,
+          message: body.length > 140 ? `${body.slice(0, 137)}…` : body,
+          type: 'chat_mention',
+        }, tx);
+      }
+    }
+
+    const rows = await tx.query(
+      `SELECT t.id, t.sender_id, t.body, t.created_at, ${SENDER_COLUMNS}
+         FROM team_messages t
+         JOIN users u ON u.id = t.sender_id
+        WHERE t.id = ?`,
+      [messageId],
+    );
+    const [message] = await withMentions(tx, rows);
+    return message;
+  });
+}
+
+export async function deleteTeamMessage(userId, messageId) {
+  const db = await getDb();
+  const row = await db.get('SELECT * FROM team_messages WHERE id = ?', [messageId]);
+  if (!row) throw notFound('That message no longer exists.');
+  if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only delete your own messages.');
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM team_message_mentions WHERE message_id = ?', [messageId]);
+    await tx.run('DELETE FROM team_messages WHERE id = ?', [messageId]);
+  });
+  return true;
 }

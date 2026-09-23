@@ -18,7 +18,7 @@
  */
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
-import { badRequest, notFound } from '../utils/errors.js';
+import { badRequest, notFound, forbidden } from '../utils/errors.js';
 import { escapeLike } from '../utils/http.js';
 
 /** Fields of the other person that the chat UI shows. Never the password hash. */
@@ -298,4 +298,26 @@ export async function unreadByPartner(userId) {
     [userId],
   );
   return rows.map((r) => ({ user_id: Number(r.sender_id), unread: Number(r.c) }));
+}
+
+export async function updateMessage(userId, messageId, body) {
+  const db = await getDb();
+  const row = await db.get('SELECT * FROM chat_messages WHERE id = ?', [messageId]);
+  if (!row) throw notFound('That message no longer exists.');
+  if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only edit your own messages.');
+  await db.run('UPDATE chat_messages SET body = ? WHERE id = ?', [body, messageId]);
+  const updated = await db.get(
+    'SELECT id, sender_id, recipient_id, body, read_at, created_at FROM chat_messages WHERE id = ?',
+    [messageId],
+  );
+  return toMessage(updated);
+}
+
+export async function deleteMessage(userId, messageId) {
+  const db = await getDb();
+  const row = await db.get('SELECT * FROM chat_messages WHERE id = ?', [messageId]);
+  if (!row) throw notFound('That message no longer exists.');
+  if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only delete your own messages.');
+  await db.run('DELETE FROM chat_messages WHERE id = ?', [messageId]);
+  return true;
 }

@@ -14,18 +14,21 @@ import { asyncHandler, badRequest } from '../utils/errors.js';
 import {
   listContacts, findPartner, listConversation, sendMessage,
   markConversationRead, unreadTotal, unreadByPartner, searchDirect,
+  updateMessage, deleteMessage,
 } from '../models/chat.js';
 import {
   listTeamMessages, postTeamMessage, teamUnread, markTeamRead, searchTeam,
+  updateTeamMessage, deleteTeamMessage,
 } from '../models/teamChat.js';
 import {
   listGroups, createGroup, renameGroup, listGroupMessages,
   postGroupMessage, markGroupRead, groupsUnreadTotal, searchGroups,
+  updateGroupMessage, deleteGroupMessage,
 } from '../models/groupChat.js';
 
-const parseId = (raw) => {
+const parseId = (raw, label = 'user id') => {
   const id = Number(raw);
-  if (!Number.isInteger(id) || id <= 0) throw badRequest('Invalid user id.');
+  if (!Number.isInteger(id) || id <= 0) throw badRequest(`Invalid ${label}.`);
   return id;
 };
 
@@ -200,4 +203,42 @@ export const search = asyncHandler(async (req, res) => {
     .slice(0, limit);
 
   return ok(res, hits, { query: term, total: hits.length });
+});
+
+export const editMessage = asyncHandler(async (req, res) => {
+  const messageId = parseId(req.params.messageId, 'message id');
+  const message = await updateMessage(req.user.id, messageId, req.body.body);
+  return ok(res, message);
+});
+
+export const removeMessage = asyncHandler(async (req, res) => {
+  const messageId = parseId(req.params.messageId, 'message id');
+  await deleteMessage(req.user.id, messageId);
+  return ok(res, { message: 'Message deleted.' });
+});
+
+export const editTeamMessage = asyncHandler(async (req, res) => {
+  const messageId = parseId(req.params.messageId, 'message id');
+  const message = await updateTeamMessage(req.user.id, messageId, req.body.body, req.body.mentions);
+  return ok(res, message);
+});
+
+export const removeTeamMessage = asyncHandler(async (req, res) => {
+  const messageId = parseId(req.params.messageId, 'message id');
+  await deleteTeamMessage(req.user.id, messageId);
+  return ok(res, { message: 'Message deleted.' });
+});
+
+export const editGroupMessage = asyncHandler(async (req, res) => {
+  const groupId = parseId(req.params.groupId, 'group id');
+  const messageId = parseId(req.params.messageId, 'message id');
+  const message = await updateGroupMessage(req.user.id, groupId, messageId, req.body.body);
+  return ok(res, message);
+});
+
+export const removeGroupMessage = asyncHandler(async (req, res) => {
+  const groupId = parseId(req.params.groupId, 'group id');
+  const messageId = parseId(req.params.messageId, 'message id');
+  await deleteGroupMessage(req.user.id, groupId, messageId);
+  return ok(res, { message: 'Message deleted.' });
 });

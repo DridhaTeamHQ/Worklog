@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Keyboard,
@@ -261,7 +262,7 @@ function formatChatTime(dateString?: string | null): string {
 export function ChatThreadScreen({ route, navigation }: any) {
   const insets = useSafeAreaInsets();
   const { user } = useAuth();
-  const { error: showError } = useToast();
+  const { error: showError, success: showSuccess } = useToast();
   const contact: ChatContact | undefined = route?.params?.contact;
   const group: ChatGroup | undefined = route?.params?.group;
   const teamRoom: boolean = Boolean(route?.params?.teamRoom);
@@ -287,6 +288,12 @@ export function ChatThreadScreen({ route, navigation }: any) {
 
   // In-app Fullscreen Photo Viewer
   const [previewImage, setPreviewImage] = useState<{ url: string; caption?: string; name?: string } | null>(null);
+
+  // Edit message states
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editingMessage, setEditingMessage] = useState<RoomMessage | null>(null);
+  const [editText, setEditText] = useState('');
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const listRef = useRef<FlatList<RoomMessage>>(null);
   const lastMessageId = useRef(0);
@@ -375,6 +382,105 @@ export function ChatThreadScreen({ route, navigation }: any) {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleDeleteMessage = async (messageId: number) => {
+    try {
+      if (group) {
+        await chatApi.groups.remove(group.id, messageId);
+      } else if (teamRoom) {
+        await chatApi.removeTeam(messageId);
+      } else {
+        await chatApi.remove(messageId);
+      }
+      setMessages(previous => previous.filter(message => message.id !== messageId));
+      showSuccess('Message deleted');
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Could not delete message.');
+    }
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingMessage) return;
+    const trimmed = editText.trim();
+    if (!trimmed) {
+      showError('Message cannot be empty.');
+      return;
+    }
+
+    setSavingEdit(true);
+    try {
+      const parsed = parseMessageBody(editingMessage.body);
+      let newBody = trimmed;
+      if (parsed.type === 'image' || parsed.type === 'video') {
+        newBody = JSON.stringify({ ...parsed, caption: trimmed });
+      } else if (parsed.type === 'file') {
+        newBody = JSON.stringify({ ...parsed, name: trimmed });
+      } else {
+        newBody = trimmed;
+      }
+
+      if (group) {
+        await chatApi.groups.edit(group.id, editingMessage.id, newBody);
+      } else if (teamRoom) {
+        await chatApi.editTeam(editingMessage.id, newBody);
+      } else {
+        await chatApi.edit(editingMessage.id, newBody);
+      }
+
+      setMessages(previous =>
+        previous.map(message =>
+          message.id === editingMessage.id ? { ...message, body: newBody } : message
+        )
+      );
+      showSuccess('Message updated');
+      setEditModalVisible(false);
+      setEditingMessage(null);
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Could not update message.');
+    } finally {
+      setSavingEdit(false);
+    }
+  };
+
+  const onMessageLongPress = (item: RoomMessage) => {
+    if (item.sender_id !== user?.id) return;
+    const parsed = parseMessageBody(item.body);
+    const initialText = parsed.text ?? parsed.caption ?? (parsed.type === 'text' ? item.body : '');
+
+    Alert.alert(
+      'Message Options',
+      'Choose an action for your message:',
+      [
+        {
+          text: 'Edit Message',
+          onPress: () => {
+            setEditingMessage(item);
+            setEditText(initialText || '');
+            setEditModalVisible(true);
+          },
+        },
+        {
+          text: 'Delete Message',
+          style: 'destructive',
+          onPress: () => {
+            Alert.alert(
+              'Delete Message',
+              'Are you sure you want to delete this message? This cannot be undone.',
+              [
+                { text: 'Cancel', style: 'cancel' },
+                {
+                  text: 'Delete',
+                  style: 'destructive',
+                  onPress: () => void handleDeleteMessage(item.id),
+                },
+              ]
+            );
+          },
+        },
+        { text: 'Cancel', style: 'cancel' },
+      ]
+    );
   };
 
   /* Real Native File, Photo & Video Pickers from device storage */
@@ -761,11 +867,14 @@ export function ChatThreadScreen({ route, navigation }: any) {
 
             return (
               <View style={[styles.messageRow, mine ? styles.messageMineRow : styles.messageOtherRow]}>
-                <View
-                  style={[
+                <Pressable
+                  delayLongPress={250}
+                  onLongPress={mine ? () => onMessageLongPress(item) : undefined}
+                  style={({ pressed }) => [
                     styles.messageBubble,
                     mine ? styles.messageMineBubble : styles.messageOtherBubble,
                     isSticker && styles.stickerBubblePadding,
+                    pressed && mine && { opacity: 0.88 },
                   ]}
                 >
                   {/* Sender Name - displayed only ONCE for other members in group/team room */}
@@ -781,7 +890,7 @@ export function ChatThreadScreen({ route, navigation }: any) {
                       {formattedTime}{mine && isDirectMessage ? `  ${item.read_at ? '✓✓' : '✓'}` : ''}
                     </Text>
                   )}
-                </View>
+                </Pressable>
               </View>
             );
           }}
@@ -1170,6 +1279,73 @@ export function ChatThreadScreen({ route, navigation }: any) {
             </View>
           )}
         </SafeAreaView>
+      </Modal>
+
+      {/* Edit Message Modal */}
+      <Modal
+        visible={editModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={() => {
+          if (!savingEdit) {
+            setEditModalVisible(false);
+            setEditingMessage(null);
+          }
+        }}
+      >
+        <KeyboardAvoidingView
+          style={styles.editModalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        >
+          <View style={styles.editMessageModalCard}>
+            <View style={styles.editModalHeader}>
+              <Text style={styles.editModalTitle}>Edit Message</Text>
+              <TouchableOpacity
+                disabled={savingEdit}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditingMessage(null);
+                }}
+              >
+                <Icon name="close" size={20} color="#a1a1aa" />
+              </TouchableOpacity>
+            </View>
+
+            <TextInput
+              style={styles.editMessageInput}
+              multiline
+              autoFocus
+              value={editText}
+              onChangeText={setEditText}
+              placeholder="Edit your message..."
+              placeholderTextColor="#71717a"
+            />
+
+            <View style={styles.editModalActions}>
+              <TouchableOpacity
+                disabled={savingEdit}
+                onPress={() => {
+                  setEditModalVisible(false);
+                  setEditingMessage(null);
+                }}
+                style={styles.editCancelBtn}
+              >
+                <Text style={styles.editCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                disabled={savingEdit || !editText.trim()}
+                onPress={() => void handleSaveEdit()}
+                style={[styles.editSaveBtn, (!editText.trim() || savingEdit) && styles.editSaveBtnDisabled]}
+              >
+                {savingEdit ? (
+                  <ActivityIndicator size="small" color="#ffffff" />
+                ) : (
+                  <Text style={styles.editSaveText}>Save Changes</Text>
+                )}
+              </TouchableOpacity>
+            </View>
+          </View>
+        </KeyboardAvoidingView>
       </Modal>
     </SafeAreaView>
   );
@@ -1843,5 +2019,77 @@ const styles = StyleSheet.create({
     color: '#e4e4e7',
     fontSize: 14,
     textAlign: 'center',
+  },
+  editModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 16,
+  },
+  editMessageModalCard: {
+    width: '100%',
+    maxWidth: 400,
+    backgroundColor: '#18181b',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#27272a',
+    padding: 16,
+    gap: 12,
+  },
+  editModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  editModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: '#fafafa',
+  },
+  editMessageInput: {
+    backgroundColor: '#09090b',
+    borderWidth: 1,
+    borderColor: '#27272a',
+    borderRadius: 10,
+    padding: 12,
+    color: '#fafafa',
+    fontSize: 14,
+    minHeight: 80,
+    maxHeight: 180,
+    textAlignVertical: 'top',
+  },
+  editModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: 10,
+  },
+  editCancelBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 9,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#3f3f46',
+  },
+  editCancelText: {
+    color: '#a1a1aa',
+    fontSize: 13,
+    fontWeight: '600',
+  },
+  editSaveBtn: {
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 8,
+    backgroundColor: '#f4553c',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editSaveBtnDisabled: {
+    opacity: 0.5,
+  },
+  editSaveText: {
+    color: '#ffffff',
+    fontSize: 13,
+    fontWeight: '600',
   },
 });
