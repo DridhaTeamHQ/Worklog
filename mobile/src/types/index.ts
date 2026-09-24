@@ -7,6 +7,18 @@ export const isManagerLevel = (role: Role | undefined): role is 'admin' | 'manag
 
 export const isAdmin = (role: Role | undefined): role is 'admin' => role === 'admin';
 
+export const canAccessTickets = (user: { department: string | null } | null | undefined): boolean => {
+  const department = user?.department?.trim().toLowerCase();
+  return department === 'technology & ai' || department === 'technology and ai' || department === 'management';
+};
+
+export const getGreeting = (date = new Date()): string => {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+};
+
 export const roleLabel = (role: Role | undefined): string =>
   role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Team Member';
 

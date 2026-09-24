@@ -1,7 +1,7 @@
 import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { taskApi, teamApi, projectApi, ticketApi } from '../api/endpoints';
 import { useAuth } from '../context/AuthContext';
-import { Task, TeamMember, Project, TaskStatus, isManagerLevel } from '../types';
+import { canAccessTickets, Task, TeamMember, Project, TaskStatus, isManagerLevel } from '../types';
 
 type Data = {
   ticketRaised: number;
@@ -30,7 +30,7 @@ export function TaskrProvider({ children }: { children: React.ReactNode }) {
     const request = ++sequence.current;
     setLoading(true);
     const [taskResult, projectResult, teamResult, ticketResult] = await Promise.allSettled([
-      taskApi.list({ limit: 100 }), projectApi.list(), user ? teamApi.list() : Promise.resolve({ data: [] as TeamMember[] }), user?.role === 'admin' ? ticketApi.list({ limit: 1 }) : Promise.resolve({ data: [], meta: undefined }),
+      taskApi.list({ limit: 100 }), projectApi.list(), user ? teamApi.list() : Promise.resolve({ data: [] as TeamMember[] }), user?.role === 'admin' && canAccessTickets(user) ? ticketApi.list({ limit: 1 }) : Promise.resolve({ data: [], meta: undefined }),
     ]);
     if (request !== sequence.current) return;
     if (taskResult.status === 'fulfilled') { setTasks(taskResult.value.data); setError(''); }

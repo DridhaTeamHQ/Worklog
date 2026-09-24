@@ -206,6 +206,7 @@ export function MyDayPage() {
             <div>
               <label className="label" htmlFor="todo-project">Project</label>
               <Select
+                noScroll
                 id="todo-project"
                 value={projectId}
                 onChange={(v) => {

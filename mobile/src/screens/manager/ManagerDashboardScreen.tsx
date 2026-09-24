@@ -5,7 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '../../context/AuthContext';
 import { dashboardApi } from '../../api/endpoints';
-import { DashboardRange, ManagerDashboardData } from '../../types';
+import { DashboardRange, getGreeting, ManagerDashboardData } from '../../types';
 import { ActivityChart } from '../../components/ActivityChart';
 import { colors } from '../../theme';
 
@@ -75,7 +75,7 @@ export function ManagerDashboardScreen({ navigation }: any) {
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open notifications" style={styles.headerAction} onPress={() => navigation.navigate('Notifications')}><Ionicons name="notifications-outline" color={colors.textSecondary} size={20} /></TouchableOpacity>
           <TouchableOpacity accessibilityRole="button" accessibilityLabel="Open profile settings" style={styles.headerAction} onPress={() => navigation.navigate('Profile')}><Ionicons name="settings-outline" color={colors.textSecondary} size={20} /></TouchableOpacity>
         </TouchableOpacity>
-        <View style={styles.overviewHeading}><View style={styles.overviewIcon}><Ionicons name="sparkles-outline" size={19} color={colors.primary} /></View><View><Text style={styles.kicker}>OVERVIEW</Text><Text style={styles.title}>Good morning, {user?.name?.split(' ')[0] || 'Admin'}</Text></View></View>
+        <View style={styles.overviewHeading}><View style={styles.overviewIcon}><Ionicons name="sparkles-outline" size={19} color={colors.primary} /></View><View><Text style={styles.kicker}>OVERVIEW</Text><Text style={styles.title}>{getGreeting()}, {user?.name?.split(' ')[0] || 'Admin'}</Text></View></View>
         <Text style={styles.date}>{new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}<Text style={{ color: colors.text }}>  •  {periods.find(p => p.value === range)?.label}</Text></Text>
         <View style={styles.periods} accessibilityRole="tablist">
           {periods.map(period => <TouchableOpacity key={period.value} accessibilityRole="tab" accessibilityState={{ selected: range === period.value }}

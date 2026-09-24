@@ -5,7 +5,7 @@ import {
 } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
-  ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send,
+  ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send, Trash2,
   Users, UserRound, Trash2, Check, X,
   Paperclip, FileText, Download, ExternalLink, Film, Image as ImageIcon,
 } from 'lucide-react';
@@ -221,6 +221,7 @@ export function ChatPage() {
   const [draft, setDraft] = useState('');
   const [sending, setSending] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [clearing, setClearing] = useState(false);
 
   const scrollRef = useRef<HTMLDivElement>(null);
   const composerRef = useRef<HTMLTextAreaElement>(null);
@@ -339,6 +340,19 @@ export function ChatPage() {
     setError(null);
     setHighlightId(null);
   }, []);
+
+  const clearAllChats = useCallback(async () => {
+    if (!window.confirm('Delete all your chat history? This cannot be undone.')) return;
+    setClearing(true);
+    try {
+      await chatApi.clearAll();
+      openDirectory();
+      setContacts([]); setGroups([]); setTeamMessages([]); setMessages([]); setGroupMessages([]);
+      await refreshCounts();
+    } catch (err) {
+      setError(err instanceof ApiError ? err.message : 'Could not delete chat history.');
+    } finally { setClearing(false); }
+  }, [openDirectory, refreshCounts]);
 
   const openThread = useCallback(async (contact: ChatContact, beforeId?: number) => {
     setActive({ kind: 'dm', contact });
@@ -675,6 +689,8 @@ export function ChatPage() {
           onPickGroup={(g) => void openGroup(g)}
           onPickHit={openHit}
           onNewGroup={() => { setGroupError(null); setGroupDialog({ mode: 'create' }); }}
+          onClearAll={clearAllChats}
+          clearing={clearing}
         />
       </aside>
 
@@ -1008,7 +1024,7 @@ function markTerm(text: string, term: string) {
 function DirectoryView({
   contacts, groups, canCreateGroup, loading, error, search, unread, teamUnread, groupUnread,
   hits, searching, active,
-  onSearch, onRefresh, onPick, onPickTeam, onPickGroup, onPickHit, onNewGroup,
+  onSearch, onRefresh, onPick, onPickTeam, onPickGroup, onPickHit, onNewGroup, onClearAll, clearing,
 }: {
   contacts: ChatContact[];
   groups: ChatGroup[];
@@ -1029,6 +1045,8 @@ function DirectoryView({
   onPickGroup: (g: ChatGroup) => void;
   onPickHit: (h: ChatSearchHit) => void;
   onNewGroup: () => void;
+  onClearAll: () => void;
+  clearing: boolean;
 }) {
   /* Groups are filtered by the search box too — it is the fastest way to reach one
      once there are more than a handful. */
@@ -1058,6 +1076,16 @@ function DirectoryView({
               <Plus className="h-4 w-4" />
             </button>
           )}
+          <button
+            type="button"
+            onClick={onClearAll}
+            disabled={clearing}
+            aria-label="Delete all chat history"
+            title="Delete all chat history"
+            className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive disabled:opacity-50"
+          >
+            <Trash2 className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={onRefresh}

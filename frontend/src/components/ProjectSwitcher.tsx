@@ -33,6 +33,7 @@ export function ProjectSwitcher({
       <div className="sm:hidden">
         <label className="label" htmlFor="project-switcher">Project</label>
         <Select
+          noScroll
           id="project-switcher"
           value={value === null ? '' : String(value)}
           onChange={(v) => onChange(v ? Number(v) : null)}

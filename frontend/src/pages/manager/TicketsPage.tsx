@@ -278,7 +278,7 @@ export function ManagerTicketsPage() {
         <div className="filter-bar grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           <div>
             <label className="label" htmlFor="tf-project">Project</label>
-            <Select id="tf-project" value={projectId} onChange={(v) => setProjectId(v)} options={[{ value: '', label: `All projects` }, ...projects.map((p) => ({ value: String(p.id), label: `${p.project_key} · ${p.name}` }))]} />
+            <Select noScroll id="tf-project" value={projectId} onChange={(v) => setProjectId(v)} options={[{ value: '', label: `All projects` }, ...projects.map((p) => ({ value: String(p.id), label: `${p.project_key} · ${p.name}` }))]} />
           </div>
           <div>
             <label className="label" htmlFor="tf-reporter">Reported by</label>

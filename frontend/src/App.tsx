@@ -4,7 +4,7 @@ import { NotificationProvider } from './context/NotificationContext';
 import { ChatProvider } from './context/ChatContext';
 import { ToastProvider } from './components/Toast';
 import { AppLayout } from './components/AppLayout';
-import { RequireAuth, RequireRole, RedirectIfAuthed, homeFor } from './components/RouteGuards';
+import { RequireAuth, RequireRole, RequireTicketAccess, RedirectIfAuthed, homeFor } from './components/RouteGuards';
 
 import { LoginPage } from './pages/auth/LoginPage';
 import { ForgotPasswordPage } from './pages/auth/ForgotPasswordPage';
@@ -54,7 +54,7 @@ export default function App() {
                     <Route path="/manager/tasks" element={<AllTasksPage />} />
                     <Route path="/manager/my-day" element={<MyDayPage />} />
                     <Route path="/manager/reports" element={<TaskReportsPage />} />
-                    <Route path="/manager/tickets" element={<ManagerTicketsPage />} />
+                    <Route element={<RequireTicketAccess />}><Route path="/manager/tickets" element={<ManagerTicketsPage />} /></Route>
                     <Route path="/manager/analytics" element={<AnalyticsPage />} />
                     <Route path="/manager/chat" element={<ChatPage />} />
                     <Route path="/manager/notifications" element={<NotificationsPage />} />
@@ -69,7 +69,7 @@ export default function App() {
                       <Route path="/employee/tasks-done" element={<TasksDonePage />} />
                       <Route path="/employee/my-day" element={<MyDayPage />} />
                       <Route path="/employee/analytics" element={<EmployeeAnalyticsPage />} />
-                      <Route path="/employee/tickets" element={<TicketsPage />} />
+                      <Route element={<RequireTicketAccess />}><Route path="/employee/tickets" element={<TicketsPage />} /></Route>
                       <Route path="/employee/notifications" element={<NotificationsPage />} />
                       <Route path="/employee/profile" element={<ProfilePage />} />
                     </Route>

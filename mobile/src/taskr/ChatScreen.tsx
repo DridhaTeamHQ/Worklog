@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   FlatList,
   Image,
   Pressable,
@@ -72,6 +73,7 @@ export function ChatScreen({ navigation }: any) {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState<TabFilter>('all');
+  const [clearing, setClearing] = useState(false);
 
   const loadDirectory = useCallback(async (term = '') => {
     try {
@@ -104,6 +106,21 @@ export function ChatScreen({ navigation }: any) {
   };
   const openTeam = () => {
     navigation.navigate('ChatThread', { teamRoom: true });
+  };
+
+  const clearAllChats = () => {
+    Alert.alert('Delete all chats?', 'Your chat history will be permanently deleted.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete all', style: 'destructive', onPress: async () => {
+        setClearing(true);
+        try {
+          await chatApi.clearAll();
+          setContacts([]); setGroups([]);
+        } catch {
+          Alert.alert('Could not delete chats', 'Please try again.');
+        } finally { setClearing(false); }
+      } },
+    ]);
   };
 
   const filteredContacts = useMemo(() => {
@@ -148,6 +165,9 @@ export function ChatScreen({ navigation }: any) {
             <View style={styles.greenPill} />
             <Text style={styles.statusText}>Connected</Text>
           </View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Delete all chat history" onPress={clearAllChats} disabled={clearing} style={{ marginLeft: 10, opacity: clearing ? 0.5 : 1 }}>
+            <Icon name="trash-outline" size={20} color="#f87171" />
+          </Pressable>
         </View>
 
         {/* Search Bar */}

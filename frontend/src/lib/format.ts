@@ -24,6 +24,14 @@ export function formatDate(iso: string | null | undefined): string {
   return d.toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' });
 }
 
+/** Uses the device's local time for the dashboard greeting. */
+export function getGreeting(date = new Date()): string {
+  const hour = date.getHours();
+  if (hour < 12) return 'Good morning';
+  if (hour < 18) return 'Good afternoon';
+  return 'Good evening';
+}
+
 /** '26 Aug 2026' — the compact form used inside tables. */
 export function formatDateShort(iso: string | null | undefined): string {
   if (!iso) return '—';

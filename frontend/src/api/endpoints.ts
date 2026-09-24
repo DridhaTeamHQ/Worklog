@@ -41,7 +41,7 @@ export const authApi = {
 export const dashboardApi = {
   /** `range` narrows the headline counts; the server defaults to today. */
   load: (params: { range?: DashboardRange } = {}) =>
-    api.get<ManagerDashboard | EmployeeDashboard>('/dashboard', params),
+    api.getCached<ManagerDashboard | EmployeeDashboard>('/dashboard', params),
   analytics: (params: { employeeId?: number; department?: string; from?: string; to?: string; days?: number }) =>
     api.get<AnalyticsPayload>('/dashboard/analytics', params),
 };
@@ -237,7 +237,7 @@ export interface TicketFilters {
 
 export const ticketApi = {
   list: (filters: TicketFilters = {}, signal?: AbortSignal) =>
-    api.get<Ticket[]>('/tickets', filters as Record<string, string | number | undefined>, signal),
+    api.getCached<Ticket[]>('/tickets', filters as Record<string, string | number | undefined>, signal),
   get: (id: number) => api.get<Ticket>(`/tickets/${id}`),
   create: (input: {
     projectId: number; taskId: number; title: string; description: string; severity: TicketSeverity;
@@ -282,6 +282,7 @@ export const todoApi = {
  * "from" id, so there is nothing to spoof.
  */
 export const chatApi = {
+  clearAll: () => api.delete<{ removed: number; message: string }>('/chat/all'),
   /**
    * Searches the text of messages across every room the caller can see — their own
    * threads, the team channel, and groups they are in. The scope is applied per store
@@ -292,7 +293,7 @@ export const chatApi = {
 
   /** Everyone messageable, newest thread first, each with its preview and badge. */
   contacts: (search?: string, signal?: AbortSignal) =>
-    api.get<ChatContact[]>('/chat/contacts', { search }, signal),
+    api.getCached<ChatContact[]>('/chat/contacts', { search }, signal),
 
   /**
    * Every badge in one call: the launcher total, each thread's count, and the team
@@ -310,7 +311,7 @@ export const chatApi = {
     userId: number,
     params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
     signal?: AbortSignal,
-  ) => api.get<ChatMessage[]>(`/chat/${userId}/messages`, {
+  ) => (params.after ? api.get : api.getCached)<ChatMessage[]>(`/chat/${userId}/messages`, {
     after: params.after,
     before: params.before,
     limit: params.limit,
@@ -339,8 +340,8 @@ export const chatApi = {
    * Group chats. Listing, reading and posting are open to members; creating and
    * renaming are admin-only and the server refuses anyone else.
    */
-  groups: {
-    list: (signal?: AbortSignal) => api.get<ChatGroup[]>('/chat/groups', undefined, signal),
+    groups: {
+    list: (signal?: AbortSignal) => api.getCached<ChatGroup[]>('/chat/groups', undefined, signal),
 
     create: (name: string, memberIds: number[]) =>
       api.post<ChatGroup>('/chat/groups', { name, memberIds }),
@@ -352,7 +353,7 @@ export const chatApi = {
       groupId: number,
       params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
       signal?: AbortSignal,
-    ) => api.get<GroupMessage[]>(`/chat/groups/${groupId}/messages`, {
+    ) => (params.after ? api.get : api.getCached)<GroupMessage[]>(`/chat/groups/${groupId}/messages`, {
       after: params.after,
       before: params.before,
       limit: params.limit,
@@ -376,7 +377,7 @@ export const chatApi = {
     messages: (
       params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
       signal?: AbortSignal,
-    ) => api.get<TeamMessage[]>('/chat/team/messages', {
+    ) => (params.after ? api.get : api.getCached)<TeamMessage[]>('/chat/team/messages', {
       after: params.after,
       before: params.before,
       limit: params.limit,

@@ -16,6 +16,11 @@ export const isManagerLevel = (role: Role | undefined): role is 'admin' | 'manag
 
 export const isAdmin = (role: Role | undefined): role is 'admin' => role === 'admin';
 
+export const canAccessTickets = (user: Pick<User, 'department'> | null | undefined): boolean => {
+  const department = user?.department?.trim().toLowerCase();
+  return department === 'technology & ai' || department === 'technology and ai' || department === 'management';
+};
+
 export const roleLabel = (role: Role | undefined): string =>
   role === 'admin' ? 'Admin' : role === 'manager' ? 'Manager' : 'Team Member';
 

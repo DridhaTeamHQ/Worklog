@@ -181,6 +181,7 @@ export function RaiseTicketModal({ open, onClose, onRaised, defaultTaskId }: Pro
           <div>
             <label className="label" htmlFor="tk-project">Project <span className="text-destructive">*</span></label>
             <Select
+              noScroll
               id="tk-project"
               value={projectId}
               onChange={changeProject}

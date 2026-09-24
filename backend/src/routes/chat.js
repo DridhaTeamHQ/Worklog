@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { requireAuth, requireAdmin } from '../middleware/auth.js';
 import { validate, safeText } from '../middleware/validate.js';
 import {
-  contacts, unread, conversation, send, markRead,
+  contacts, unread, conversation, send, markRead, clearAll,
   teamMessages, postToTeam, markTeamChannelRead,
   groups, createGroupRoom, renameGroupRoom, groupMessages, postToGroup, markGroupRoomRead,
   search,
@@ -106,6 +106,7 @@ router.patch('/groups/:groupId/read', markGroupRoomRead);
 router.get('/search', validate(searchQuery, 'query'), search);
 router.get('/contacts', validate(contactsQuery, 'query'), contacts);
 router.get('/unread-count', unread);
+router.delete('/all', clearAll);
 router.get('/team/messages', validate(conversationQuery, 'query'), teamMessages);
 router.post('/team/messages', validate(teamPostSchema), postToTeam);
 router.patch('/team/messages/:messageId', validate(teamPostSchema), editTeamMessage);

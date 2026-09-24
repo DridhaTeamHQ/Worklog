@@ -10,7 +10,7 @@ import { NotificationBell } from './NotificationBell';
 import { useChatUnread } from '../context/ChatContext';
 import { applyTheme, currentTheme, type Theme } from '../lib/theme';
 import { Avatar } from './ui';
-import { isManagerLevel, roleLabel } from '../types';
+import { canAccessTickets, isManagerLevel, roleLabel } from '../types';
 
 interface NavItem {
   to: string;
@@ -70,7 +70,7 @@ export function AppLayout() {
   };
 
   const isManager = isManagerLevel(user?.role);
-  const nav = isManager ? MANAGER_NAV : EMPLOYEE_NAV;
+  const nav = (isManager ? MANAGER_NAV : EMPLOYEE_NAV).filter((item) => item.label !== 'Tickets' || canAccessTickets(user));
   const profilePath = isManager ? '/manager/profile' : '/employee/profile';
   /* The name is the only way to the profile page now, so it also has to be what
      shows you are on it — otherwise that route highlights nothing at all. */

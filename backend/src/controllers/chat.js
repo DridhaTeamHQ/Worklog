@@ -14,6 +14,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest } from '../utils/errors.js';
+import { getDb } from '../db/index.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -37,6 +38,19 @@ const parseId = (raw, label = 'user id') => {
   if (!Number.isInteger(id) || id <= 0) throw badRequest(`Invalid ${label}.`);
   return id;
 };
+
+/** Clear the signed-in user's chat history across direct, team, and group rooms. */
+export const clearAll = asyncHandler(async (req, res) => {
+  const db = await getDb();
+  const userId = req.user.id;
+  const removed = await db.transaction(async (tx) => {
+    const direct = await tx.run('DELETE FROM chat_messages WHERE sender_id = ? OR recipient_id = ?', [userId, userId]);
+    const team = await tx.run('DELETE FROM team_messages WHERE sender_id = ?', [userId]);
+    const groups = await tx.run('DELETE FROM chat_group_messages WHERE sender_id = ?', [userId]);
+    return Number(direct.changes || 0) + Number(team.changes || 0) + Number(groups.changes || 0);
+  });
+  return ok(res, { removed, message: 'All your chat history was deleted.' });
+});
 
 /** Who the caller can message, with each thread's preview and unread count. */
 export const contacts = asyncHandler(async (req, res) => {

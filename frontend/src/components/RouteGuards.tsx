@@ -2,7 +2,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { PageLoader } from './ui';
 import type { Role } from '../types';
-import { isManagerLevel } from '../types';
+import { canAccessTickets, isManagerLevel } from '../types';
 
 /**
  * Admins share the manager portal — they see everything a manager sees — so both
@@ -37,6 +37,13 @@ export function RequireRole({ role }: { role: Role | Role[] }) {
   const allowed = Array.isArray(role) ? role : [role];
   if (!allowed.includes(user.role)) return <Navigate to={homeFor(user.role)} replace />;
   return <Outlet />;
+}
+
+export function RequireTicketAccess() {
+  const { user, loading } = useAuth();
+  if (loading) return <PageLoader />;
+  if (!user) return <Navigate to="/login" replace />;
+  return canAccessTickets(user) ? <Outlet /> : <Navigate to={homeFor(user.role)} replace />;
 }
 
 /** Keeps a signed-in user off the login screen. */

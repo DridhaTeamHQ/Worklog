@@ -7,6 +7,7 @@
 
 const BASE = '/api';
 const TOKEN_KEY = 'worklog.token';
+const GET_CACHE = new Map<string, { at: number; result: ApiResult<unknown> }>();
 
 export class ApiError extends Error {
   status: number;
@@ -111,6 +112,16 @@ export async function request<T>(path: string, options: RequestOptions = {}): Pr
 export const api = {
   get: <T>(path: string, query?: RequestOptions['query'], signal?: AbortSignal) =>
     request<T>(path, { query, signal }),
+  /** Short-lived in-memory cache for screens revisited during the same session. */
+  getCached: <T>(path: string, query?: RequestOptions['query'], signal?: AbortSignal, ttl = 15000): Promise<ApiResult<T>> => {
+    const key = `${tokenStore.get() || 'anonymous'}|${path}|${JSON.stringify(query || {})}`;
+    const hit = GET_CACHE.get(key);
+    if (hit && Date.now() - hit.at < ttl) return Promise.resolve(hit.result as ApiResult<T>);
+    return request<T>(path, { query, signal }).then((result) => {
+      GET_CACHE.set(key, { at: Date.now(), result: result as ApiResult<unknown> });
+      return result;
+    });
+  },
   post: <T>(path: string, body?: unknown, opts?: RequestOptions) =>
     request<T>(path, { ...opts, method: 'POST', body }),
   patch: <T>(path: string, body?: unknown) => request<T>(path, { method: 'PATCH', body }),

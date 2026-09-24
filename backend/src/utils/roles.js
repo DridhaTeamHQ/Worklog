@@ -23,6 +23,13 @@ export const ALL_ROLES = Object.freeze([ROLES.ADMIN, ROLES.MANAGER, ROLES.TEAM_M
 /** Roles that reach the manager portal and its APIs. */
 export const MANAGER_ROLES = Object.freeze([ROLES.ADMIN, ROLES.MANAGER]);
 
+/** Departments allowed to use the ticket system. Keep this rule server-side so a
+ * hidden navigation item cannot be bypassed with a hand-written API request. */
+export const TICKET_DEPARTMENTS = Object.freeze(['technology & ai', 'technology and ai', 'management']);
+
+const normalizedDepartment = (department) => String(department || '').trim().toLowerCase();
+export const canAccessTickets = (user) => TICKET_DEPARTMENTS.includes(normalizedDepartment(user?.department));
+
 /** True for admins and managers — the "can see the whole team's work" tier. */
 export const isManagerLevel = (role) => MANAGER_ROLES.includes(role);
 
@@ -52,4 +59,4 @@ export function roleLabel(role) {
   return 'Team Member';
 }
 
-export default { ROLES, ALL_ROLES, MANAGER_ROLES, isManagerLevel, isAdmin, isTeamMember, grantableRoles, roleLabel };
+export default { ROLES, ALL_ROLES, MANAGER_ROLES, TICKET_DEPARTMENTS, canAccessTickets, isManagerLevel, isAdmin, isTeamMember, grantableRoles, roleLabel };

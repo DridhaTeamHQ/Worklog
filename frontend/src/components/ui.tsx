@@ -372,7 +372,7 @@ export interface SelectOption {
  * letters jumps to a matching option.
  */
 export function Select({
-  value, onChange, options, id, placeholder = 'Select…', className = '', disabled, ariaLabel, invalid,
+  value, onChange, options, id, placeholder = 'Select…', className = '', disabled, ariaLabel, invalid, noScroll = false,
 }: {
   value: string;
   onChange: (value: string) => void;
@@ -383,6 +383,8 @@ export function Select({
   disabled?: boolean;
   ariaLabel?: string;
   invalid?: boolean;
+  /** Keep compact option lists fully open instead of adding an inner scrollbar. */
+  noScroll?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [active, setActive] = useState(0);
@@ -618,12 +620,12 @@ export function Select({
             position: 'fixed',
             left: rect.left,
             width: rect.width,
-            maxHeight: '9.5rem',
+            maxHeight: noScroll ? 'none' : '9.5rem',
             ...(dropUp
               ? { bottom: Math.max(viewportH - rect.top + 6, 0) }
               : { top: rect.bottom + 6 }),
           }}
-          className="fade-in z-50 overflow-y-auto rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md"
+          className={`fade-in z-50 rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-md ${noScroll ? 'overflow-visible' : 'overflow-y-auto'}`}
         >
           {options.length === 0 && (
             <li className="px-3 py-2 text-sm text-muted-foreground">No options</li>

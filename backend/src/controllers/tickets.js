@@ -7,7 +7,7 @@
  */
 import { ok, created } from '../utils/http.js';
 import { asyncHandler, badRequest, forbidden, notFound } from '../utils/errors.js';
-import { isManagerLevel, isTeamMember } from '../utils/roles.js';
+import { canAccessTickets, isManagerLevel, isTeamMember } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
   listTickets, getTicketById, createTicket, updateTicketStatus, updateTicket, deleteTicket,
@@ -20,7 +20,12 @@ const parseId = (raw) => {
   return id;
 };
 
+const ensureTicketAccess = (user) => {
+  if (!canAccessTickets(user)) throw forbidden('The ticket system is available only to Technology & AI and Management teams.');
+};
+
 export const list = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   const q = req.validatedQuery;
 
   if (!isManagerLevel(req.user.role)) {
@@ -62,6 +67,7 @@ export const list = asyncHandler(async (req, res) => {
 });
 
 export const getOne = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   const ticket = await getTicketById(parseId(req.params.id));
   if (!ticket) throw notFound('That ticket no longer exists.');
   // Same wording as a missing ticket: whether an id exists in another department is
@@ -87,6 +93,7 @@ export const getOne = asyncHandler(async (req, res) => {
  * work, and the model ties it to a task assigned to them.
  */
 export const create = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   if (!isTeamMember(req.user.role)) {
     throw forbidden('Tickets are raised by the team member working on the task.');
   }
@@ -98,6 +105,7 @@ export const create = asyncHandler(async (req, res) => {
 });
 
 export const setStatus = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   const ticket = await updateTicketStatus({
     ticketId: parseId(req.params.id),
     status: req.body.status,
@@ -108,6 +116,7 @@ export const setStatus = asyncHandler(async (req, res) => {
 });
 
 export const update = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   const ticket = await updateTicket({
     ticketId: parseId(req.params.id),
     actor: req.user,
@@ -117,6 +126,7 @@ export const update = asyncHandler(async (req, res) => {
 });
 
 export const assign = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   if (isTeamMember(req.user.role)) {
     throw forbidden('Only managers and admins can assign tickets.');
   }
@@ -139,6 +149,7 @@ export const assign = asyncHandler(async (req, res) => {
 });
 
 export const remove = asyncHandler(async (req, res) => {
+  ensureTicketAccess(req.user);
   await deleteTicket({ ticketId: parseId(req.params.id), actor: req.user });
   return ok(res, { message: 'Ticket deleted.' });
 });

@@ -4,7 +4,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useAuth } from '../context/AuthContext';
 import { useNotifications } from '../context/NotificationContext';
 import { useTaskr } from './TaskrContext';
-import { isManagerLevel } from '../types';
+import { canAccessTickets, isManagerLevel } from '../types';
 import { Avatar, Empty, Icon, IconButton, IconName, TaskRow } from './components';
 import { palette as p, s, teamStyle } from './theme';
 
@@ -397,7 +397,7 @@ export function ProfileScreen({ navigation }: { navigation: Nav }) {
       </View>
       <View style={[s.row, { flexWrap: 'wrap', justifyContent: 'center', gap: 16, marginTop: 4 }]}>
         <Pressable onPress={() => navigation.navigate('MyDay')}><Text style={[s.link, { fontSize: 12 }]}>My Day</Text></Pressable>
-        <Pressable onPress={() => navigation.navigate(manager ? 'ManagerTickets' : 'Tickets')}><Text style={[s.link, { fontSize: 12 }]}>Tickets</Text></Pressable>
+        {canAccessTickets(user) && <Pressable onPress={() => navigation.navigate(manager ? 'ManagerTickets' : 'Tickets')}><Text style={[s.link, { fontSize: 12 }]}>Tickets</Text></Pressable>}
         {manager && <Pressable onPress={() => navigation.navigate('TaskReports')}><Text style={[s.link, { fontSize: 12 }]}>Reports</Text></Pressable>}
       </View>
     </Page>

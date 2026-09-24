@@ -188,6 +188,7 @@ export function AssignTaskModal({ open, onClose, onAssigned, employee, defaultPr
         <div>
           <label className="label" htmlFor="t-project">Project <span className="text-destructive">*</span></label>
           <Select
+            noScroll
             id="t-project"
             value={projectId}
             onChange={setProjectId}

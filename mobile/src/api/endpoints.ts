@@ -49,7 +49,7 @@ export const authApi = {
 
 export const dashboardApi = {
   load: (params: { range?: DashboardRange } = {}) =>
-    api.get<ManagerDashboardData | EmployeeDashboardData>('/dashboard', params),
+    api.getCached<ManagerDashboardData | EmployeeDashboardData>('/dashboard', params),
   analytics: (params: { employeeId?: number; department?: string; from?: string; to?: string; days?: number }) =>
     api.get<AnalyticsPayload>('/dashboard/analytics', params),
 };
@@ -221,7 +221,7 @@ export interface TicketFilters {
 
 export const ticketApi = {
   list: (filters: TicketFilters = {}, signal?: AbortSignal) =>
-    api.get<Ticket[]>('/tickets', filters as Record<string, string | number | undefined>, signal),
+    api.getCached<Ticket[]>('/tickets', filters as Record<string, string | number | undefined>, signal),
   get: (id: number) => api.get<Ticket>(`/tickets/${id}`),
   create: (input: {
     projectId: number;
@@ -262,19 +262,20 @@ export const profileApi = {
 };
 
 export const chatApi = {
-  contacts: (search?: string, signal?: AbortSignal) => api.get<ChatContact[]>('/chat/contacts', { search }, signal),
+  clearAll: () => api.delete<{ removed: number; message: string }>('/chat/all'),
+  contacts: (search?: string, signal?: AbortSignal) => api.getCached<ChatContact[]>('/chat/contacts', { search }, signal),
   unreadCount: (signal?: AbortSignal) => api.get<ChatUnread>('/chat/unread-count', undefined, signal),
-  messages: (userId: number, after = 0, signal?: AbortSignal) => api.get<ChatMessage[]>(`/chat/${userId}/messages`, { after }, signal),
+  messages: (userId: number, after = 0, signal?: AbortSignal) => (after ? api.get : api.getCached)<ChatMessage[]>(`/chat/${userId}/messages`, { after }, signal),
   send: (userId: number, body: string) => api.post<ChatMessage>(`/chat/${userId}/messages`, { body }),
   edit: (messageId: number, body: string) => api.patch<ChatMessage>(`/chat/messages/${messageId}`, { body }),
   remove: (messageId: number) => api.delete<{ message: string }>(`/chat/messages/${messageId}`),
-  teamMessages: (after = 0, signal?: AbortSignal) => api.get<TeamMessage[]>('/chat/team/messages', { after }, signal),
+  teamMessages: (after = 0, signal?: AbortSignal) => (after ? api.get : api.getCached)<TeamMessage[]>('/chat/team/messages', { after }, signal),
   sendTeam: (body: string) => api.post<TeamMessage>('/chat/team/messages', { body }),
   editTeam: (messageId: number, body: string) => api.patch<TeamMessage>(`/chat/team/messages/${messageId}`, { body }),
   removeTeam: (messageId: number) => api.delete<{ message: string }>(`/chat/team/messages/${messageId}`),
   groups: {
-    list: (signal?: AbortSignal) => api.get<ChatGroup[]>('/chat/groups', undefined, signal),
-    messages: (groupId: number, after = 0, signal?: AbortSignal) => api.get<GroupMessage[]>(`/chat/groups/${groupId}/messages`, { after }, signal),
+    list: (signal?: AbortSignal) => api.getCached<ChatGroup[]>('/chat/groups', undefined, signal),
+    messages: (groupId: number, after = 0, signal?: AbortSignal) => (after ? api.get : api.getCached)<GroupMessage[]>(`/chat/groups/${groupId}/messages`, { after }, signal),
     send: (groupId: number, body: string) => api.post<GroupMessage>(`/chat/groups/${groupId}/messages`, { body }),
     edit: (groupId: number, messageId: number, body: string) => api.patch<GroupMessage>(`/chat/groups/${groupId}/messages/${messageId}`, { body }),
     remove: (groupId: number, messageId: number) => api.delete<{ message: string }>(`/chat/groups/${groupId}/messages/${messageId}`),

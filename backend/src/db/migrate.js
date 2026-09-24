@@ -42,6 +42,18 @@ const DEFAULT_PROJECT = {
   description: 'Tasks created before projects existed.',
 };
 
+/** Core workspace projects shown in task and todo project pickers. */
+const WORKSPACE_PROJECTS = [
+  { name: 'Daily Matter', key: 'DAILY', description: 'Daily Matter workspace.' },
+  { name: 'Long Matter', key: 'LONG', description: 'Long Matter workspace.' },
+  { name: 'Email Agent', key: 'EMAIL', description: 'Email Agent workspace.' },
+  { name: 'Pixie', key: 'PIXIE', description: 'Pixie workspace.' },
+  { name: 'Newsletter', key: 'NEWS', description: 'Newsletter workspace.' },
+  { name: 'Taskr', key: 'TASKR', description: 'Taskr workspace.' },
+];
+
+const HIDDEN_LEGACY_PROJECT_KEYS = ['PLAT', 'SHMOB', 'SHWEB'];
+
 async function listColumns(db, table) {
   if (db.dialect === 'postgres') {
     const rows = await db.query(
@@ -213,6 +225,34 @@ async function backfillProjects(db) {
   return orphans.length;
 }
 
+/** Add the standard workspaces once, without changing projects users already created. */
+async function ensureWorkspaceProjects(db) {
+  const now = new Date().toISOString();
+  let added = 0;
+  for (const project of WORKSPACE_PROJECTS) {
+    const existing = await db.get('SELECT id FROM projects WHERE project_key = ?', [project.key]);
+    if (existing) continue;
+    await db.run(
+      `INSERT INTO projects (name, project_key, description, lead_id, is_archived, created_at, updated_at)
+       VALUES (?, ?, ?, NULL, 0, ?, ?)`,
+      [project.name, project.key, project.description, now, now],
+    );
+    added += 1;
+  }
+  return added;
+}
+
+/** Keep legacy project history intact while removing it from normal pickers. */
+async function archiveLegacyProjects(db) {
+  const placeholders = HIDDEN_LEGACY_PROJECT_KEYS.map(() => '?').join(', ');
+  const result = await db.run(
+    `UPDATE projects SET is_archived = 1, updated_at = ?
+       WHERE project_key IN (${placeholders}) AND is_archived = 0`,
+    [new Date().toISOString(), ...HIDDEN_LEGACY_PROJECT_KEYS],
+  );
+  return Number(result?.changes || 0);
+}
+
 export async function migrate({ fresh = false } = {}) {
   const db = await getDb();
   const file = config.db.client === 'postgres' ? 'schema.postgres.sql' : 'schema.sqlite.sql';
@@ -280,8 +320,10 @@ export async function migrate({ fresh = false } = {}) {
   }
 
   const backfilled = await backfillProjects(db);
+  const workspaceProjectsAdded = await ensureWorkspaceProjects(db);
+  const legacyProjectsArchived = await archiveLegacyProjects(db);
 
-  return { driver: config.db.client, fresh, added, backfilled, roleConstraintUpgraded, passwordHashRelaxed };
+  return { driver: config.db.client, fresh, added, backfilled, workspaceProjectsAdded, legacyProjectsArchived, roleConstraintUpgraded, passwordHashRelaxed };
 }
 
 const isEntry = process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1]);
@@ -292,6 +334,8 @@ if (isEntry) {
       console.log(`[migrate] schema ready (driver=${r.driver}${r.fresh ? ', fresh' : ''})`);
       if (r.added.length) console.log(`[migrate] added columns: ${r.added.join(', ')}`);
       if (r.backfilled) console.log(`[migrate] moved ${r.backfilled} existing task(s) into the ${DEFAULT_PROJECT.key} project`);
+      if (r.workspaceProjectsAdded) console.log(`[migrate] added ${r.workspaceProjectsAdded} workspace project(s)`);
+      if (r.legacyProjectsArchived) console.log(`[migrate] archived ${r.legacyProjectsArchived} legacy project(s)`);
       if (r.roleConstraintUpgraded) console.log("[migrate] users.role now accepts 'admin'");
       if (r.passwordHashRelaxed) console.log('[migrate] users.password_hash is now nullable (invited accounts)');
       if (config.db.client === 'sqlite') console.log(`[migrate] file: ${config.db.sqliteFile}`);

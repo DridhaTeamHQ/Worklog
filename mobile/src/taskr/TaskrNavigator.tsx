@@ -21,7 +21,7 @@ import { TaskReportsScreen } from '../screens/manager/TaskReportsScreen';
 import { ManagerTicketsScreen } from '../screens/manager/ManagerTicketsScreen';
 import { AnalyticsScreen } from '../screens/manager/AnalyticsScreen';
 import { useAuth } from '../context/AuthContext';
-import { isManagerLevel } from '../types';
+import { canAccessTickets, isManagerLevel } from '../types';
 
 type TabParams = { Home: undefined; Tasks: { filter?: string } | undefined; Chat: undefined; Tickets: undefined; Profile: undefined };
 type StackParams = { Main: undefined; TaskDetails: { id: number }; CreateTask: undefined; TeamDetails: { name: string }; Profile: undefined; MyDay: undefined; Notifications: undefined; Tickets: undefined; TasksDone: undefined; TeamMembers: undefined; EmployeeDetail: { id: number; name?: string }; TaskReports: undefined; ManagerTickets: undefined; Analytics: undefined; ChatThread: { contact?: any; group?: any; teamRoom?: boolean } };
@@ -159,7 +159,7 @@ const tabStyles = StyleSheet.create({
   },
 });
 function TicketsTab(props: any) { const { user } = useAuth(); return isManagerLevel(user?.role) ? <ManagerTicketsScreen {...props} /> : <TicketsScreen {...props} />; }
-function MainTabs() { return <Tabs.Navigator tabBar={props => <TaskrTabBar {...props} />} screenOptions={{ headerShown: false }}><Tabs.Screen name="Home" component={HomeScreen} /><Tabs.Screen name="Tasks" component={TasksScreen} /><Tabs.Screen name="Chat" component={ChatScreen} /><Tabs.Screen name="Tickets" component={TicketsTab} /><Tabs.Screen name="Profile" component={AccountProfileScreen} /></Tabs.Navigator>; }
+function MainTabs() { const { user } = useAuth(); return <Tabs.Navigator tabBar={props => <TaskrTabBar {...props} />} screenOptions={{ headerShown: false }}><Tabs.Screen name="Home" component={HomeScreen} /><Tabs.Screen name="Tasks" component={TasksScreen} /><Tabs.Screen name="Chat" component={ChatScreen} />{canAccessTickets(user) && <Tabs.Screen name="Tickets" component={TicketsTab} />}<Tabs.Screen name="Profile" component={AccountProfileScreen} /></Tabs.Navigator>; }
 export function TaskrNavigator() {
   const { user } = useAuth();
   return <TaskrProvider><Stack.Navigator screenOptions={{ headerStyle: { backgroundColor: '#18181b' }, headerTintColor: p.ink, headerShadowVisible: false, contentStyle: { backgroundColor: p.canvas } }}>
@@ -178,6 +178,6 @@ export function TaskrNavigator() {
       <Stack.Screen name="TaskReports" component={TaskReportsScreen} options={{ title: 'Reports' }} />
       <Stack.Screen name="ManagerTickets" component={ManagerTicketsScreen} options={{ title: 'Tickets' }} />
       <Stack.Screen name="Analytics" component={AnalyticsScreen} options={{ headerShown: false }} />
-    </> : <Stack.Screen name="Tickets" component={TicketsScreen} />}
+    </> : canAccessTickets(user) ? <Stack.Screen name="Tickets" component={TicketsScreen} /> : null}
   </Stack.Navigator></TaskrProvider>;
 }

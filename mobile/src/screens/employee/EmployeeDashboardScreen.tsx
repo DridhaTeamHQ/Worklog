@@ -12,7 +12,7 @@ import {
 import { useAuth } from '../../context/AuthContext';
 import { useToast } from '../../context/ToastContext';
 import { dashboardApi, taskApi } from '../../api/endpoints';
-import { EmployeeDashboardData, Task, TaskStatus } from '../../types';
+import { canAccessTickets, EmployeeDashboardData, Task, TaskStatus } from '../../types';
 import { Card } from '../../components/Card';
 import { Button } from '../../components/Button';
 import { StatCard } from '../../components/StatCard';
@@ -241,6 +241,7 @@ export function EmployeeDashboardScreen({ navigation }: any) {
           ))
         )}
 
+        {canAccessTickets(user) && <>
         {/* Recent Tickets Section */}
         <View style={[styles.sectionHeaderRow, { marginTop: spacing.xl }]}>
           <Text style={styles.sectionTitle}>Recent Tickets / Issues</Text>
@@ -273,6 +274,7 @@ export function EmployeeDashboardScreen({ navigation }: any) {
             </Card>
           ))
         )}
+        </>}
       </ScrollView>
 
       {/* Status Update Modal */}
