@@ -5,10 +5,9 @@ import {
 } from 'recharts';
 import {
   BarChart3, CheckCircle2, CalendarDays, TrendingUp, Clock, Plus,
-  Search, FileText, CheckSquare, Sparkles, Filter,
+  FileText, CheckSquare, Sparkles, Filter,
 } from 'lucide-react';
 import { taskApi, reportApi } from '../../api/endpoints';
-import { useAuth } from '../../context/AuthContext';
 import { ApiError } from '../../api/client';
 import { EmptyState, ErrorState, PageLoader, SearchInput } from '../../components/ui';
 import { formatDate, formatDateShort, formatWeekday, formatTime, todayIso, addDaysIso, reportLines } from '../../lib/format';
@@ -26,7 +25,6 @@ const RANGE_OPTIONS: { key: TimeRange; label: string; days?: number }[] = [
 ];
 
 export function EmployeeAnalyticsPage() {
-  const { user } = useAuth();
   const today = todayIso();
 
   const [range, setRange] = useState<TimeRange>('30days');
