@@ -5,11 +5,11 @@
  * hand out, so the requested role is checked rather than trusted.
  */
 import { ok, created } from '../utils/http.js';
-import { asyncHandler, forbidden, badRequest } from '../utils/errors.js';
+import { asyncHandler, forbidden, badRequest, notFound } from '../utils/errors.js';
 import { ROLES, grantableRoles, roleLabel, isAdmin } from '../utils/roles.js';
 import {
   listManagers, createUser, deleteManagerAccount, countAdmins, countActiveAdmins,
-  setManagerAccess,
+  setManagerAccess, markInvited,
 } from '../models/user.js';
 import { sendInviteEmail } from '../services/mail.js';
 
@@ -42,21 +42,44 @@ export const create = asyncHandler(async (req, res) => {
   const user = await createUser({ ...req.body, role: requested });
   const label = roleLabel(requested).toLowerCase();
 
-  // Best-effort, exactly as for a team member: the account exists either way, and it
-  // has no password until they claim the invite themselves.
-  const mail = await sendInviteEmail({
-    name: user.name,
-    email: user.email,
-    managerName: req.user.name,
-    role: requested,
-  });
-
+  // Nothing is emailed here, exactly as for a team member: the invitation goes out
+  // only when "Invite" is pressed on the roster (POST /api/admins/:id/invite).
   return created(res, {
     admin: user,
+    message: `${user.name} now has ${label} access.`,
+  });
+});
+
+/**
+ * POST /api/admins/:id/invite — email a manager-level account its invitation.
+ *
+ * Refused once the account has been claimed, for the same reason as a team member:
+ * the email describes a button that only an unclaimed account is shown.
+ */
+export const invite = asyncHandler(async (req, res) => {
+  const targetId = Number(req.params.id);
+  if (!Number.isInteger(targetId) || targetId <= 0) throw badRequest('Invalid account id.');
+
+  const target = (await listManagers()).find((m) => m.id === targetId);
+  if (!target) throw notFound('That account could not be found.');
+  if (!target.unclaimed) throw badRequest(`${target.name} has already set a password and signed in.`);
+
+  const mail = await sendInviteEmail({
+    name: target.name,
+    email: target.email,
+    managerName: req.user.name,
+    role: target.role,
+  });
+  // Recorded unless the send outright failed, so the roster shows "Invited" from the
+  // moment the button is pressed — including in log-only mail mode during development.
+  if (!mail.error) await markInvited(targetId);
+
+  return ok(res, {
+    id: targetId,
     email: { delivered: mail.delivered, mode: mail.mode, error: mail.error },
     message: mail.delivered
-      ? `${user.name} now has ${label} access and has been emailed a link to set their password.`
-      : `${user.name} now has ${label} access.`,
+      ? `An invitation has been emailed to ${target.email}.`
+      : `The invitation could not be emailed. Share the sign-in address with ${target.name} directly.`,
   });
 });
 

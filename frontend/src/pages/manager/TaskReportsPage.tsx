@@ -7,7 +7,7 @@ import { ApiError } from '../../api/client';
 import { Avatar, EmptyState, ErrorState, LoadingBlock, PageHeader, SearchInput, Select } from '../../components/ui';
 import { formatDate, formatTime, reportLines, todayIso } from '../../lib/format';
 import type { DailyReport, TeamMember } from '../../types';
-import { isAdmin } from '../../types';
+import { isManagerLevel } from '../../types';
 
 type RangeKey = 'all' | 'today' | 'week' | 'month' | 'custom';
 
@@ -22,8 +22,8 @@ const RANGES: { value: RangeKey; label: string }[] = [
 /** Company-wide view of every daily report, grouped by date. */
 export function TaskReportsPage() {
   const { user } = useAuth();
-  /** Only an admin spans more than one department, so only they get the filter. */
-  const canSeeAllDepartments = isAdmin(user?.role);
+  /** Admins and managers both span every department, so both get the filter. */
+  const canSeeAllDepartments = isManagerLevel(user?.role);
   const [reports, setReports] = useState<DailyReport[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);

@@ -15,7 +15,7 @@ import { formatDate, formatTime, relativeTime, todayIso } from '../lib/format';
 import { Avatar, EmptyState, Spinner } from '../components/ui';
 import { GroupModal } from '../components/GroupModal';
 import {
-  isAdmin, roleLabel,
+  isManagerLevel, roleLabel,
   type ChatContact, type ChatGroup, type ChatMessage, type ChatSearchHit,
   type GroupMessage, type TeamMessage,
 } from '../types';
@@ -493,7 +493,7 @@ export function ChatPage() {
         <DirectoryView
           contacts={contacts}
           groups={groups}
-          canCreateGroup={isAdmin(user.role)}
+          canCreateGroup={isManagerLevel(user.role)}
           loading={contactsLoading}
           error={error}
           search={search}
@@ -532,7 +532,7 @@ export function ChatPage() {
             onBack={openDirectory}
             onDraft={setDraft}
             onSend={() => void send()}
-            canRenameGroup={isAdmin(user.role)}
+            canRenameGroup={isManagerLevel(user.role)}
             onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
           />
         ) : (
@@ -1059,7 +1059,7 @@ function RoomView({
           <span className="block truncate text-sm font-semibold text-foreground">{header.name}</span>
           <span className="block truncate text-[11px] text-muted-foreground">{header.sub}</span>
         </span>
-        {/* Renaming is admin-only and sits in the room itself, which is where you
+        {/* Renaming is manager-level and sits in the room itself, which is where you
             are when you notice the name is wrong. */}
         {isGroup && canRenameGroup && (
           <button

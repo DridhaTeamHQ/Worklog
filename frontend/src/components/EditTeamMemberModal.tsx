@@ -17,7 +17,7 @@ interface Props {
 }
 
 /**
- * Admin-only edit of a team member's account details.
+ * Manager-level edit of a team member's account details.
  *
  * Only the fields that actually moved are sent, so a save can never blank something
  * the admin did not touch. There is no password field on purpose: no one but the

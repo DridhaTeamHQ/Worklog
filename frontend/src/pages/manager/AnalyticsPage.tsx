@@ -13,7 +13,7 @@ import { EmptyState, ErrorState, Spinner, Select } from '../../components/ui';
 import { formatDateShort, formatWeekday, todayIso, addDaysIso } from '../../lib/format';
 import { useChartTheme } from '../../lib/chart';
 import type { AnalyticsPayload, ActivityPoint, TeamMember } from '../../types';
-import { isAdmin } from '../../types';
+import { isManagerLevel } from '../../types';
 
 /**
  * The analytics screen.
@@ -157,8 +157,8 @@ export function AnalyticsPage() {
     CHART, STATUS_COLORS, TOOLTIP_STYLE, TOOLTIP_LABEL_STYLE, TOOLTIP_ITEM_STYLE,
   } = useChartTheme();
   const { user } = useAuth();
-  /** Only an admin spans more than one department, so only they get the filter. */
-  const canSeeAllDepartments = isAdmin(user?.role);
+  /** Admins and managers both span every department, so both get the filter. */
+  const canSeeAllDepartments = isManagerLevel(user?.role);
   const [data, setData] = useState<AnalyticsPayload | null>(null);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [departments, setDepartments] = useState<string[]>([]);

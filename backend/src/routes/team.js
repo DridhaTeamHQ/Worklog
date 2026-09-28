@@ -1,9 +1,10 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireManager } from '../middleware/auth.js';
 import { validate, safeText, optionalText, isoDate } from '../middleware/validate.js';
 import {
   list, departments, addDepartment, create, getOne, update, memberReports, memberTasks, remove,
+  invite,
 } from '../controllers/team.js';
 
 const router = Router();
@@ -64,11 +65,13 @@ router.post('/departments', validate(z.object({ name: safeText(120, 'Department 
 // team_member and the scope rules keep the new staff member in the manager's area.
 router.post('/', validate(createSchema), create);
 router.get('/:id', getOne);
-// Admin-only, like create and delete: a manager runs their department but does not
-// edit the accounts in it.
-router.patch('/:id', requireAdmin, validate(updateSchema), update);
+// Manager-level, like create: managers administer accounts exactly as admins do.
+router.patch('/:id', requireManager, validate(updateSchema), update);
 router.get('/:id/reports', validate(reportQuery, 'query'), memberReports);
 router.get('/:id/tasks', memberTasks);
-router.delete('/:id', requireAdmin, remove);
+router.delete('/:id', requireManager, remove);
+// Sends the invitation email. Separate from create so adding details never emails
+// anyone by itself.
+router.post('/:id/invite', requireManager, invite);
 
 export default router;

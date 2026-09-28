@@ -1,6 +1,6 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireManager } from '../middleware/auth.js';
 import { validate, safeText } from '../middleware/validate.js';
 import {
   contacts, unread, conversation, send, markRead,
@@ -78,8 +78,7 @@ const teamPostSchema = z.object({
  * Two different permissions here, and they are not the same question:
  *
  *   - Creating and renaming a group is administration of who-talks-to-whom, so it is
- *     `requireAdmin`. A manager runs their department but does not decide the
- *     company's rooms, which is the same line drawn for creating accounts.
+ *     `requireManager`: admins and managers share that power, team members do not.
  *   - Reading and posting is participation, so it is gated on membership inside the
  *     model instead. An admin who is not in a group cannot read it.
  */
@@ -93,8 +92,8 @@ const renameGroupSchema = z.object({
 });
 
 router.get('/groups', groups);
-router.post('/groups', requireAdmin, validate(createGroupSchema), createGroupRoom);
-router.patch('/groups/:groupId', requireAdmin, validate(renameGroupSchema), renameGroupRoom);
+router.post('/groups', requireManager, validate(createGroupSchema), createGroupRoom);
+router.patch('/groups/:groupId', requireManager, validate(renameGroupSchema), renameGroupRoom);
 router.get('/groups/:groupId/messages', validate(conversationQuery, 'query'), groupMessages);
 router.post('/groups/:groupId/messages', validate(sendSchema), postToGroup);
 router.patch('/groups/:groupId/read', markGroupRoomRead);
