@@ -56,8 +56,11 @@ const HIDDEN_LEGACY_PROJECT_KEYS = ['PLAT', 'SHMOB', 'SHWEB'];
 
 async function listColumns(db, table) {
   if (db.dialect === 'postgres') {
+    // Scoped to the app's own schema: on Supabase, `auth.users` also exists and has
+    // columns of its own (invited_at among them), which would otherwise be mistaken
+    // for ours and stop the ALTER from ever running.
     const rows = await db.query(
-      'SELECT column_name AS name FROM information_schema.columns WHERE table_name = ?',
+      'SELECT column_name AS name FROM information_schema.columns WHERE table_schema = current_schema() AND table_name = ?',
       [table],
     );
     return rows.map((r) => r.name);
@@ -307,6 +310,11 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'personal_todos', 'task_id', 'INTEGER REFERENCES assigned_tasks (id) ON DELETE SET NULL')) {
     added.push('personal_todos.task_id');
+  }
+  // When the invitation email was actually sent. Adding an account no longer sends
+  // one, so "Invited" on the roster is recorded rather than assumed.
+  if (await ensureColumn(db, 'users', 'invited_at', 'TEXT')) {
+    added.push('users.invited_at');
   }
 
   // Databases created before the admin role existed still reject role = 'admin'.

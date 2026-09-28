@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import {
-  Users, Eye, Pencil, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle,
+  Users, Pencil, CheckCircle2, Clock, UserPlus, ShieldCheck, ShieldPlus, Trash2, AlertTriangle, Send,
 } from 'lucide-react';
 import { adminApi, teamApi } from '../../api/endpoints';
 import { ApiError } from '../../api/client';
@@ -15,7 +15,7 @@ import { EditTeamMemberModal } from '../../components/EditTeamMemberModal';
 import { useToast } from '../../components/Toast';
 import { formatDate, formatDateShort } from '../../lib/format';
 import type { Manager, Role, TeamMember } from '../../types';
-import { isAdmin, roleLabel } from '../../types';
+import { isAdmin, isManagerLevel, roleLabel } from '../../types';
 
 type Tab = 'team' | 'admins';
 
@@ -48,12 +48,12 @@ export function TeamMembersPage() {
    * Mirrors the server rules in backend/src/utils/roles.js and the route guards, so
    * nothing on screen can produce a request the API would refuse.
    *
-   * Only an admin administers accounts: creating people, removing them, and seeing who
-   * holds elevated access. A manager runs one department — they assign its work, read
-   * its reports and triage its tickets — and the roster they see is confined to it, so
-   * the department filter and the department column have nothing left to say.
+   * Admins and managers both administer accounts: creating people, removing them, and
+   * seeing who holds elevated access. The one power kept back from a manager is
+   * granting admin access, so only the "Add admin" button is admin-only.
    */
-  const canAdminister = isAdmin(user?.role);
+  const canAdminister = isManagerLevel(user?.role);
+  const canGrantAdmin = isAdmin(user?.role);
 
   /**
    * Portal access, toggled straight from the roster.
@@ -88,6 +88,30 @@ export function TeamMembersPage() {
       toast.error(err instanceof ApiError ? err.message : 'Could not change that access.');
     } finally {
       setSavingAccess(null);
+    }
+  };
+
+  /**
+   * Sending the invitation email. Adding someone's details does not email them; only
+   * this does, so the manager decides when the person is told. `inviting` holds the id
+   * in flight so just that row's button is disabled.
+   */
+  const [inviting, setInviting] = useState<number | null>(null);
+
+  const sendInvite = async (person: { id: number; name: string }, kind: 'member' | 'admin') => {
+    setInviting(person.id);
+    try {
+      const { data } = kind === 'member'
+        ? await teamApi.invite(person.id)
+        : await adminApi.invite(person.id);
+      if (data.email.delivered) toast.success(data.message);
+      else toast.error(data.message);
+      // The row now carries the "Invited" badge, and a resend should read as one.
+      reloadBoth();
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : `Could not invite ${person.name}.`);
+    } finally {
+      setInviting(null);
     }
   };
 
@@ -203,17 +227,19 @@ export function TeamMembersPage() {
           </button>
         ) : (
           <span className="flex flex-wrap items-center gap-2">
-            <button type="button" onClick={() => setAddingRole('manager')} className="btn-secondary">
+            <button type="button" onClick={() => setAddingRole('manager')} className={canGrantAdmin ? 'btn-secondary' : 'btn-primary'}>
               <ShieldPlus className="h-4 w-4" /> Add manager
             </button>
-            <button type="button" onClick={() => setAddingRole('admin')} className="btn-primary">
-              <ShieldPlus className="h-4 w-4" /> Add admin
-            </button>
+            {canGrantAdmin && (
+              <button type="button" onClick={() => setAddingRole('admin')} className="btn-primary">
+                <ShieldPlus className="h-4 w-4" /> Add admin
+              </button>
+            )}
           </span>
         )}
       />
 
-      {/* The Admins list is administration, so a manager is not offered the tab at all. */}
+      {/* Both manager-level tiers see who holds elevated access. */}
       {canAdminister && (
         <div className="flex gap-1" role="tablist" aria-label="People">
           {([
@@ -255,8 +281,7 @@ export function TeamMembersPage() {
             className="sm:w-80"
           />
           {/*
-            Only an admin spans more than one department, so only an admin has anything
-            to filter by. A manager's roster is already confined to theirs by the server.
+            Admins and managers both span every department, so both get the filter.
           */}
           {isTeam && canAdminister && (
             <Select value={department} onChange={(v) => setDepartment(v)} options={[{ value: '', label: `All departments` }, ...departments.map((d) => ({ value: String(d), label: `${d}` }))]} ariaLabel="Filter by department" className="sm:w-52" />
@@ -316,8 +341,8 @@ export function TeamMembersPage() {
                           <span className="min-w-0">
                             <span className="flex items-center gap-2">
                               <span className="truncate font-semibold text-foreground group-hover:text-foreground">{m.name}</span>
-                              {/* Until they claim the invite they have no password and
-                                  have never signed in — worth seeing at a glance. */}
+                              {/* Shown only once Invite has been pressed, and until
+                                  they claim the account by choosing a password. */}
                               {m.invited && (
                                 <span className="badge shrink-0 border-warning/25 bg-warning/10 text-warning">Invited</span>
                               )}
@@ -363,9 +388,21 @@ export function TeamMembersPage() {
                       )}
                       <td className="text-right">
                         <div className="flex items-center justify-end gap-1.5">
-                          <Link to={`/manager/team/${m.id}`} className="btn-secondary btn-sm">
-                            <Eye className="h-3.5 w-3.5" /> View
-                          </Link>
+                          {/* Only an unclaimed account can be invited; once they have
+                              signed in there is nothing to send. The name is the link
+                              to their page, so no separate View button is needed. */}
+                          {m.unclaimed && (
+                            <button
+                              type="button"
+                              onClick={() => void sendInvite(m, 'member')}
+                              disabled={inviting === m.id}
+                              className="btn-secondary btn-sm"
+                            >
+                              {inviting === m.id
+                                ? <><Spinner className="h-3.5 w-3.5" /> Sending…</>
+                                : <><Send className="h-3.5 w-3.5" /> Invite</>}
+                            </button>
+                          )}
                           {/* Editing and removing an account are both administration,
                               like creating one, so they travel with the same right. */}
                           {canAdminister && (
@@ -406,8 +443,8 @@ export function TeamMembersPage() {
             action={filtered ? (
               <button type="button" onClick={() => setSearch('')} className="btn-secondary">Clear search</button>
             ) : (
-              <button type="button" onClick={() => setAddingRole('admin')} className="btn-primary">
-                <ShieldPlus className="h-4 w-4" /> Add admin
+              <button type="button" onClick={() => setAddingRole(canGrantAdmin ? 'admin' : 'manager')} className="btn-primary">
+                <ShieldPlus className="h-4 w-4" /> {canGrantAdmin ? 'Add admin' : 'Add manager'}
               </button>
             )}
           />
@@ -485,6 +522,19 @@ export function TeamMembersPage() {
                           not something a confirm dialog should be the first warning of.
                           The server refuses it independently.
                         */}
+                        <div className="flex items-center justify-end gap-1.5">
+                        {a.unclaimed && (
+                          <button
+                            type="button"
+                            onClick={() => void sendInvite(a, 'admin')}
+                            disabled={inviting === a.id}
+                            className="btn-secondary btn-sm"
+                          >
+                            {inviting === a.id
+                              ? <><Spinner className="h-3.5 w-3.5" /> Sending…</>
+                              : <><Send className="h-3.5 w-3.5" /> Invite</>}
+                          </button>
+                        )}
                         {a.id !== user?.id && (
                           <button
                             type="button"
@@ -496,6 +546,7 @@ export function TeamMembersPage() {
                             <Trash2 className="h-4 w-4" />
                           </button>
                         )}
+                        </div>
                       </td>
                     </tr>
                   ))}

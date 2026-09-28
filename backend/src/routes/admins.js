@@ -1,16 +1,15 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { requireAuth, requireAdmin } from '../middleware/auth.js';
+import { requireAuth, requireManager } from '../middleware/auth.js';
 import { validate, safeText, optionalText } from '../middleware/validate.js';
 import { ROLES } from '../utils/roles.js';
-import { list, create, remove, setAccess } from '../controllers/admins.js';
+import { list, create, remove, setAccess, invite } from '../controllers/admins.js';
 
 const router = Router();
 
-// Admin-only throughout. Who holds elevated access, and who is granted it, is
-// administration rather than day-to-day management — a manager sees neither the list
-// nor the endpoints that change it.
-router.use(requireAuth, requireAdmin);
+// Manager-level throughout. Managers administer the portal exactly as admins do; the
+// one thing they cannot do — grant admin access — is refused in the controller.
+router.use(requireAuth, requireManager);
 
 const listQuery = z.object({
   search: z.string().trim().max(200).optional(),
@@ -35,5 +34,8 @@ router.post('/', validate(createSchema), create);
 // but the sign-in, where delete closes the account and moves its work elsewhere.
 router.patch('/:id', validate(accessSchema), setAccess);
 router.delete('/:id', remove);
+// Sends the invitation email. Separate from create so adding details never emails
+// anyone by itself.
+router.post('/:id/invite', invite);
 
 export default router;

@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS users (
   phone          TEXT,
   profile_image  TEXT,
   is_active      INTEGER NOT NULL DEFAULT 1,
+  invited_at     TEXT,
   created_at     TEXT NOT NULL,
   updated_at     TEXT NOT NULL
 );

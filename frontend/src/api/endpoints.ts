@@ -149,13 +149,17 @@ export interface EditTeamMemberInput {
 export const teamApi = {
   list: (params: { search?: string; department?: string } = {}, signal?: AbortSignal) =>
     api.get<TeamMember[]>('/team', params, signal),
+  /** Creates the account only. Nothing is emailed until `invite` is called. */
   create: (input: NewTeamMemberInput) =>
+    api.post<{ employee: User; message: string }>('/team', input),
+  /** Emails the invitation to an account nobody has claimed yet. */
+  invite: (id: number) =>
     api.post<{
-      employee: User;
+      id: number;
       /** Whether the invite email actually went out. `mode` is 'smtp' or 'log'. */
       email: { delivered: boolean; mode: string; error?: string };
       message: string;
-    }>('/team', input),
+    }>(`/team/${id}/invite`),
   /** Admin-only: edit an existing team member's details. */
   update: (id: number, patch: EditTeamMemberInput) => api.patch<User>(`/team/${id}`, patch),
   departments: () => api.get<string[]>('/team/departments'),
@@ -186,12 +190,16 @@ export const teamApi = {
 export const adminApi = {
   list: (params: { search?: string } = {}, signal?: AbortSignal) =>
     api.get<Manager[]>('/admins', params, signal),
+  /** Creates the account only. Nothing is emailed until `invite` is called. */
   create: (input: NewTeamMemberInput & { role?: 'admin' | 'manager' }) =>
+    api.post<{ admin: User; message: string }>('/admins', input),
+  /** Emails the invitation to an account nobody has claimed yet. */
+  invite: (id: number) =>
     api.post<{
-      admin: User;
+      id: number;
       email: { delivered: boolean; mode: string; error?: string };
       message: string;
-    }>('/admins', input),
+    }>(`/admins/${id}/invite`),
   /**
    * Closes a manager-level account. Work they had assigned moves to the admin making
    * the request rather than being deleted; `transferred` is how many tasks moved.

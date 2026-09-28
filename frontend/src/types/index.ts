@@ -52,10 +52,12 @@ export interface TaskCounts {
 }
 
 /**
- * `invited` means the account has been created but nobody has claimed it yet — the
- * person has not chosen a password, so they have never signed in.
+ * `unclaimed` means nobody has chosen a password for the account yet, so it can be
+ * invited. `invited` means unclaimed *and* an invitation has actually been sent —
+ * adding someone does not email them, so this only turns on once Invite is pressed.
  */
 export interface TeamMember extends User {
+  unclaimed: boolean;
   invited: boolean;
   counts: TaskCounts;
   current_status: EffectiveStatus | 'idle';
@@ -65,12 +67,14 @@ export interface TeamMember extends User {
 
 /** A user with manager access, plus how much work they have out with the team. */
 export interface Manager extends User {
+  unclaimed: boolean;
   invited: boolean;
   assigned_tasks: number;
   open_tasks: number;
 }
 
 export interface TeamMemberDetail extends User {
+  unclaimed: boolean;
   invited: boolean;
   counts: TaskCounts;
   report_count: number;

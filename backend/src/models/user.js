@@ -10,11 +10,25 @@ import { MANAGER_ROLES } from '../utils/roles.js';
 const PUBLIC_COLUMNS = `id, name, email, role, department, job_title, phone, profile_image, is_active, created_at, updated_at`;
 
 /**
- * Whether the account is still waiting to be claimed, derived in SQL so the hash it
- * is derived from never leaves the database. Selected alongside PUBLIC_COLUMNS by the
- * roster queries, which is where a manager needs to see who has not signed in yet.
+ * Two roster flags, derived in SQL so the hash they depend on never leaves the
+ * database:
+ *
+ *   - `unclaimed`: nobody has chosen a password yet, so the account can be invited.
+ *   - `invited`: unclaimed *and* an invitation has actually been sent. Adding someone
+ *     does not email them, so this is only true once "Invite" has been pressed.
  */
-const INVITED_COLUMN = `CASE WHEN password_hash IS NULL THEN 1 ELSE 0 END AS invited`;
+const INVITED_COLUMN = `
+  CASE WHEN password_hash IS NULL THEN 1 ELSE 0 END AS unclaimed,
+  CASE WHEN password_hash IS NULL AND invited_at IS NOT NULL THEN 1 ELSE 0 END AS invited`;
+
+/** The roster flags for a row, as booleans. */
+const inviteFlags = (row) => ({ unclaimed: Boolean(row.unclaimed), invited: Boolean(row.invited) });
+
+/** Records that an invitation email went out, which is what shows "Invited" on the roster. */
+export async function markInvited(userId) {
+  const db = await getDb();
+  await db.run('UPDATE users SET invited_at = ? WHERE id = ?', [nowIso(), userId]);
+}
 
 export const toPublicUser = (row) => {
   if (!row) return null;
@@ -257,7 +271,7 @@ export async function listTeamMembers({ search, department, status } = {}) {
           : c.total > 0 ? 'completed' : 'idle';
     return {
       ...toPublicUser(row),
-      invited: Boolean(row.invited),
+      ...inviteFlags(row),
       counts: c,
       current_status: currentStatus,
       last_report_date: lastReport.get(Number(row.id)) || null,
@@ -303,7 +317,7 @@ export async function listManagers({ search } = {}) {
 
   return rows.map((row) => ({
     ...toPublicUser(row),
-    invited: Boolean(row.invited),
+    ...inviteFlags(row),
     ...(byManager.get(Number(row.id)) || { assigned_tasks: 0, open_tasks: 0 }),
   }));
 }
@@ -442,6 +456,6 @@ export async function getTeamMember(employeeId) {
     || { total: 0, pending: 0, in_progress: 0, completed: 0, overdue: 0 };
   const reportCount = await db.get('SELECT COUNT(*) AS c FROM daily_task_reports WHERE employee_id = ?', [employeeId]);
   return {
-    ...toPublicUser(row), invited: Boolean(row.invited), counts, report_count: Number(reportCount?.c || 0),
+    ...toPublicUser(row), ...inviteFlags(row), counts, report_count: Number(reportCount?.c || 0),
   };
 }

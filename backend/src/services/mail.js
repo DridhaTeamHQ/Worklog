@@ -136,7 +136,7 @@ const button = (href, label) => `
  *
  * Carries no password — there is none to carry. It points at the sign-in page, where
  * entering this address reveals the "Invited" button that lets the person set their
- * own. Sent once, at account creation.
+ * own. Sent when "Invite" is pressed on the roster, not when the account is created.
  */
 export async function sendInviteEmail({ name, email, managerName, role = 'team_member' }) {
   const loginUrl = `${config.mail.appUrl}/login`;

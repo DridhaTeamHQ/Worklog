@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from 'react';
-import { UserPlus, CircleCheck, MailCheck, Copy, Check } from 'lucide-react';
+import { UserPlus, CircleCheck, Copy, Check } from 'lucide-react';
 import { adminApi, teamApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
 import { useToast } from './Toast';
@@ -21,24 +21,24 @@ interface Props {
 const COPY = {
   team_member: {
     title: 'Add a team member',
-    description: 'Creates their account and invites them to set their own password.',
+    description: 'Creates their account. Use the Invite button on the roster when you are ready to email them.',
     submit: 'Add team member',
     submitting: 'Adding…',
     namePlaceholder: 'Full name',
     titlePlaceholder: 'e.g. Backend Engineer',
     deptPlaceholder: 'e.g. Development',
-    successTitle: 'Team member invited',
+    successTitle: 'Team member added',
     failMessage: 'Could not add the team member.',
   },
   manager: {
     title: 'Add a manager',
-    description: 'Creates an account with manager access and invites them to set their own password.',
+    description: 'Creates an account with manager access. Use the Invite button on the roster when you are ready to email them.',
     submit: 'Add manager',
     submitting: 'Adding…',
     namePlaceholder: 'Full name',
     titlePlaceholder: 'e.g. Delivery Manager',
     deptPlaceholder: 'e.g. Management',
-    successTitle: 'Manager invited',
+    successTitle: 'Manager added',
     failMessage: 'Could not add the manager.',
   },
   admin: {
@@ -49,7 +49,7 @@ const COPY = {
     namePlaceholder: 'Full name',
     titlePlaceholder: 'e.g. Administrator',
     deptPlaceholder: 'e.g. Management',
-    successTitle: 'Admin invited',
+    successTitle: 'Admin added',
     failMessage: 'Could not add the admin.',
   },
 } as const;
@@ -69,8 +69,8 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
   const [submitting, setSubmitting] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  /** Set once the account exists, so the modal can confirm who was invited. */
-  const [invited, setInvited] = useState<{ user: User; emailed: boolean } | null>(null);
+  /** Set once the account exists, so the modal can confirm who was added. */
+  const [invited, setInvited] = useState<{ user: User } | null>(null);
 
   useEffect(() => {
     if (!open) return;
@@ -115,9 +115,9 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
       const createdUser = 'admin' in data ? data.admin : data.employee;
       toast.success(data.message);
       onCreated(createdUser);
-      // Stay open on a confirmation screen: when no invite email went out, the manager
-      // is the one who has to tell them the account is waiting.
-      setInvited({ user: createdUser, emailed: data.email?.delivered ?? false });
+      // Stay open on a confirmation screen: no email has gone out, so the manager is
+      // told where the Invite button is and given the sign-in details to pass on.
+      setInvited({ user: createdUser });
     } catch (err) {
       if (err instanceof ApiError) {
         setErrors(err.fieldErrors);
@@ -154,7 +154,7 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
         open={open}
         onClose={onClose}
         title={copy.successTitle}
-        description="They choose their own password the first time they open the portal."
+        description="No email has been sent yet. Press Invite on their row when you are ready."
         size="sm"
         footer={(
           <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
@@ -167,30 +167,15 @@ export function AddUserModal({ open, onClose, onCreated, role, departments = [] 
             <CircleCheck className="mt-0.5 h-5 w-5 shrink-0 text-success" aria-hidden />
             <div className="min-w-0">
               <p className="font-semibold text-success">
-                {invited.user.name} has been invited{isElevated ? ` as ${role === 'admin' ? 'an admin' : 'a manager'}` : ''}
+                {invited.user.name} has been added{isElevated ? ` as ${role === 'admin' ? 'an admin' : 'a manager'}` : ''}
               </p>
               <p className="mt-0.5 text-sm text-success">
-                No password has been set. They enter their email on the sign-in page,
-                click <span className="font-semibold">Invited</span>, and choose one themselves.
+                No password has been set. Once invited, they enter their email on the
+                sign-in page, click <span className="font-semibold">Invited</span>, and
+                choose one themselves.
               </p>
             </div>
           </div>
-
-          {/*
-            Only the positive case is shown. A failed send is not surfaced here: the
-            account exists either way, the sign-in details are on this screen with a
-            copy button, and the outcome is still reported by the API and written to
-            the server log for anyone who needs it.
-          */}
-          {invited.emailed && (
-            <div className="flex items-start gap-3 rounded-lg border border-border bg-muted px-4 py-3">
-              <MailCheck className="mt-0.5 h-5 w-5 shrink-0 text-primary-strong" aria-hidden />
-              <p className="min-w-0 text-sm text-primary-strong">
-                An invitation has been sent to{' '}
-                <span className="font-medium text-foreground">{invited.user.email}</span>.
-              </p>
-            </div>
-          )}
 
           <dl className="rounded-xl border border-border bg-muted p-4 text-sm">
             <div className="flex flex-wrap items-baseline justify-between gap-2">

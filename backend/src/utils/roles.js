@@ -42,13 +42,15 @@ export const isTeamMember = (role) => role === ROLES.TEAM_MEMBER;
 /**
  * Which roles a given actor may create.
  *
- * Account creation is an admin-only power. A manager runs their own department — they
- * assign work, read reports and triage tickets within it — but they do not decide who
- * is in the company, which is why this returns nothing for them. Making it structural
- * rather than a UI decision means a hand-written POST is refused too.
+ * Admins and managers share the same portal and the same powers, save one: granting
+ * admin access is reserved for admins. Making it structural rather than a UI decision
+ * means a hand-written POST is refused too.
  */
 export function grantableRoles(actorRole) {
   if (isAdmin(actorRole)) return [ROLES.ADMIN, ROLES.MANAGER, ROLES.TEAM_MEMBER];
+  // A manager administers the portal exactly as an admin does, with one exception:
+  // only an admin can grant admin access.
+  if (isManagerLevel(actorRole)) return [ROLES.MANAGER, ROLES.TEAM_MEMBER];
   return [];
 }
 

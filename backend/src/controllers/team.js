@@ -11,6 +11,7 @@ import { ROLES, isManagerLevel } from '../utils/roles.js';
 import { departmentScope, isEmptyScope, scopedDepartment, withinScope } from '../utils/scope.js';
 import {
   listTeamMembers, getTeamMember, listDepartments, createDepartment, createUser, deleteTeamMember, updateTeamMember,
+  markInvited,
 } from '../models/user.js';
 import { listTasks } from '../models/task.js';
 import { listReports } from '../models/report.js';
@@ -72,7 +73,7 @@ export const departments = asyncHandler(async (req, res) => {
 });
 
 /**
- * POST /api/team — invite a team member. Managers can use this to grow their
+ * POST /api/team — add a team member. Managers can use this to grow their
  * department; the role is deliberately fixed to team_member.
  *
  * No password is set here, by anyone. The account is created without one and the new
@@ -80,34 +81,57 @@ export const departments = asyncHandler(async (req, res) => {
  * password is never known to the manager, never emailed, and never in transit. The
  * role is fixed to team_member rather than taken from the request, so this endpoint
  * can never be used to mint a manager or an admin.
+ *
+ * Nothing is emailed here. Adding someone's details and telling them about it are two
+ * separate steps: the invitation goes out only when the manager presses "Invite" on
+ * the roster, which is POST /api/team/:id/invite below.
  */
 export const create = asyncHandler(async (req, res) => {
   const department = req.body.department;
   if (!department) throw badRequest('Department is required.');
   const user = await createUser({ ...req.body, department, role: ROLES.TEAM_MEMBER });
 
-  // The invite email is best-effort. The account already exists, so a mail failure
-  // must not fail the request — it is reported instead, and the manager is told to
-  // pass the sign-in address on by hand.
-  const mail = await sendInviteEmail({
-    name: user.name,
-    email: user.email,
-    managerName: req.user.name,
-  });
-
   return created(res, {
     employee: user,
+    message: `${user.name} has been added to the team.`,
+  });
+});
+
+/**
+ * POST /api/team/:id/invite — email a team member their invitation.
+ *
+ * Only an account nobody has claimed yet can be invited: once they have set a
+ * password the invitation would point them at a button that no longer appears. The
+ * send is best-effort — a mail failure is reported rather than thrown, so the manager
+ * can pass the sign-in address on by hand.
+ */
+export const invite = asyncHandler(async (req, res) => {
+  const employeeId = Number(req.params.id);
+  const employee = await getMemberInScope(req, employeeId);
+  if (!employee.unclaimed) throw badRequest(`${employee.name} has already set a password and signed in.`);
+
+  const mail = await sendInviteEmail({
+    name: employee.name,
+    email: employee.email,
+    managerName: req.user.name,
+  });
+  // Recorded unless the send outright failed, so the roster shows "Invited" from the
+  // moment the button is pressed — including in log-only mail mode during development.
+  if (!mail.error) await markInvited(employeeId);
+
+  return ok(res, {
+    id: employeeId,
     email: { delivered: mail.delivered, mode: mail.mode, error: mail.error },
     message: mail.delivered
-      ? `${user.name} has been invited and emailed a link to set their password.`
-      : `${user.name} has been added to the team.`,
+      ? `An invitation has been emailed to ${employee.email}.`
+      : `The invitation could not be emailed. Share the sign-in address with ${employee.name} directly.`,
   });
 });
 
 /**
  * PATCH /api/team/:id — edit a team member's details.
  *
- * Admin-only (the route applies `requireAdmin`), because this can move someone's email
+ * Manager-level (the route applies `requireManager`), because this can move someone's email
  * address — the thing they sign in with — and switch their account off. It still goes
  * through `getMemberInScope` so the same "is this person mine to look at?" answer
  * governs editing as governs viewing.

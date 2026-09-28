@@ -11,8 +11,8 @@ import { roleLabel, type ChatContact } from '../types';
  * together means the name rules, the error handling and the busy state are written
  * once rather than drifting apart in two nearly identical files.
  *
- * Admin-only, but that is not enforced here: the launcher only offers it to admins
- * and the API refuses everybody else. This component is the form, not the gate.
+ * Manager-level, but that is not enforced here: the launcher only offers it to admins
+ * and managers, and the API refuses everybody else. This component is the form, not the gate.
  */
 export function GroupModal({
   open, mode, contacts, initialName = '', busy = false, error, onClose, onSubmit,
