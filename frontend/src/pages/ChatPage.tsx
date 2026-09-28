@@ -6,7 +6,7 @@ import {
 import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send, Trash2,
-  Users, UserRound, Trash2, Check, X,
+  Users, UserRound, Check, X,
   Paperclip, FileText, Download, ExternalLink, Film, Image as ImageIcon,
 } from 'lucide-react';
 import { chatApi } from '../api/endpoints';
