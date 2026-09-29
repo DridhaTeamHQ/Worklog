@@ -7,7 +7,7 @@ import { useSearchParams } from 'react-router-dom';
 import {
   ArrowLeft, AtSign, MessageCircle, MessagesSquare, Pencil, Plus, RefreshCw, Search, Send, Trash2,
   Users, UserRound, X,
-  Paperclip, FileText, Download, Film, Image as ImageIcon,
+  Paperclip, FileText, Download, Film, Image as ImageIcon, Check, UserPlus, UserMinus,
 } from 'lucide-react';
 import { chatApi } from '../api/endpoints';
 import { ApiError } from '../api/client';
@@ -19,7 +19,7 @@ import { Avatar, EmptyState, Spinner, Modal } from '../components/ui';
 import { GroupModal } from '../components/GroupModal';
 import {
   isManagerLevel, roleLabel,
-  type ChatContact, type ChatGroup, type ChatMessage, type ChatSearchHit,
+  type ChatContact, type ChatGroup, type ChatGroupMember, type ChatMessage, type ChatSearchHit,
   type GroupMessage, type TeamMessage,
 } from '../types';
 
@@ -194,6 +194,7 @@ export function ChatPage() {
   const { user } = useAuth();
   const { counts, refresh: refreshCounts, setTotal } = useChatUnread();
   const [searchParams, setSearchParams] = useSearchParams();
+  const toast = useToast();
 
   const teamUnread = counts.team;
   const groupUnreadTotal = counts.groups;
@@ -211,6 +212,11 @@ export function ChatPage() {
   const [groupDialog, setGroupDialog] = useState<{ mode: 'create' } | { mode: 'rename'; group: ChatGroup } | null>(null);
   const [groupBusy, setGroupBusy] = useState(false);
   const [groupError, setGroupError] = useState<string | null>(null);
+  /** The group whose member list is open, from its icon in the list or the room header. */
+  const [membersGroup, setMembersGroup] = useState<ChatGroup | null>(null);
+  /** The group waiting on "are you sure" before it is deleted. */
+  const [confirmDeleteGroup, setConfirmDeleteGroup] = useState<ChatGroup | null>(null);
+  const [deletingGroup, setDeletingGroup] = useState(false);
 
   /** Message-search results for the current term, and whether they are in flight. */
   const [hits, setHits] = useState<ChatSearchHit[]>([]);
@@ -416,7 +422,7 @@ export function ChatPage() {
       // have moved on since the list was drawn.
       const fresh = meta?.group as ChatGroup | undefined;
       if (fresh) setActive({ kind: 'group', group: { ...group, ...fresh } });
-      setGroups((prev) => prev.map((g) => (g.id === group.id ? { ...g, unread: 0 } : g)));
+      setGroups((prev) => prev.map((g) => (g.id === group.id ? { ...g, unread: 0, mentions: 0 } : g)));
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Could not open that group.');
     } finally {
@@ -459,6 +465,40 @@ export function ChatPage() {
     setSearchParams(next, { replace: true });
   }, [searchParams, setSearchParams, openTeam]);
 
+  /* `?group=<id>` opens that group — where a group mention notification leads. */
+  useEffect(() => {
+    const groupId = Number(searchParams.get('group'));
+    if (!groupId) return;
+    const next = new URLSearchParams(searchParams);
+    next.delete('group');
+    setSearchParams(next, { replace: true });
+    void (async () => {
+      try {
+        const { data } = await chatApi.groups.list();
+        setGroups(data);
+        const group = data.find((g) => g.id === groupId);
+        if (group) void openGroup(group);
+      } catch {
+        /* The list still loads normally; the group can be opened from there. */
+      }
+    })();
+  }, [searchParams, setSearchParams, openGroup]);
+
+  /** Opens a direct thread with someone picked from a group's member list. */
+  const messageMember = useCallback(async (member: ChatGroupMember) => {
+    setMembersGroup(null);
+    // The list on screen may be narrowed by the search box, so fall back to the full one.
+    let contact = contacts.find((c) => c.id === member.id);
+    if (!contact) {
+      try {
+        const { data } = await chatApi.contacts();
+        contact = data.find((c) => c.id === member.id);
+      } catch { /* handled below */ }
+    }
+    if (contact) void openThread(contact);
+    else toast.error(`Could not open a chat with ${member.name}.`);
+  }, [contacts, openThread, toast]);
+
   /** Asks only for what is newer than the last message on screen. */
   const pollRoom = useCallback(async (room: NonNullable<ActiveRoom>) => {
     try {
@@ -498,10 +538,17 @@ export function ChatPage() {
         lastIdRef.current = data[data.length - 1].id;
       }
       if (typeof meta?.unread === 'number') setTotal(meta.unread);
-    } catch {
-      /* transient; the next tick retries */
+    } catch (err) {
+      /* A group that answers "not found" is one this person was removed from, or that
+         was deleted, while they had it open — leave it rather than keep asking.
+         Anything else is transient; the next tick retries. */
+      if (room.kind === 'group' && err instanceof ApiError && err.status === 404) {
+        setGroups((prev) => prev.filter((g) => g.id !== room.group.id));
+        openDirectory();
+        toast.info(`You are no longer in "${room.group.name}".`);
+      }
     }
-  }, [setTotal]);
+  }, [setTotal, openDirectory, toast]);
 
   useEffect(() => {
     if (!active) return undefined;
@@ -532,7 +579,7 @@ export function ChatPage() {
           ? { ...c, last_message: data.body, last_message_at: data.created_at, last_message_mine: true }
           : c)));
       } else if (active.kind === 'group') {
-        const { data } = await chatApi.groups.post(active.group.id, body);
+        const { data } = await chatApi.groups.post(active.group.id, body, findMentions(body, active.group.members ?? []));
         setGroupMessages((prev) => [...prev, data]);
         lastIdRef.current = Math.max(lastIdRef.current, data.id);
         setGroups((prev) => prev.map((g) => (g.id === active.group.id
@@ -589,7 +636,65 @@ export function ChatPage() {
     }
   }, [groupDialog, openGroup]);
 
-  const toast = useToast();
+  /**
+   * A roster change came back from the server: show the new member list everywhere
+   * this group is drawn — the list row, the open room's header and @ picker, and the
+   * member dialog itself.
+   */
+  const applyRoster = useCallback((fresh: Pick<ChatGroup, 'id' | 'members' | 'member_count'>) => {
+    const merge = (g: ChatGroup) => ({ ...g, members: fresh.members, member_count: fresh.member_count });
+    setGroups((prev) => prev.map((g) => (g.id === fresh.id ? merge(g) : g)));
+    setActive((prev) => (prev?.kind === 'group' && prev.group.id === fresh.id
+      ? { kind: 'group', group: merge(prev.group) }
+      : prev));
+    setMembersGroup((prev) => (prev && prev.id === fresh.id ? merge(prev) : prev));
+  }, []);
+
+  const addMembers = useCallback(async (group: ChatGroup, memberIds: number[]) => {
+    try {
+      const { data } = await chatApi.groups.addMembers(group.id, memberIds);
+      applyRoster(data);
+      const added = data.member_count - group.member_count;
+      toast.success(`Added ${added} ${added === 1 ? 'person' : 'people'} to "${group.name}".`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not add those people.');
+      throw err;
+    }
+  }, [applyRoster, toast]);
+
+  const removeMember = useCallback(async (group: ChatGroup, member: ChatGroupMember) => {
+    try {
+      const { data } = await chatApi.groups.removeMember(group.id, member.id);
+      applyRoster(data);
+      toast.success(`${member.name} was removed from "${group.name}".`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not remove that person.');
+      throw err;
+    }
+  }, [applyRoster, toast]);
+
+  /**
+   * Deletes a group for everybody in it. If it is the room on screen, the view goes
+   * back to the list — there is nothing left to show.
+   */
+  const deleteGroup = useCallback(async () => {
+    const group = confirmDeleteGroup;
+    if (!group) return;
+    setDeletingGroup(true);
+    try {
+      await chatApi.groups.delete(group.id);
+      setGroups((prev) => prev.filter((g) => g.id !== group.id));
+      if (active?.kind === 'group' && active.group.id === group.id) openDirectory();
+      setConfirmDeleteGroup(null);
+      setMembersGroup(null);
+      void refreshCounts();
+      toast.success(`"${group.name}" was deleted.`);
+    } catch (err) {
+      toast.error(err instanceof ApiError ? err.message : 'Could not delete that group.');
+    } finally {
+      setDeletingGroup(false);
+    }
+  }, [confirmDeleteGroup, active, openDirectory, refreshCounts, toast]);
 
   const handleEditMessage = useCallback(async (messageId: number, newBody: string) => {
     if (!active || !newBody.trim()) return;
@@ -601,7 +706,9 @@ export function ChatPage() {
         const { data } = await chatApi.team.edit(messageId, newBody.trim(), findMentions(newBody.trim(), contacts));
         setTeamMessages((prev) => prev.map((m) => (m.id === messageId ? data : m)));
       } else if (active.kind === 'group') {
-        const { data } = await chatApi.groups.edit(active.group.id, messageId, newBody.trim());
+        const { data } = await chatApi.groups.edit(
+          active.group.id, messageId, newBody.trim(), findMentions(newBody.trim(), active.group.members ?? []),
+        );
         setGroupMessages((prev) => prev.map((m) => (m.id === messageId ? data : m)));
       }
       toast.success('Message updated.');
@@ -633,13 +740,14 @@ export function ChatPage() {
 
   /* ---------------------------------------------------------------- behaviour */
 
-  // Escape backs out of a room to the list, which is the only level there is now.
+  // Escape backs out of a room to the list, which is the only level there is now —
+  // unless the member list is open, in which case Escape closes just that.
   useEffect(() => {
-    if (!active) return undefined;
+    if (!active || membersGroup || confirmDeleteGroup) return undefined;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') openDirectory(); };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  }, [active, openDirectory]);
+  }, [active, membersGroup, confirmDeleteGroup, openDirectory]);
 
   /*
     New messages pin the view to the bottom — except when the room was opened at a
@@ -687,6 +795,7 @@ export function ChatPage() {
           onPick={(c) => void openThread(c)}
           onPickTeam={() => void openTeam()}
           onPickGroup={(g) => void openGroup(g)}
+          onShowMembers={setMembersGroup}
           onPickHit={openHit}
           onNewGroup={() => { setGroupError(null); setGroupDialog({ mode: 'create' }); }}
           onClearAll={clearAllChats}
@@ -715,6 +824,8 @@ export function ChatPage() {
             onSend={(customBody?: string) => send(customBody)}
             canRenameGroup={isManagerLevel(user.role)}
             onRenameGroup={(g) => { setGroupError(null); setGroupDialog({ mode: 'rename', group: g }); }}
+            onShowMembers={setMembersGroup}
+            onDeleteGroup={setConfirmDeleteGroup}
             onEditMessage={handleEditMessage}
             onDeleteMessage={handleDeleteMessage}
           />
@@ -739,6 +850,41 @@ export function ChatPage() {
         onClose={() => { setGroupDialog(null); setGroupError(null); }}
         onSubmit={(name, memberIds) => void submitGroup(name, memberIds)}
       />
+
+      <GroupMembersModal
+        key={membersGroup?.id ?? 0}
+        group={membersGroup}
+        me={user.id}
+        canManage={isManagerLevel(user.role)}
+        onClose={() => setMembersGroup(null)}
+        onMessage={(m) => void messageMember(m)}
+        onDelete={(g) => { setMembersGroup(null); setConfirmDeleteGroup(g); }}
+        onAdd={addMembers}
+        onRemove={removeMember}
+      />
+
+      <Modal
+        open={!!confirmDeleteGroup}
+        onClose={() => { if (!deletingGroup) setConfirmDeleteGroup(null); }}
+        size="sm"
+        title="Delete group"
+        description={confirmDeleteGroup ? `“${confirmDeleteGroup.name}”` : undefined}
+        footer={
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmDeleteGroup(null)} disabled={deletingGroup} className="btn-secondary">
+              Cancel
+            </button>
+            <button type="button" onClick={() => void deleteGroup()} disabled={deletingGroup} className="btn-danger">
+              {deletingGroup ? <><Spinner className="h-4 w-4" /> Deleting…</> : 'Delete group'}
+            </button>
+          </div>
+        }
+      >
+        <p className="text-sm text-muted-foreground">
+          The group and all of its messages will be permanently removed for all
+          {' '}{confirmDeleteGroup?.member_count ?? 0} members. This cannot be undone.
+        </p>
+      </Modal>
     </div>
   );
 }
@@ -1024,7 +1170,7 @@ function markTerm(text: string, term: string) {
 function DirectoryView({
   contacts, groups, canCreateGroup, loading, error, search, unread, teamUnread, groupUnread,
   hits, searching, active,
-  onSearch, onRefresh, onPick, onPickTeam, onPickGroup, onPickHit, onNewGroup, onClearAll, clearing,
+  onSearch, onRefresh, onPick, onPickTeam, onPickGroup, onShowMembers, onPickHit, onNewGroup, onClearAll, clearing,
 }: {
   contacts: ChatContact[];
   groups: ChatGroup[];
@@ -1043,6 +1189,7 @@ function DirectoryView({
   onPick: (c: ChatContact) => void;
   onPickTeam: () => void;
   onPickGroup: (g: ChatGroup) => void;
+  onShowMembers: (g: ChatGroup) => void;
   onPickHit: (h: ChatSearchHit) => void;
   onNewGroup: () => void;
   onClearAll: () => void;
@@ -1164,7 +1311,7 @@ function DirectoryView({
             </p>
             <ul className="space-y-0.5">
             {visibleGroups.map((g) => (
-              <li key={g.id}>
+              <li key={g.id} className="relative">
                 <button
                   type="button"
                   onClick={() => onPickGroup(g)}
@@ -1173,9 +1320,8 @@ function DirectoryView({
                     active?.kind === 'group' && active.group.id === g.id ? SELECTED_ROOM : 'hover:bg-muted'
                   }`}
                 >
-                  <span className="inline-flex h-12 w-12 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <Users className="h-6 w-6" />
-                  </span>
+                  {/* Holds the icon's place; the icon itself is the button laid over it. */}
+                  <span className="h-12 w-12 shrink-0" aria-hidden />
                   <span className="min-w-0 flex-1">
                     <span className="flex items-center justify-between gap-2">
                       <span className="truncate text-[15px] font-medium text-foreground">{g.name}</span>
@@ -1189,14 +1335,37 @@ function DirectoryView({
                           ? `${g.last_message_mine ? 'You' : g.last_sender_name}: ${getMessagePreview(g.last_message)}`
                           : `${g.member_count} member${g.member_count === 1 ? '' : 's'}`}
                       </span>
-                      {g.unread > 0 && (
-                        <span className="inline-flex h-5 min-w-[1.25rem] shrink-0 items-center justify-center
-                                         rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
-                          {g.unread > 99 ? '99+' : g.unread}
-                        </span>
-                      )}
+                      <span className="flex shrink-0 items-center gap-1">
+                        {!!g.mentions && (
+                          <span
+                            title={`${g.mentions} mention${g.mentions === 1 ? '' : 's'}`}
+                            className="inline-flex h-5 items-center gap-0.5 rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground"
+                          >
+                            <AtSign className="h-3 w-3" />{g.mentions}
+                          </span>
+                        )}
+                        {g.unread > 0 && (
+                          <span className="inline-flex h-5 min-w-[1.25rem] items-center justify-center
+                                           rounded-full bg-primary px-1 text-[10px] font-bold text-primary-foreground">
+                            {g.unread > 99 ? '99+' : g.unread}
+                          </span>
+                        )}
+                      </span>
                     </span>
                   </span>
+                </button>
+                {/* A sibling of the row rather than inside it — a button cannot hold
+                    another — positioned over the placeholder above. */}
+                <button
+                  type="button"
+                  onClick={() => onShowMembers(g)}
+                  aria-label={`Show members of ${g.name}`}
+                  title="Show members"
+                  className="absolute left-3 top-1/2 inline-flex h-12 w-12 -translate-y-1/2 items-center justify-center
+                             rounded-full bg-muted text-muted-foreground transition-colors
+                             hover:bg-primary/15 hover:text-primary-strong focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <Users className="h-6 w-6" />
                 </button>
               </li>
             ))}
@@ -1303,12 +1472,273 @@ function DirectoryView({
   );
 }
 
+/* -------------------------------------------------------------- group members */
+
+/**
+ * Who is in a group — opened from the group's icon in the list or its room header.
+ *
+ * Two views in one dialog. The list shows everyone, marks whoever created the group,
+ * and picking anyone else opens a direct thread with them. For managers it is also
+ * where the roster is kept: each person can be removed, and "Add people" switches to
+ * a picker of everybody not already in the group. The server makes the same check,
+ * so these controls being hidden from everyone else is convenience, not the gate.
+ */
+function GroupMembersModal({
+  group, me, canManage, onClose, onMessage, onDelete, onAdd, onRemove,
+}: {
+  group: ChatGroup | null;
+  me: number;
+  canManage: boolean;
+  onClose: () => void;
+  onMessage: (m: ChatGroupMember) => void;
+  onDelete: (g: ChatGroup) => void;
+  onAdd: (g: ChatGroup, memberIds: number[]) => Promise<void>;
+  onRemove: (g: ChatGroup, m: ChatGroupMember) => Promise<void>;
+}) {
+  // The parent keys this on the group, so each group starts on a clean list view.
+  const [view, setView] = useState<'list' | 'add'>('list');
+  const [filter, setFilter] = useState('');
+  /** Who is waiting on a second click to be removed. One step is too easy to hit. */
+  const [confirmRemoveId, setConfirmRemoveId] = useState<number | null>(null);
+  const [removingId, setRemovingId] = useState<number | null>(null);
+
+  const [people, setPeople] = useState<ChatContact[] | null>(null);
+  const [picked, setPicked] = useState<number[]>([]);
+  const [adding, setAdding] = useState(false);
+
+  const members = useMemo(() => group?.members ?? [], [group]);
+  const memberIds = useMemo(() => new Set(members.map((m) => m.id)), [members]);
+  const needle = filter.trim().toLowerCase();
+
+  const visible = useMemo(() => {
+    // You first, then everyone else in the server's alphabetical order.
+    const sorted = [...members].sort((a, b) => Number(b.id === me) - Number(a.id === me));
+    return needle ? sorted.filter((m) => m.name.toLowerCase().includes(needle)) : sorted;
+  }, [members, needle, me]);
+
+  const candidates = useMemo(() => {
+    const outside = (people ?? []).filter((p) => !memberIds.has(p.id));
+    return needle
+      ? outside.filter((p) => p.name.toLowerCase().includes(needle) || p.email.toLowerCase().includes(needle))
+      : outside;
+  }, [people, memberIds, needle]);
+
+  /* The full directory, not the chat list on screen — that one may be narrowed by
+     its own search box. */
+  const openAdd = async () => {
+    setView('add');
+    setFilter('');
+    setPicked([]);
+    if (people) return;
+    try {
+      const { data } = await chatApi.contacts();
+      setPeople(data);
+    } catch {
+      setPeople([]);
+    }
+  };
+
+  const backToList = () => { setView('list'); setFilter(''); setPicked([]); };
+
+  const submitAdd = async () => {
+    if (!group || !picked.length) return;
+    setAdding(true);
+    try {
+      await onAdd(group, picked);
+      backToList();
+    } finally {
+      setAdding(false);
+    }
+  };
+
+  const remove = async (m: ChatGroupMember) => {
+    if (!group) return;
+    setRemovingId(m.id);
+    try {
+      await onRemove(group, m);
+      setConfirmRemoveId(null);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
+  const toggle = (id: number) => {
+    setPicked((prev) => (prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]));
+  };
+
+  const count = `${members.length} member${members.length === 1 ? '' : 's'}`;
+
+  const footer = view === 'add' ? (
+    <div className="flex items-center justify-end gap-2">
+      <button type="button" className="btn-secondary" onClick={backToList} disabled={adding}>Back</button>
+      <button type="button" className="btn-primary" onClick={() => void submitAdd()} disabled={!picked.length || adding}>
+        {adding && <Spinner className="h-4 w-4" />}
+        {picked.length ? `Add ${picked.length} ${picked.length === 1 ? 'person' : 'people'}` : 'Add people'}
+      </button>
+    </div>
+  ) : canManage && group ? (
+    <div className="flex items-center justify-between gap-2">
+      <button
+        type="button"
+        onClick={() => onDelete(group)}
+        className="inline-flex items-center gap-2 text-sm font-medium text-destructive hover:underline"
+      >
+        <Trash2 className="h-4 w-4" /> Delete group
+      </button>
+      <button type="button" className="btn-primary" onClick={() => void openAdd()}>
+        <UserPlus className="h-4 w-4" /> Add people
+      </button>
+    </div>
+  ) : undefined;
+
+  return (
+    <Modal
+      open={!!group}
+      onClose={onClose}
+      size="sm"
+      title={view === 'add' ? `Add people to ${group?.name ?? 'group'}` : (group?.name ?? 'Group')}
+      description={view === 'add' ? 'Everyone added can read the whole history and post.' : count}
+      footer={footer}
+    >
+      {(view === 'add' || members.length > 6) && (
+        <div className="relative mb-3">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" aria-hidden />
+          <input
+            type="search"
+            value={filter}
+            onChange={(e) => setFilter(e.target.value)}
+            placeholder={view === 'add' ? 'Search people…' : 'Find a member…'}
+            aria-label={view === 'add' ? 'Search people to add' : 'Find a member'}
+            className="input pl-9"
+          />
+        </div>
+      )}
+
+      {view === 'add' ? (
+        people === null ? (
+          <div className="flex justify-center py-8 text-muted-foreground"><Spinner /></div>
+        ) : candidates.length === 0 ? (
+          <p className="py-6 text-center text-sm text-muted-foreground">
+            {needle ? 'Nobody matches that.' : 'Everyone is already in this group.'}
+          </p>
+        ) : (
+          <ul className="max-h-72 overflow-y-auto rounded-lg border border-border">
+            {candidates.map((c) => {
+              const on = picked.includes(c.id);
+              return (
+                <li key={c.id}>
+                  <button
+                    type="button"
+                    aria-pressed={on}
+                    onClick={() => toggle(c.id)}
+                    className={`flex w-full items-center gap-3 border-b border-border px-3 py-2 text-left transition-colors last:border-b-0 ${
+                      on ? 'bg-primary/10' : 'hover:bg-muted'
+                    }`}
+                  >
+                    <Avatar name={c.name} src={c.profile_image} size="sm" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm font-medium text-foreground">{c.name}</span>
+                      <span className="block truncate text-xs text-muted-foreground">
+                        {roleLabel(c.role)}{c.department ? ` · ${c.department}` : ''}
+                      </span>
+                    </span>
+                    <span
+                      aria-hidden
+                      className={`inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full border ${
+                        on ? 'border-primary bg-primary text-primary-foreground' : 'border-border'
+                      }`}
+                    >
+                      {on && <Check className="h-3 w-3" />}
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        )
+      ) : visible.length === 0 ? (
+        <p className="py-6 text-center text-sm text-muted-foreground">Nobody in this group matches that.</p>
+      ) : (
+        <ul className="-mx-2 space-y-0.5">
+          {visible.map((m) => {
+            const isMe = m.id === me;
+            const isCreator = group?.created_by === m.id;
+            const confirming = confirmRemoveId === m.id;
+            return (
+              <li key={m.id} className="flex items-center gap-1">
+                <button
+                  type="button"
+                  disabled={isMe}
+                  onClick={() => onMessage(m)}
+                  title={isMe ? undefined : `Message ${m.name}`}
+                  className="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 text-left transition-colors
+                             enabled:hover:bg-muted disabled:cursor-default"
+                >
+                  <Avatar name={m.name} src={m.profile_image} size="md" />
+                  <span className="min-w-0 flex-1">
+                    <span className="flex items-center gap-1.5">
+                      <span className="truncate text-sm font-medium text-foreground">{m.name}{isMe && ' (You)'}</span>
+                      {isCreator && (
+                        <span className="shrink-0 rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-semibold text-primary-strong">
+                          Group admin
+                        </span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {roleLabel(m.role)}{m.department ? ` · ${m.department}` : ''}
+                    </span>
+                  </span>
+                  {!isMe && !canManage && <MessageCircle className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />}
+                </button>
+                {/* Removing yourself would lock you out of the room you are managing,
+                    so a manager cannot do it from here. */}
+                {canManage && !isMe && (
+                  confirming ? (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        onClick={() => void remove(m)}
+                        disabled={removingId === m.id}
+                        className="btn-danger px-2.5 py-1 text-xs"
+                      >
+                        {removingId === m.id ? <Spinner className="h-3 w-3" /> : 'Remove'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setConfirmRemoveId(null)}
+                        aria-label="Keep in group"
+                        className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <X className="h-4 w-4" />
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setConfirmRemoveId(m.id)}
+                      aria-label={`Remove ${m.name} from the group`}
+                      title="Remove from group"
+                      className="shrink-0 rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+                    >
+                      <UserMinus className="h-4 w-4" />
+                    </button>
+                  )
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </Modal>
+  );
+}
+
 /* ----------------------------------------------------------------------- room */
 
 function RoomView({
   me, room, messages, teamMessages, groupMessages, contacts, loading, error, draft, sending,
-  highlightId, scrollRef, composerRef, onBack, onDraft, onSend, canRenameGroup, onRenameGroup,
-  onEditMessage, onDeleteMessage,
+  highlightId, scrollRef, composerRef, onBack, onDraft, onSend, canRenameGroup, onRenameGroup, onShowMembers,
+  onDeleteGroup, onEditMessage, onDeleteMessage,
 }: {
   me: number;
   room: NonNullable<ActiveRoom>;
@@ -1328,6 +1758,8 @@ function RoomView({
   onSend: (customBody?: string) => Promise<void> | void;
   canRenameGroup: boolean;
   onRenameGroup: (g: ChatGroup) => void;
+  onShowMembers: (g: ChatGroup) => void;
+  onDeleteGroup: (g: ChatGroup) => void;
   onEditMessage: (messageId: number, body: string) => Promise<void>;
   onDeleteMessage: (messageId: number) => Promise<void>;
 }) {
@@ -1475,13 +1907,24 @@ function RoomView({
   const [mentionQuery, setMentionQuery] = useState<{ from: number; text: string } | null>(null);
   const [mentionIndex, setMentionIndex] = useState(0);
 
+  /*
+    Who can be tagged here. The channel offers everybody; a group offers only its own
+    members — tagging someone into a room they cannot open would be a dead end — and
+    not yourself.
+  */
+  const canMention = isTeam || isGroup;
+  const taggable: ChatGroupMember[] = useMemo(
+    () => (room.kind === 'group' ? (room.group.members ?? []).filter((m) => m.id !== me) : contacts),
+    [room, contacts, me],
+  );
+
   const suggestions = useMemo(() => {
-    if (!isTeam || !mentionQuery) return [];
+    if (!canMention || !mentionQuery) return [];
     const needle = mentionQuery.text.toLowerCase();
-    return contacts
+    return taggable
       .filter((c) => c.name.toLowerCase().includes(needle))
-      .slice(0, 5);
-  }, [isTeam, mentionQuery, contacts]);
+      .slice(0, isGroup ? 8 : 5);
+  }, [canMention, isGroup, mentionQuery, taggable]);
 
   /*
     Finds the mention being typed: an "@" that starts a word, with no space between it
@@ -1489,7 +1932,7 @@ function RoomView({
     one — the picker narrows on the first name and inserting completes the rest.
   */
   const syncMention = (value: string, caret: number) => {
-    if (!isTeam) return;
+    if (!canMention) return;
     const upto = value.slice(0, caret);
     const at = upto.lastIndexOf('@');
     if (at === -1) { setMentionQuery(null); return; }
@@ -1501,7 +1944,7 @@ function RoomView({
     setMentionIndex(0);
   };
 
-  const applyMention = (person: ChatContact) => {
+  const applyMention = (person: ChatGroupMember) => {
     if (!mentionQuery) return;
     const el = composerRef.current;
     const caret = el?.selectionStart ?? draft.length;
@@ -1543,7 +1986,7 @@ function RoomView({
   const empty = isTeam
     ? { title: 'Nothing here yet', description: 'Post an update for the whole team. Type @ to tag someone.' }
     : isGroup
-      ? { title: 'Nothing here yet', description: `Start the conversation with the ${room.group.member_count} people in this group.` }
+      ? { title: 'Nothing here yet', description: `Start the conversation with the ${room.group.member_count} people in this group. Type @ to tag someone.` }
       : { title: `Say hello to ${room.contact.name.split(' ')[0]}`, description: 'Messages you send here are only visible to the two of you.' };
 
   const items: RoomMessage[] = isTeam
@@ -1574,21 +2017,38 @@ function RoomView({
         >
           <ArrowLeft className="h-4 w-4" />
         </button>
-        {isTeam ? (
+        {isTeam && (
           <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary-strong">
             <Users className="h-4 w-4" />
           </span>
-        ) : isGroup ? (
-          <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-            <Users className="h-4 w-4" />
-          </span>
-        ) : (
+        )}
+        {!isTeam && !isGroup && (
           <Avatar name={room.contact.name} src={room.contact.profile_image} size="sm" />
         )}
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-sm font-semibold text-foreground">{header.name}</span>
-          <span className="block truncate text-[11px] text-muted-foreground">{header.sub}</span>
-        </span>
+        {isGroup ? (
+          /* The group's icon and name open its member list, as the icon in the list does. */
+          <button
+            type="button"
+            onClick={() => onShowMembers(room.group)}
+            title="Show members"
+            aria-label={`Show members of ${room.group.name}`}
+            className="group/members -my-1 flex min-w-0 flex-1 items-center gap-2 rounded-lg py-1 pr-2 text-left hover:bg-muted"
+          >
+            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground
+                             transition-colors group-hover/members:bg-primary/15 group-hover/members:text-primary-strong">
+              <Users className="h-4 w-4" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-semibold text-foreground">{header.name}</span>
+              <span className="block truncate text-[11px] text-muted-foreground">{header.sub} · tap to view</span>
+            </span>
+          </button>
+        ) : (
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-sm font-semibold text-foreground">{header.name}</span>
+            <span className="block truncate text-[11px] text-muted-foreground">{header.sub}</span>
+          </span>
+        )}
         {/* Renaming is manager-level and sits in the room itself, which is where you
             are when you notice the name is wrong. */}
         {isGroup && canRenameGroup && (
@@ -1600,6 +2060,17 @@ function RoomView({
             className="rounded p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             <Pencil className="h-4 w-4" />
+          </button>
+        )}
+        {isGroup && canRenameGroup && (
+          <button
+            type="button"
+            onClick={() => onDeleteGroup(room.group)}
+            aria-label="Delete group"
+            title="Delete group"
+            className="rounded p-1.5 text-muted-foreground hover:bg-destructive/10 hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
           </button>
         )}
       </header>
@@ -1619,8 +2090,8 @@ function RoomView({
               </p>
               {dayItems.map((m, i) => {
                 const mine = m.sender_id === me;
+                /* The channel and groups both carry mentions; direct messages do not. */
                 const team = 'mentions' in m ? m : null;
-                /* Both rooms show who is talking; only the channel has mentions. */
                 const named = 'sender_name' in m ? m : null;
                 /* In a room, the name is shown once per run of messages from the
                    same person — repeating it on every bubble is noise. */
@@ -1766,7 +2237,7 @@ function RoomView({
       <div className="relative flex shrink-0 items-end gap-2 border-t border-border p-3">
         {/* The mention picker. Sits above the composer so it never covers what is
             being typed, and is dismissed by Escape or by typing past the name. */}
-        {isTeam && mentionQuery && suggestions.length > 0 && (
+        {canMention && mentionQuery && suggestions.length > 0 && (
           <ul
             role="listbox"
             aria-label="Tag someone"
@@ -1826,7 +2297,7 @@ function RoomView({
               : isTeam
                 ? 'Message the team… use @ to tag'
                 : isGroup
-                  ? `Message ${room.group.name}…`
+                  ? `Message ${room.group.name}… use @ to tag`
                   : `Message ${room.contact.name.split(' ')[0]}…`
           }
           aria-label={isTeam ? 'Message the team'

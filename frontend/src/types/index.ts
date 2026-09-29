@@ -289,6 +289,8 @@ export interface ChatGroup {
   last_sender_name: string | null;
   last_message_mine: boolean;
   unread: number;
+  /** How many of the unread messages tag the viewer. */
+  mentions?: number;
 }
 
 /** A post in a group room. Carries its sender, because a room shows who is talking. */
@@ -302,6 +304,8 @@ export interface GroupMessage {
   sender_role: Role;
   sender_department: string | null;
   sender_profile_image: string | null;
+  /** Members tagged with @ in this message, as resolved by the server. */
+  mentions: ChatMention[];
 }
 
 /**
@@ -348,7 +352,7 @@ export interface TicketCounts {
 
 export type NotificationType =
   | 'task_assigned' | 'task_updated' | 'status_changed' | 'report_submitted'
-  | 'ticket_raised' | 'ticket_updated' | 'chat_mention' | 'general';
+  | 'ticket_raised' | 'ticket_updated' | 'chat_mention' | 'group_mention' | 'general';
 
 export interface AppNotification {
   id: number;
@@ -357,6 +361,8 @@ export interface AppNotification {
   type: NotificationType;
   related_task_id: number | null;
   related_ticket_id: number | null;
+  /** Set on a group mention: the group to open. */
+  related_group_id?: number | null;
   task_title: string | null;
   task_employee_id: number | null;
   is_read: boolean;

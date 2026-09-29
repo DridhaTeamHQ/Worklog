@@ -357,6 +357,17 @@ export const chatApi = {
     rename: (groupId: number, name: string) =>
       api.patch<ChatGroup>(`/chat/groups/${groupId}`, { name }),
 
+    /** Manager-level. Both return the group with its updated member list. */
+    addMembers: (groupId: number, memberIds: number[]) =>
+      api.post<ChatGroup>(`/chat/groups/${groupId}/members`, { memberIds }),
+
+    removeMember: (groupId: number, userId: number) =>
+      api.delete<ChatGroup>(`/chat/groups/${groupId}/members/${userId}`),
+
+    /** Manager-level. Removes the group and its whole history for every member. */
+    delete: (groupId: number) =>
+      api.delete<{ message: string }>(`/chat/groups/${groupId}`),
+
     messages: (
       groupId: number,
       params: { after?: number; before?: number; limit?: number; markRead?: boolean } = {},
@@ -368,11 +379,12 @@ export const chatApi = {
       markRead: params.markRead === false ? 'false' : undefined,
     }, signal),
 
-    post: (groupId: number, body: string) =>
-      api.post<GroupMessage>(`/chat/groups/${groupId}/messages`, { body }),
+    /** `mentions` works as it does in the team channel, limited to the group's members. */
+    post: (groupId: number, body: string, mentions: number[] = []) =>
+      api.post<GroupMessage>(`/chat/groups/${groupId}/messages`, { body, mentions }),
 
-    edit: (groupId: number, messageId: number, body: string) =>
-      api.patch<GroupMessage>(`/chat/groups/${groupId}/messages/${messageId}`, { body }),
+    edit: (groupId: number, messageId: number, body: string, mentions?: number[]) =>
+      api.patch<GroupMessage>(`/chat/groups/${groupId}/messages/${messageId}`, { body, mentions }),
 
     remove: (groupId: number, messageId: number) =>
       api.delete<{ message: string }>(`/chat/groups/${groupId}/messages/${messageId}`),

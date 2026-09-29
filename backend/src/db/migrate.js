@@ -17,6 +17,7 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 // Ordered child-first so foreign keys never block a --fresh rebuild.
 const TABLES = [
   'chat_group_reads',
+  'chat_group_message_mentions',
   'chat_group_messages',
   'chat_group_members',
   'chat_groups',
@@ -300,6 +301,12 @@ export async function migrate({ fresh = false } = {}) {
   }
   if (await ensureColumn(db, 'notifications', 'related_ticket_id', 'INTEGER REFERENCES tickets (id) ON DELETE CASCADE')) {
     added.push('notifications.related_ticket_id');
+  }
+  // Added here rather than in the schema file on every database, fresh or not: the
+  // notifications table is created before chat_groups, and postgres refuses a
+  // reference to a table that does not exist yet.
+  if (await ensureColumn(db, 'notifications', 'related_group_id', 'INTEGER REFERENCES chat_groups (id) ON DELETE CASCADE')) {
+    added.push('notifications.related_group_id');
   }
   if (await ensureColumn(db, 'tickets', 'assignee_id', 'INTEGER REFERENCES users (id) ON DELETE SET NULL')) {
     added.push('tickets.assignee_id');

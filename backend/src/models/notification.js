@@ -3,7 +3,7 @@ import { nowIso } from '../utils/dates.js';
 
 export const NOTIFICATION_TYPES = [
   'task_assigned', 'task_updated', 'status_changed', 'report_submitted',
-  'ticket_raised', 'ticket_updated', 'chat_mention', 'general',
+  'ticket_raised', 'ticket_updated', 'chat_mention', 'group_mention', 'general',
 ];
 
 /**
@@ -12,15 +12,15 @@ export const NOTIFICATION_TYPES = [
  * notification are committed together or not at all.
  */
 export async function createNotification(
-  { userId, title, message, type = 'general', relatedTaskId = null, relatedTicketId = null },
+  { userId, title, message, type = 'general', relatedTaskId = null, relatedTicketId = null, relatedGroupId = null },
   conn,
 ) {
   const db = conn || (await getDb());
   return db.insert(
     `INSERT INTO notifications
-       (user_id, title, message, type, related_task_id, related_ticket_id, is_read, created_at)
-     VALUES (?, ?, ?, ?, ?, ?, 0, ?)`,
-    [userId, title, message, type, relatedTaskId, relatedTicketId, nowIso()],
+       (user_id, title, message, type, related_task_id, related_ticket_id, related_group_id, is_read, created_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?)`,
+    [userId, title, message, type, relatedTaskId, relatedTicketId, relatedGroupId, nowIso()],
   );
 }
 
@@ -28,7 +28,7 @@ export async function listNotifications(userId, { unreadOnly = false, limit = 50
   const db = await getDb();
   const where = unreadOnly ? 'AND n.is_read = 0' : '';
   const rows = await db.query(
-    `SELECT n.id, n.title, n.message, n.type, n.related_task_id, n.related_ticket_id,
+    `SELECT n.id, n.title, n.message, n.type, n.related_task_id, n.related_ticket_id, n.related_group_id,
             n.is_read, n.created_at,
             t.title AS task_title, t.employee_id AS task_employee_id
        FROM notifications n

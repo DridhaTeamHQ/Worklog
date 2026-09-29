@@ -22,6 +22,7 @@
  */
 import { getDb } from '../db/index.js';
 import { nowIso } from '../utils/dates.js';
+import { createNotification } from './notification.js';
 import { badRequest, forbidden, notFound } from '../utils/errors.js';
 import { escapeLike } from '../utils/http.js';
 
@@ -52,6 +53,78 @@ async function requireMembership(db, groupId, userId) {
     throw notFound('That group could not be found.');
   }
   return group;
+}
+
+/**
+ * Turns the mention ids a client sent into the rows that should be stored.
+ *
+ * The team channel's two checks, plus a third: the person must be a *member of this
+ * group*. Tagging someone into a room they cannot open would notify them about a
+ * conversation they are not allowed to read. Anything that fails a check is dropped
+ * rather than refused, so a stale picker never costs somebody their message.
+ */
+async function resolveMentions(db, groupId, body, mentionIds) {
+  const ids = [...new Set((mentionIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!ids.length) return [];
+
+  const people = await db.query(
+    `SELECT u.id, u.name
+       FROM users u
+       JOIN chat_group_members m ON m.user_id = u.id AND m.group_id = ?
+      WHERE u.is_active = 1 AND u.id IN (${placeholders(ids.length)})`,
+    [groupId, ...ids],
+  );
+  const lower = body.toLowerCase();
+  return people.filter((p) => lower.includes(`@${p.name.toLowerCase()}`));
+}
+
+/** Attaches the mention list to each message in one extra query, not one per row. */
+async function withMentions(db, rows) {
+  if (!rows.length) return [];
+  const ids = rows.map((r) => r.id);
+  const mentions = await db.query(
+    `SELECT m.message_id, m.user_id, u.name
+       FROM chat_group_message_mentions m
+       JOIN users u ON u.id = m.user_id
+      WHERE m.message_id IN (${placeholders(ids.length)})`,
+    ids,
+  );
+  const byMessage = new Map();
+  for (const m of mentions) {
+    const list = byMessage.get(Number(m.message_id)) || [];
+    list.push({ id: Number(m.user_id), name: m.name });
+    byMessage.set(Number(m.message_id), list);
+  }
+  return rows.map((r) => ({ ...r, mentions: byMessage.get(Number(r.id)) || [] }));
+}
+
+/**
+ * Stores the tags on one message and notifies everyone tagged except the author.
+ *
+ * Called inside the post or edit transaction, so a tag and its notification are
+ * committed with the message or not at all.
+ */
+async function recordMentions(tx, { groupId, messageId, senderId, body, mentionIds }) {
+  const mentions = await resolveMentions(tx, groupId, body, mentionIds);
+  if (!mentions.length) return;
+
+  const sender = await tx.get('SELECT name FROM users WHERE id = ?', [senderId]);
+  const group = await tx.get('SELECT name FROM chat_groups WHERE id = ?', [groupId]);
+  for (const person of mentions) {
+    await tx.run(
+      'INSERT INTO chat_group_message_mentions (message_id, user_id) VALUES (?, ?)',
+      [messageId, person.id],
+    );
+    if (Number(person.id) === Number(senderId)) continue;
+    await createNotification({
+      userId: person.id,
+      title: `${sender?.name || 'Someone'} mentioned you in ${group?.name || 'a group'}`,
+      // Trimmed rather than sent whole: a notification is a pointer to the room.
+      message: body.length > 140 ? `${body.slice(0, 137)}…` : body,
+      type: 'group_mention',
+      relatedGroupId: groupId,
+    }, tx);
+  }
 }
 
 /** The people in a group, for the header and the member list. */
@@ -127,6 +200,22 @@ export async function listGroups(userId) {
   );
   const unreadByGroup = new Map(unreadRows.map((r) => [Number(r.group_id), Number(r.unread || 0)]));
 
+  // Of those unread, how many tagged this member — so the row can say "you were
+  // tagged" rather than only "there is traffic", as the team channel's row does.
+  const mentionRows = await db.query(
+    `SELECT c.group_id, COUNT(*) AS mentions
+       FROM chat_group_message_mentions mm
+       JOIN chat_group_messages c ON c.id = mm.message_id
+       LEFT JOIN chat_group_reads r ON r.group_id = c.group_id AND r.user_id = ?
+      WHERE mm.user_id = ?
+        AND c.sender_id <> ?
+        AND c.id > COALESCE(r.last_read_id, 0)
+        AND c.group_id IN (${placeholders(ids.length)})
+      GROUP BY c.group_id`,
+    [userId, userId, userId, ...ids],
+  );
+  const mentionsByGroup = new Map(mentionRows.map((r) => [Number(r.group_id), Number(r.mentions || 0)]));
+
   const membersByGroup = await membersOf(db, ids);
 
   const out = groups.map((g) => {
@@ -141,6 +230,7 @@ export async function listGroups(userId) {
       last_sender_name: last ? last.sender_name : null,
       last_message_mine: last ? Number(last.sender_id) === Number(userId) : false,
       unread: unreadByGroup.get(Number(g.id)) ?? 0,
+      mentions: mentionsByGroup.get(Number(g.id)) ?? 0,
     };
   });
 
@@ -206,6 +296,7 @@ export async function createGroup(creatorId, { name, memberIds }) {
       last_sender_name: null,
       last_message_mine: false,
       unread: 0,
+      mentions: 0,
     };
   });
 }
@@ -225,6 +316,106 @@ export async function renameGroup(groupId, name) {
   );
   if (!res.changes) throw notFound('That group could not be found.');
   return db.get('SELECT id, name, created_by, created_at, updated_at FROM chat_groups WHERE id = ?', [groupId]);
+}
+
+/** A group as the list and header draw it, with its current members. */
+async function groupWithMembers(db, groupId) {
+  const group = await db.get('SELECT id, name, created_by, created_at, updated_at FROM chat_groups WHERE id = ?', [groupId]);
+  if (!group) throw notFound('That group could not be found.');
+  const members = (await membersOf(db, [groupId])).get(Number(groupId)) || [];
+  return { ...group, members, member_count: members.length };
+}
+
+/**
+ * Adds people to an existing group. Manager-level, checked by the route.
+ *
+ * As at creation, ids that are not active accounts are dropped rather than refused,
+ * and anyone already in the group is skipped, so adding the same person twice is a
+ * no-op instead of an error. A newcomer sees the whole history — the group is one
+ * conversation, not a feed that starts when you join.
+ */
+export async function addGroupMembers(groupId, memberIds) {
+  const db = await getDb();
+  const wanted = [...new Set((memberIds || []).map(Number).filter((n) => Number.isInteger(n) && n > 0))];
+  if (!wanted.length) throw badRequest('Pick at least one person to add.');
+
+  return db.transaction(async (tx) => {
+    const group = await tx.get('SELECT id FROM chat_groups WHERE id = ?', [groupId]);
+    if (!group) throw notFound('That group could not be found.');
+
+    const rows = await tx.query(
+      `SELECT u.id FROM users u
+        WHERE u.is_active = 1 AND u.id IN (${placeholders(wanted.length)})
+          AND NOT EXISTS (SELECT 1 FROM chat_group_members m WHERE m.group_id = ? AND m.user_id = u.id)`,
+      [...wanted, groupId],
+    );
+    if (!rows.length) throw badRequest('Everyone picked is already in the group.');
+
+    const ts = nowIso();
+    for (const r of rows) {
+      await tx.run(
+        'INSERT INTO chat_group_members (group_id, user_id, added_at) VALUES (?, ?, ?)',
+        [groupId, r.id, ts],
+      );
+    }
+    await tx.run('UPDATE chat_groups SET updated_at = ? WHERE id = ?', [ts, groupId]);
+    return groupWithMembers(tx, groupId);
+  });
+}
+
+/**
+ * Takes someone out of a group. Manager-level, checked by the route.
+ *
+ * Their past messages stay — the conversation should still read as it happened — but
+ * their read mark and any mention notifications pointing at the group go, since they
+ * can no longer open it. A group is never left with fewer than two people: at that
+ * point it is not a group, and deleting it is the honest action.
+ */
+export async function removeGroupMember(groupId, userId) {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    const group = await tx.get('SELECT id FROM chat_groups WHERE id = ?', [groupId]);
+    if (!group) throw notFound('That group could not be found.');
+    if (!(await isMember(tx, groupId, userId))) throw notFound('That person is not in this group.');
+
+    const count = await tx.get('SELECT COUNT(*) AS c FROM chat_group_members WHERE group_id = ?', [groupId]);
+    if (Number(count?.c || 0) <= 2) {
+      throw badRequest('A group needs at least two people. Delete the group instead.');
+    }
+
+    await tx.run('DELETE FROM chat_group_members WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+    await tx.run('DELETE FROM chat_group_reads WHERE group_id = ? AND user_id = ?', [groupId, userId]);
+    await tx.run('DELETE FROM notifications WHERE related_group_id = ? AND user_id = ?', [groupId, userId]);
+    await tx.run('UPDATE chat_groups SET updated_at = ? WHERE id = ?', [nowIso(), groupId]);
+    return groupWithMembers(tx, groupId);
+  });
+}
+
+/**
+ * Deletes a group and everything in it — messages, tags, read marks, members, and the
+ * mention notifications that point at it.
+ *
+ * Manager-level, and like renaming not gated on membership: it is roster
+ * administration. Each child table is cleared explicitly rather than trusting ON
+ * DELETE CASCADE, which SQLite only honours when foreign keys are switched on.
+ */
+export async function deleteGroup(groupId) {
+  const db = await getDb();
+  return db.transaction(async (tx) => {
+    const group = await tx.get('SELECT id FROM chat_groups WHERE id = ?', [groupId]);
+    if (!group) throw notFound('That group could not be found.');
+    await tx.run(
+      `DELETE FROM chat_group_message_mentions
+        WHERE message_id IN (SELECT id FROM chat_group_messages WHERE group_id = ?)`,
+      [groupId],
+    );
+    await tx.run('DELETE FROM chat_group_messages WHERE group_id = ?', [groupId]);
+    await tx.run('DELETE FROM chat_group_reads WHERE group_id = ?', [groupId]);
+    await tx.run('DELETE FROM chat_group_members WHERE group_id = ?', [groupId]);
+    await tx.run('DELETE FROM notifications WHERE related_group_id = ?', [groupId]);
+    await tx.run('DELETE FROM chat_groups WHERE id = ?', [groupId]);
+    return true;
+  });
 }
 
 /** One group's messages, oldest last. Membership is checked before anything is read. */
@@ -265,24 +456,30 @@ export async function listGroupMessages(userId, groupId, { limit = 100, afterId 
     )).reverse();
 
   const members = (await membersOf(db, [groupId])).get(Number(groupId)) || [];
-  return { group: { ...group, members, member_count: members.length }, messages: rows };
+  return { group: { ...group, members, member_count: members.length }, messages: await withMentions(db, rows) };
 }
 
-export async function postGroupMessage(userId, groupId, body) {
+/** Posts to a group and notifies the members it tags, all in one transaction. */
+export async function postGroupMessage(userId, groupId, body, mentionIds) {
   const db = await getDb();
   if (!(await isMember(db, groupId, userId))) throw forbidden('You are not in that group.');
 
-  const id = await db.insert(
-    'INSERT INTO chat_group_messages (group_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)',
-    [groupId, userId, body, nowIso()],
-  );
-  return db.get(
-    `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
-       FROM chat_group_messages c
-       JOIN users u ON u.id = c.sender_id
-      WHERE c.id = ?`,
-    [id],
-  );
+  return db.transaction(async (tx) => {
+    const id = await tx.insert(
+      'INSERT INTO chat_group_messages (group_id, sender_id, body, created_at) VALUES (?, ?, ?, ?)',
+      [groupId, userId, body, nowIso()],
+    );
+    await recordMentions(tx, { groupId, messageId: id, senderId: userId, body, mentionIds });
+    const rows = await tx.query(
+      `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
+         FROM chat_group_messages c
+         JOIN users u ON u.id = c.sender_id
+        WHERE c.id = ?`,
+      [id],
+    );
+    const [message] = await withMentions(tx, rows);
+    return message;
+  });
 }
 
 /**
@@ -369,7 +566,11 @@ export async function groupsUnreadTotal(userId) {
   return Number(row?.c || 0);
 }
 
-export async function updateGroupMessage(userId, groupId, messageId, body) {
+/**
+ * Edits one of the caller's own messages. When `mentionIds` is sent the tags are
+ * rebuilt from the new text, so removing a name from the message removes the tag.
+ */
+export async function updateGroupMessage(userId, groupId, messageId, body, mentionIds) {
   const db = await getDb();
   if (!(await isMember(db, groupId, userId))) throw forbidden('You are not in that group.');
   const row = await db.get('SELECT * FROM chat_group_messages WHERE id = ? AND group_id = ?', [messageId, groupId]);
@@ -388,14 +589,22 @@ export async function updateGroupMessage(userId, groupId, messageId, body) {
     }
   }
 
-  await db.run('UPDATE chat_group_messages SET body = ? WHERE id = ?', [body, messageId]);
-  return db.get(
-    `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
-       FROM chat_group_messages c
-       JOIN users u ON u.id = c.sender_id
-      WHERE c.id = ?`,
-    [messageId],
-  );
+  return db.transaction(async (tx) => {
+    await tx.run('UPDATE chat_group_messages SET body = ? WHERE id = ?', [body, messageId]);
+    if (mentionIds !== undefined) {
+      await tx.run('DELETE FROM chat_group_message_mentions WHERE message_id = ?', [messageId]);
+      await recordMentions(tx, { groupId, messageId, senderId: userId, body, mentionIds });
+    }
+    const rows = await tx.query(
+      `SELECT c.id, c.group_id, c.sender_id, c.body, c.created_at, ${SENDER_COLUMNS}
+         FROM chat_group_messages c
+         JOIN users u ON u.id = c.sender_id
+        WHERE c.id = ?`,
+      [messageId],
+    );
+    const [message] = await withMentions(tx, rows);
+    return message;
+  });
 }
 
 export async function deleteGroupMessage(userId, groupId, messageId) {
@@ -405,6 +614,9 @@ export async function deleteGroupMessage(userId, groupId, messageId) {
   if (!row) throw notFound('That message no longer exists.');
   if (Number(row.sender_id) !== Number(userId)) throw forbidden('You can only delete your own messages.');
 
-  await db.run('DELETE FROM chat_group_messages WHERE id = ?', [messageId]);
+  await db.transaction(async (tx) => {
+    await tx.run('DELETE FROM chat_group_message_mentions WHERE message_id = ?', [messageId]);
+    await tx.run('DELETE FROM chat_group_messages WHERE id = ?', [messageId]);
+  });
   return true;
 }

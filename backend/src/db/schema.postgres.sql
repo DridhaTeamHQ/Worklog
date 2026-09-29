@@ -247,6 +247,16 @@ CREATE TABLE IF NOT EXISTS chat_group_messages (
 );
 CREATE INDEX IF NOT EXISTS idx_group_messages_room ON chat_group_messages (group_id, id DESC);
 
+-- Who was tagged in a group message — the same stored-row rule as the team channel,
+-- and only ever a member of that group: you cannot tag somebody into a room they
+-- cannot open.
+CREATE TABLE IF NOT EXISTS chat_group_message_mentions (
+  message_id INTEGER NOT NULL REFERENCES chat_group_messages (id) ON DELETE CASCADE,
+  user_id    INTEGER NOT NULL REFERENCES users (id) ON DELETE CASCADE,
+  PRIMARY KEY (message_id, user_id)
+);
+CREATE INDEX IF NOT EXISTS idx_group_mentions_user ON chat_group_message_mentions (user_id, message_id DESC);
+
 -- How far each member has read each group, the same high-water mark the team
 -- channel uses — one row per member per group rather than per message.
 CREATE TABLE IF NOT EXISTS chat_group_reads (

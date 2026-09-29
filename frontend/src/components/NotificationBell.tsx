@@ -42,6 +42,10 @@ export function NotificationBell() {
       navigate(`${base}/chat?room=team`);
       return;
     }
+    if (n.type === 'group_mention' && n.related_group_id) {
+      navigate(`${base}/chat?group=${n.related_group_id}`);
+      return;
+    }
     if (n.related_ticket_id) {
       navigate(`${base}/tickets?highlight=${n.related_ticket_id}`);
       return;

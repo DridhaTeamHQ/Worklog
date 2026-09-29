@@ -16,6 +16,7 @@ const TYPE_LABEL: Record<NotificationType, string> = {
   ticket_raised: 'Ticket raised',
   ticket_updated: 'Ticket updated',
   chat_mention: 'Mentioned in Team Chat',
+  group_mention: 'Mentioned in a group',
   general: 'General',
 };
 
@@ -39,6 +40,10 @@ export function NotificationsPage() {
        notification hands over a ?highlight. */
     if (n.type === 'chat_mention') {
       navigate(`${base}/chat?room=team`);
+      return;
+    }
+    if (n.type === 'group_mention' && n.related_group_id) {
+      navigate(`${base}/chat?group=${n.related_group_id}`);
       return;
     }
     if (n.related_ticket_id) {
@@ -105,7 +110,8 @@ export function NotificationsPage() {
         ) : (
           <ul className="divide-y divide-border">
             {visible.map((n) => {
-              const clickable = Boolean(n.related_task_id || n.related_ticket_id || n.type === 'chat_mention');
+              const clickable = Boolean(n.related_task_id || n.related_ticket_id || n.type === 'chat_mention'
+                || (n.type === 'group_mention' && n.related_group_id));
               const Tag = clickable ? 'button' : 'div';
               return (
                 <li key={n.id}>

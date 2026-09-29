@@ -28,7 +28,7 @@ import {
   updateTeamMessage, deleteTeamMessage,
 } from '../models/teamChat.js';
 import {
-  listGroups, createGroup, renameGroup, listGroupMessages,
+  listGroups, createGroup, renameGroup, deleteGroup, addGroupMembers, removeGroupMember, listGroupMessages,
   postGroupMessage, markGroupRead, groupsUnreadTotal, searchGroups,
   updateGroupMessage, deleteGroupMessage,
 } from '../models/groupChat.js';
@@ -168,6 +168,27 @@ export const renameGroupRoom = asyncHandler(async (req, res) => {
   return ok(res, group);
 });
 
+/** Manager-level. Returns the group with its updated member list. */
+export const addMembersToGroup = asyncHandler(async (req, res) => {
+  const group = await addGroupMembers(parseId(req.params.groupId, 'group id'), req.body.memberIds);
+  return ok(res, group);
+});
+
+/** Manager-level. Returns the group with its updated member list. */
+export const removeMemberFromGroup = asyncHandler(async (req, res) => {
+  const group = await removeGroupMember(
+    parseId(req.params.groupId, 'group id'),
+    parseId(req.params.userId),
+  );
+  return ok(res, group);
+});
+
+/** Manager-level delete. Takes the whole conversation with it for every member. */
+export const deleteGroupRoom = asyncHandler(async (req, res) => {
+  await deleteGroup(parseId(req.params.groupId, 'group id'));
+  return ok(res, { message: 'Group deleted.' });
+});
+
 /** One group. Opening it marks it read, as every other room here does. */
 export const groupMessages = asyncHandler(async (req, res) => {
   const groupId = parseId(req.params.groupId);
@@ -179,7 +200,7 @@ export const groupMessages = asyncHandler(async (req, res) => {
 
 export const postToGroup = asyncHandler(async (req, res) => {
   const groupId = parseId(req.params.groupId);
-  const message = await postGroupMessage(req.user.id, groupId, req.body.body);
+  const message = await postGroupMessage(req.user.id, groupId, req.body.body, req.body.mentions);
   // Posting is reading: the author has seen everything above their own message.
   await markGroupRead(req.user.id, groupId);
   return created(res, message);
@@ -252,7 +273,7 @@ export const removeTeamMessage = asyncHandler(async (req, res) => {
 export const editGroupMessage = asyncHandler(async (req, res) => {
   const groupId = parseId(req.params.groupId, 'group id');
   const messageId = parseId(req.params.messageId, 'message id');
-  const message = await updateGroupMessage(req.user.id, groupId, messageId, req.body.body);
+  const message = await updateGroupMessage(req.user.id, groupId, messageId, req.body.body, req.body.mentions);
   return ok(res, message);
 });
 

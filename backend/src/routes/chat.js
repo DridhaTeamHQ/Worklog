@@ -5,7 +5,7 @@ import { validate, safeText } from '../middleware/validate.js';
 import {
   contacts, unread, conversation, send, markRead, clearAll,
   teamMessages, postToTeam, markTeamChannelRead,
-  groups, createGroupRoom, renameGroupRoom, groupMessages, postToGroup, markGroupRoomRead,
+  groups, createGroupRoom, renameGroupRoom, deleteGroupRoom, addMembersToGroup, removeMemberFromGroup, groupMessages, postToGroup, markGroupRoomRead,
   search,
   editMessage, removeMessage, editTeamMessage, removeTeamMessage, editGroupMessage, removeGroupMessage,
   uploadFile,
@@ -84,9 +84,15 @@ const teamPostSchema = z.object({
  *   - Reading and posting is participation, so it is gated on membership inside the
  *     model instead. An admin who is not in a group cannot read it.
  */
+// Posting and editing in a group take the same `mentions` field as the team channel,
+// narrowed further by the model to members of that group.
 const createGroupSchema = z.object({
   name: safeText(80, 'Group name'),
   memberIds: z.array(z.coerce.number().int().positive()).min(1, 'Pick at least one person.').max(200),
+});
+
+const addMembersSchema = z.object({
+  memberIds: z.array(z.coerce.number().int().positive()).min(1, 'Pick at least one person to add.').max(200),
 });
 
 const renameGroupSchema = z.object({
@@ -96,9 +102,12 @@ const renameGroupSchema = z.object({
 router.get('/groups', groups);
 router.post('/groups', requireManager, validate(createGroupSchema), createGroupRoom);
 router.patch('/groups/:groupId', requireManager, validate(renameGroupSchema), renameGroupRoom);
+router.delete('/groups/:groupId', requireManager, deleteGroupRoom);
+router.post('/groups/:groupId/members', requireManager, validate(addMembersSchema), addMembersToGroup);
+router.delete('/groups/:groupId/members/:userId', requireManager, removeMemberFromGroup);
 router.get('/groups/:groupId/messages', validate(conversationQuery, 'query'), groupMessages);
-router.post('/groups/:groupId/messages', validate(sendSchema), postToGroup);
-router.patch('/groups/:groupId/messages/:messageId', validate(sendSchema), editGroupMessage);
+router.post('/groups/:groupId/messages', validate(teamPostSchema), postToGroup);
+router.patch('/groups/:groupId/messages/:messageId', validate(teamPostSchema), editGroupMessage);
 router.delete('/groups/:groupId/messages/:messageId', removeGroupMessage);
 router.patch('/groups/:groupId/read', markGroupRoomRead);
 
